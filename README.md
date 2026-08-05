@@ -17,7 +17,7 @@ dashboard — so you can run and manage everything with or without a terminal.
 
 > 📖 **[راهنمای فارسی (Persian) — README_FA.md](README_FA.md)**
 >
-> Telegram: **[@BlackProtocols](https://t.me/BlackProtocols)**
+> Telegram: **[@devmahdi_com](https://t.me/devmahdi_com)**
 
 ---
 
