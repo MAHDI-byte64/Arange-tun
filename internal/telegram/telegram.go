@@ -632,13 +632,7 @@ func webUIText() string {
 
 func supportText() string {
 	return "GitHub : https://github.com/mahdi-byte64\n" +
-		"Channel : https://t.me/BlackProtocols\n\n" +
-		"🔺 Tron [ TRX ] :\n" +
-		"TTzuUAtsEsrLgNpFVLNTyLVJVRRFNWESYc\n\n" +
-		"💠 USDT [ BEP20 ] :\n" +
-		"0xc112AE9bfF7c59dEcFb34E988A397848D3093E82\n\n" +
-		"💎 Gram [ TON ] :\n" +
-		"UQD9g40QubAICJ6zPqegtCY7s-joMx2DB8aIqA0xF1aHoCDs"
+		"Telegram : https://t.me/devmahdi_com"
 }
 
 func sleepCtx(ctx context.Context, d time.Duration) {
