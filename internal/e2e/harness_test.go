@@ -35,9 +35,16 @@ const tunnelReadyTimeout = 20 * time.Second
 // later. A failure to bind is fatal in the engine, which takes the whole test
 // binary down with it — so ports are handed out from a private range instead,
 // never reused within a run, and checked free on both TCP and UDP first.
+//
+// That private range stays BELOW the ephemeral port range (Linux defaults to
+// 32768–60999). Overlapping it is the remaining source of the intermittent
+// "bind: address already in use": between freePort checking a port and the
+// tunnel binding it, an outbound dial elsewhere in the suite can be assigned
+// that exact number as its source port. Handing out only ports under 32768
+// closes that window — the kernel never picks these for an outbound socket.
 var (
 	portMu   sync.Mutex
-	nextPort = 34000 + (int(time.Now().UnixNano()/1e6) % 8000)
+	nextPort = 20000 + (int(time.Now().UnixNano()/1e6) % 8000)
 	issued   = map[int]bool{}
 )
 
@@ -49,8 +56,8 @@ func freePort(t *testing.T) int {
 	for attempts := 0; attempts < 4000; attempts++ {
 		port := nextPort
 		nextPort++
-		if nextPort > 60000 {
-			nextPort = 34000
+		if nextPort > 32000 {
+			nextPort = 20000
 		}
 		if issued[port] || !portFree(port) {
 			continue
