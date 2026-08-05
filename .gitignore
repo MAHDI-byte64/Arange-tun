@@ -1,0 +1,15 @@
+# Build artifacts
+/arange-tun
+/dist/
+/release/
+
+# Go module cache accidentally copied into the project (must live outside it)
+/go/
+
+# Vendored deps are optional to commit; uncomment to keep the repo small.
+# /vendor/
+
+# OS / editor cruft
+.DS_Store
+*.log
+*.swp
