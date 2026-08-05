@@ -235,8 +235,10 @@ WSS and WSS Mux, with connection pooling.
 **Monitoring**
 
 - **Web dashboard (port 7777)** — dark UI matching the CLI, with live
-  CPU/RAM/disk/traffic and per-tunnel status, ping and logs. Backup, Telegram
-  setup and the panel password live in Settings. Monitoring only.
+  CPU/RAM/disk/traffic and per-tunnel status, ping and logs. Create tunnels
+  (server or client, every transport and preset, with the same advanced tuning
+  as the CLI), then restart or delete them — all from the dashboard. Backup,
+  Telegram setup and the panel password live in Settings.
 - **Metrics** — traffic and connections on every transport and, on KCP,
   retransmits, loss and packets repaired by FEC. Totals are kept across restarts.
 - **Health Check** — tests the server, the panel and every tunnel, printing a fix
