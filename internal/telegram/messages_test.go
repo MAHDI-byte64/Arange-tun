@@ -66,12 +66,7 @@ func TestSystemTextIsTrimmed(t *testing.T) {
 
 func TestSupportTextFormat(t *testing.T) {
 	got := supportText()
-	for _, want := range []string{
-		"GitHub : ", "Channel : ",
-		"🔺 Tron [ TRX ] :",
-		"💠 USDT [ BEP20 ] :",
-		"💎 Gram [ TON ] :",
-	} {
+	for _, want := range []string{"GitHub : ", "Telegram : "} {
 		if !strings.Contains(got, want) {
 			t.Errorf("support text is missing %q:\n%s", want, got)
 		}
