@@ -178,9 +178,10 @@ func Serve() error {
 	// deliberately run elsewhere — in the arange-tun-monitor service. See
 	// internal/monitor for why.
 
-	// The panel is a monitoring dashboard: live stats, tunnel state and logs.
-	// Tunnels are created and managed from the CLI; the only mutating actions
-	// here are panel-scoped (password, port, self-update).
+	// The panel is a monitoring dashboard — live stats, tunnel state and logs —
+	// that can also build and manage tunnels: creating, restarting and deleting
+	// them over the web, the same operations the CLI menu offers. The remaining
+	// mutating actions are panel-scoped (password, port, self-update).
 	mux := http.NewServeMux()
 	mux.HandleFunc("/login", srv.handleLogin)
 	mux.HandleFunc("/login2fa", srv.handleLogin2FA)
@@ -190,6 +191,10 @@ func Serve() error {
 	// or a Prometheus scraper can watch without holding a browser session.
 	mux.HandleFunc("/api/stats", srv.requireReadAuth(srv.handleStats))
 	mux.HandleFunc("/api/tunnels", srv.requireReadAuth(srv.handleTunnels))
+	// Tunnel lifecycle — admin-only, since these build and tear down tunnels.
+	mux.HandleFunc("/api/tunnels/create", srv.requireAuth(srv.handleTunnelCreate))
+	mux.HandleFunc("/api/tunnels/delete", srv.requireAuth(srv.handleTunnelDelete))
+	mux.HandleFunc("/api/tunnels/restart", srv.requireAuth(srv.handleTunnelRestart))
 	mux.HandleFunc("/metrics", srv.requireReadAuth(srv.handlePrometheus))
 	mux.HandleFunc("/api/logs", srv.requireAuth(srv.handleLogs))
 	mux.HandleFunc("/api/password", srv.requireAuth(srv.handlePassword))

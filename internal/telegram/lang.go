@@ -39,7 +39,7 @@ var fa = map[string]string{
 	"🗑 Tunnel *%s* no longer exists": "🗑 تونل *%s* دیگر وجود ندارد",
 
 	// Release announcement
-	"⬆️ Arange-tun %s has been released (you are on %s).":                                            "⬆️ نسخه %s بک‌پک منتشر شد (نسخه فعلی شما %s است).",
+	"⬆️ Arange-tun %s has been released (you are on %s).":                                            "⬆️ نسخه %s آرنج‌تان منتشر شد (نسخه فعلی شما %s است).",
 	"Update from the CLI: sudo arange-tun → Update.":                                                 "برای به‌روزرسانی در ترمینال: sudo arange-tun ← Update.",
 	"It saves a restore point first and rolls back by itself if the tunnel does not come back up.": "ابتدا یک نقطه بازیابی می‌سازد و اگر تونل بالا نیامد، خودش برمی‌گردد.",
 	// Status report
