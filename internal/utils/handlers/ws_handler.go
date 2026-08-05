@@ -6,9 +6,9 @@ import (
 	"io"
 	"net"
 
+	"github.com/gorilla/websocket"
 	"github.com/mahdi-byte64/arange-tun/internal/metrics"
 	"github.com/mahdi-byte64/arange-tun/internal/web"
-	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 )
 
