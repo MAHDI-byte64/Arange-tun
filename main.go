@@ -1,0 +1,106 @@
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/mahdi-byte64/arange-tun/cmd"
+	"github.com/mahdi-byte64/arange-tun/internal/app"
+	"github.com/mahdi-byte64/arange-tun/internal/localproxy"
+	"github.com/mahdi-byte64/arange-tun/internal/manage"
+	"github.com/mahdi-byte64/arange-tun/internal/menu"
+	"github.com/mahdi-byte64/arange-tun/internal/monitor"
+	"github.com/mahdi-byte64/arange-tun/internal/telegram"
+	"github.com/mahdi-byte64/arange-tun/internal/utils"
+	"github.com/mahdi-byte64/arange-tun/internal/webui"
+)
+
+var logger = utils.NewLogger("info")
+
+// main has two modes:
+//
+//   - Engine mode:  `arange-tun -c /etc/arange-tun/<name>.toml`
+//     Runs a single tunnel (server or client). This is what the systemd
+//     units execute. Behaviour is identical to the original engine.
+//
+//   - Menu mode:    `arange-tun`  (no arguments)
+//     Opens the interactive management CLI on the VPS.
+func main() {
+	configPath := flag.String("c", "", "path to a tunnel configuration file (TOML) — runs in engine mode")
+	showVersion := flag.Bool("v", false, "print the version and exit")
+	restartAll := flag.Bool("restart-all", false, "restart every configured tunnel and exit (used by the auto-refresh job)")
+	tgReport := flag.Bool("telegram-report", false, "send a Telegram status report and exit (used by the scheduled job)")
+	webPanel := flag.Bool("webui", false, "run the web panel (used by the arange-tun-webui service)")
+	monitorMode := flag.Bool("monitor", false, "run the watchdog, Telegram bot and alerts (used by the arange-tun-monitor service)")
+	proxyMode := flag.Bool("proxy", false, "run the built-in SOCKS5/HTTP proxy (used by the arange-tun-proxy service)")
+	flag.Parse()
+
+	switch {
+	case *showVersion:
+		fmt.Println(app.Version)
+		return
+	case *restartAll:
+		ok, failed := manage.RestartAll()
+		fmt.Printf("restarted %d tunnels, %d failed\n", ok, failed)
+		return
+	case *tgReport:
+		if err := telegram.SendStatusNow(); err != nil {
+			logger.Errorf("telegram report failed: %v", err)
+			os.Exit(1)
+		}
+		return
+	case *webPanel:
+		if err := webui.Serve(); err != nil {
+			logger.Fatalf("web panel failed: %v", err)
+		}
+		return
+	case *monitorMode:
+		monitor.Run()
+		return
+	case *proxyMode:
+		runProxy()
+		return
+	}
+
+	// No config file -> interactive menu.
+	if *configPath == "" {
+		menu.Run()
+		return
+	}
+
+	runEngine(*configPath)
+}
+
+// runProxy runs the built-in proxy until a termination signal arrives. The
+// proxy is a plain loopback service; the tunnel forwards to it like any backend.
+func runProxy() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	go localproxy.Run(ctx)
+	<-sigChan
+	cancel()
+	logger.Info("arange-tun proxy stopped")
+}
+
+// runEngine starts a single tunnel from a TOML config and blocks until a
+// termination signal arrives, then shuts down gracefully.
+func runEngine(configPath string) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	go cmd.Run(configPath, ctx)
+
+	<-sigChan
+	cancel()
+	time.Sleep(1 * time.Second)
+	logger.Info("arange-tun engine stopped")
+}

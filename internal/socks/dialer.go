@@ -1,0 +1,139 @@
+package socks
+
+import (
+	"context"
+	"encoding/binary"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"strconv"
+	"time"
+)
+
+// Dial connects to targetHost:targetPort through a SOCKS5 proxy at proxyAddr,
+// authenticating with username/password.
+func Dial(proxyAddr, user, pass, targetHost string, targetPort int) (net.Conn, error) {
+	conn, err := net.DialTimeout("tcp", proxyAddr, 15*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	if err := Negotiate(conn, user, pass, targetHost, targetPort); err != nil {
+		conn.Close()
+		return nil, err
+	}
+	return conn, nil
+}
+
+// Negotiate runs the SOCKS5 handshake on a connection that is already open to
+// the proxy, leaving it connected to targetHost:targetPort.
+//
+// It is separate from Dial because the tunnel has to open that connection
+// itself: the socket a tunnel dials carries its buffer sizes, its congestion
+// control, its keepalive and its MSS, and a connection opened by a plain
+// net.Dial here would have none of them. The handshake is the same either way,
+// so only the dialling differs.
+func Negotiate(conn net.Conn, user, pass, host string, port int) error {
+	conn.SetDeadline(time.Now().Add(20 * time.Second))
+
+	// With no credentials, offer no-auth; otherwise offer username/password.
+	// A proxy that binds loopback behind an authenticated tunnel takes no-auth,
+	// so the same client dials both.
+	noAuth := user == "" && pass == ""
+	want := byte(authUP)
+	if noAuth {
+		want = authNone
+	}
+	if _, err := conn.Write([]byte{ver5, 0x01, want}); err != nil {
+		return err
+	}
+	resp := make([]byte, 2)
+	if _, err := io.ReadFull(conn, resp); err != nil {
+		return err
+	}
+	if resp[0] != ver5 || resp[1] != want {
+		return fmt.Errorf("socks5: proxy rejected the offered auth method")
+	}
+
+	if !noAuth {
+		// Username/password sub-negotiation.
+		auth := []byte{0x01, byte(len(user))}
+		auth = append(auth, user...)
+		auth = append(auth, byte(len(pass)))
+		auth = append(auth, pass...)
+		if _, err := conn.Write(auth); err != nil {
+			return err
+		}
+		ar := make([]byte, 2)
+		if _, err := io.ReadFull(conn, ar); err != nil {
+			return err
+		}
+		if ar[1] != 0x00 {
+			return fmt.Errorf("socks5: authentication failed")
+		}
+	}
+
+	// CONNECT request (domain address type).
+	req := []byte{ver5, cmdConn, 0x00, atypHost, byte(len(host))}
+	req = append(req, host...)
+	p := make([]byte, 2)
+	binary.BigEndian.PutUint16(p, uint16(port))
+	req = append(req, p...)
+	if _, err := conn.Write(req); err != nil {
+		return err
+	}
+
+	// Reply: VER REP RSV ATYP ...
+	head := make([]byte, 4)
+	if _, err := io.ReadFull(conn, head); err != nil {
+		return err
+	}
+	if head[1] != repOK {
+		return fmt.Errorf("socks5: connect failed (code %d)", head[1])
+	}
+	// Consume the bound address and port.
+	//
+	// These errors are returned rather than ignored: leaving unread bytes in
+	// the socket does not fail here, it fails later — the next read is the
+	// caller's, which parses the leftovers as the start of its own response.
+	// The symptom is a request that mysteriously returns garbage instead of a
+	// connection error, which is far harder to diagnose than the real fault.
+	var skip int
+	switch head[3] {
+	case atypIPv4:
+		skip = 4 + 2
+	case atypIPv6:
+		skip = 16 + 2
+	case atypHost:
+		l := make([]byte, 1)
+		if _, err := io.ReadFull(conn, l); err != nil {
+			return fmt.Errorf("socks5: reading the bound address length: %w", err)
+		}
+		skip = int(l[0]) + 2
+	default:
+		return fmt.Errorf("socks5: unknown address type %d in reply", head[3])
+	}
+	if _, err := io.ReadFull(conn, make([]byte, skip)); err != nil {
+		return fmt.Errorf("socks5: reading the bound address: %w", err)
+	}
+	conn.SetDeadline(time.Time{})
+	return nil
+}
+
+// HTTPClient returns an *http.Client whose connections are tunnelled through
+// the SOCKS5 proxy at proxyAddr using the given credentials.
+func HTTPClient(proxyAddr, user, pass string, timeout time.Duration) *http.Client {
+	return &http.Client{
+		Timeout: timeout,
+		Transport: &http.Transport{
+			DialContext: func(_ context.Context, _, addr string) (net.Conn, error) {
+				host, portStr, err := net.SplitHostPort(addr)
+				if err != nil {
+					return nil, err
+				}
+				port, _ := strconv.Atoi(portStr)
+				return Dial(proxyAddr, user, pass, host, port)
+			},
+		},
+	}
+}
