@@ -227,14 +227,14 @@ func TestSummaryReportsOffState(t *testing.T) {
 
 func TestCommandParsing(t *testing.T) {
 	cases := map[string]string{
-		"/status":             "status",
+		"/status":               "status",
 		"/status@arange-tunbot": "status",
-		"/System":             "system",
-		"/metrics extra arg":  "metrics",
-		"  /help  ":           "help",
-		"hello":               "",
-		"":                    "",
-		"/":                   "",
+		"/System":               "system",
+		"/metrics extra arg":    "metrics",
+		"  /help  ":             "help",
+		"hello":                 "",
+		"":                      "",
+		"/":                     "",
 	}
 	for in, want := range cases {
 		if got := command(in); got != want {

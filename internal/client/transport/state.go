@@ -5,8 +5,8 @@ import (
 	"net"
 	"sync"
 
-	"github.com/mahdi-byte64/arange-tun/internal/web"
 	"github.com/gorilla/websocket"
+	"github.com/mahdi-byte64/arange-tun/internal/web"
 )
 
 // A client transport rebuilds its state on every reconnect: Restart() swaps the
