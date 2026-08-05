@@ -4,16 +4,11 @@
 #
 #   bash <(curl -fsSL https://raw.githubusercontent.com/mahdi-byte64/Arange-tun/main/install.sh)
 #
-# It downloads the prebuilt release tar.gz for this architecture into
-# /root/Arange-tun and installs the binary, verifying it against the checksum
-# published with the release. If run inside a source checkout and the download
-# fails, it builds from source as a last resort.
-#
-# A server that cannot reach GitHub at all installs offline instead: download
-# the archive on a machine that can, copy it over, and follow the offline steps
-# in the README. Third-party GitHub proxies are deliberately not used — the
-# archive and its checksum would arrive through the same proxy, so verifying
-# one against the other would prove nothing.
+# It builds Arange-tun from source: if run inside a source checkout it builds
+# that; otherwise it downloads the current source from GitHub into
+# /root/Arange-tun and builds it there. Go is installed automatically if the
+# machine does not already have a new enough toolchain. No prebuilt releases are
+# used — the binary is always compiled from the source you can read in this repo.
 #
 # When it finishes it opens the menu automatically (on an interactive terminal).
 # Later, reopen it any time with:  sudo arange-tun
@@ -26,10 +21,10 @@ warn() { echo -e "${GRAY}[!]${NC} $*"; }
 err()  { echo -e "${RED}[x]${NC} $*" >&2; }
 
 REPO="mahdi-byte64/Arange-tun"
+BRANCH="main"
 BIN_PATH="/usr/local/bin/arange-tun"
 INSTALL_DIR="/root/Arange-tun"
 GO_VERSION="1.24.5"
-# toolchain already on the machine is not usable for a source build.
 GO_MIN_MINOR=24
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-/tmp}")" 2>/dev/null && pwd || echo /tmp)"
 
@@ -41,110 +36,15 @@ case "$(uname -m)" in
   *) err "Unsupported architecture: $(uname -m)"; exit 1 ;;
 esac
 
-ASSET="arange-tun_linux_${ARCH}.tar.gz"
 mkdir -p /etc/arange-tun "$INSTALL_DIR/backups"
 
 # fetch <url> <out> — straight to GitHub, so TLS terminates there.
 fetch() {
-  local url="$1" out="$2"
-  info "Downloading: ${url}"
-  curl -fSL --connect-timeout 15 "$url" -o "$out" 2>/dev/null
-}
-
-# verify_asset <file> <sumsfile>
-# Confirms the downloaded archive matches the checksum published with the
-# release. This matters most on restricted networks: the archive usually
-# arrives through a third-party mirror, and without this there is nothing
-# stopping that mirror from substituting a different binary.
-verify_asset() {
-  local file="$1" sums="$2"
-  local expected actual
-
-  expected="$(grep -E "[[:space:]]\\*?${ASSET}\$" "$sums" 2>/dev/null | awk '{print $1}' | head -1)"
-  if [[ -z "$expected" ]]; then
-    warn "No checksum published for ${ASSET} — cannot verify this download."
-    return 1
-  fi
-
-  if command -v sha256sum >/dev/null 2>&1; then
-    actual="$(sha256sum "$file" | awk '{print $1}')"
-  elif command -v shasum >/dev/null 2>&1; then
-    actual="$(shasum -a 256 "$file" | awk '{print $1}')"
-  else
-    warn "Neither sha256sum nor shasum is available — cannot verify this download."
-    return 1
-  fi
-
-  if [[ "$expected" != "$actual" ]]; then
-    err "CHECKSUM MISMATCH for ${ASSET}"
-    err "  expected: ${expected}"
-    err "  actual:   ${actual}"
-    err "The file does not match what the release publishes. It may have been"
-    err "altered in transit. Refusing to install it."
-    return 2
-  fi
-  info "Checksum verified: ${actual:0:16}..."
-  return 0
-}
-
-install_release() {
-  # 1) A local release asset next to the script (e.g. ./release/ or ./dist/).
-  for cand in "$SCRIPT_DIR/release/$ASSET" "$SCRIPT_DIR/dist/$ASSET" "$SCRIPT_DIR/$ASSET"; do
-    if [[ -f "$cand" ]]; then
-      info "Using local release asset: ${cand}"
-      cp "$cand" "$INSTALL_DIR/$ASSET"
-      # An offline install can carry SHA256SUMS beside the archive; verify it
-      # when it is there, and say plainly when it is not.
-      local localsums="$(dirname "$cand")/SHA256SUMS"
-      if [[ -f "$localsums" ]]; then
-        # `|| rc=$?` rather than a bare call: `set -e` is currently suppressed
-        # here because install_release runs inside `if`, so a bare call happens
-        # to work — but only for that reason. Moving the call site would make a
-        # failed verification kill the script instead of reaching the warning.
-        local rc=0
-        verify_asset "$INSTALL_DIR/$ASSET" "$localsums" || rc=$?
-        if [[ $rc -eq 2 ]]; then
-          rm -f "$INSTALL_DIR/$ASSET"
-          exit 1
-        fi
-      else
-        warn "No SHA256SUMS beside the local asset — installing it unverified."
-      fi
-      return 0
-    fi
-  done
-
-  # 2) The latest GitHub release.
-  fetch "https://github.com/${REPO}/releases/latest/download/${ASSET}" "$INSTALL_DIR/$ASSET" || return 1
-
-  # 3) Verify against the checksums published with the same release. An archive
-  #    that cannot be verified is not installed: this binary runs as root, and
-  #    the offline install in the README is always available as a way out.
-  if ! fetch "https://github.com/${REPO}/releases/latest/download/SHA256SUMS" "$INSTALL_DIR/SHA256SUMS"; then
-    err "Could not fetch SHA256SUMS, so the download cannot be verified."
-    err "Refusing to install it. Install offline instead — see the README."
-    rm -f "$INSTALL_DIR/$ASSET"
-    exit 1
-  fi
-  if ! verify_asset "$INSTALL_DIR/$ASSET" "$INSTALL_DIR/SHA256SUMS"; then
-    err "Refusing to install an archive that could not be verified."
-    err "Install offline instead — see the README."
-    rm -f "$INSTALL_DIR/$ASSET"
-    exit 1
-  fi
-  return 0
-}
-
-install_binary_from_tar() {
-  tar -xzf "$INSTALL_DIR/$ASSET" -C "$INSTALL_DIR" arange-tun
-  install -m 0755 "$INSTALL_DIR/arange-tun" "$BIN_PATH"
-  rm -f "$INSTALL_DIR/arange-tun"
-  echo "$INSTALL_DIR" > /etc/arange-tun/install_path
+  curl -fsSL --connect-timeout 15 "$1" -o "$2"
 }
 
 # ---------------------------------------------------------------------------
-# Build-from-source fallback (only used when the release download fails and
-# this script sits inside a source checkout).
+# Go toolchain — installed automatically when the machine has none new enough.
 # ---------------------------------------------------------------------------
 download_go() {
   local file="go${GO_VERSION}.linux-${ARCH}.tar.gz" out="$1"
@@ -164,9 +64,14 @@ go_new_enough() {
 ensure_go() {
   command -v go >/dev/null 2>&1 && go_new_enough "$(command -v go)" && { info "Go: $(go version)"; return; }
   [[ -x /usr/local/go/bin/go ]] && go_new_enough /usr/local/go/bin/go && { export PATH="/usr/local/go/bin:$PATH"; info "Go: $(go version)"; return; }
-  warn "Installing Go ${GO_VERSION}..."; download_go /tmp/go-bp.tgz || { err "Could not obtain Go."; exit 1; }
-  rm -rf /usr/local/go && tar -C /usr/local -xzf /tmp/go-bp.tgz; export PATH="/usr/local/go/bin:$PATH"; info "$(go version)"
+  warn "Installing Go ${GO_VERSION}..."; download_go /tmp/go-at.tgz || { err "Could not obtain Go."; exit 1; }
+  rm -rf /usr/local/go && tar -C /usr/local -xzf /tmp/go-at.tgz; export PATH="/usr/local/go/bin:$PATH"; info "$(go version)"
 }
+
+# ---------------------------------------------------------------------------
+# Build. build_from_source compiles whatever is in SCRIPT_DIR; fetch_source
+# downloads the current source from GitHub first when there is no local checkout.
+# ---------------------------------------------------------------------------
 build_from_source() {
   cd "$SCRIPT_DIR"
   ensure_go; export PATH="/usr/local/go/bin:$PATH"
@@ -178,20 +83,30 @@ build_from_source() {
   echo "$INSTALL_DIR" > /etc/arange-tun/install_path
 }
 
-if install_release; then
-  install_binary_from_tar
-  info "Installed release binary -> ${BIN_PATH}"
-elif [[ -f "$SCRIPT_DIR/go.mod" && -f "$SCRIPT_DIR/main.go" ]]; then
-  warn "Release download failed — building from source instead."
+fetch_source() {
+  local url="https://github.com/${REPO}/archive/refs/heads/${BRANCH}.tar.gz"
+  local tarball="$INSTALL_DIR/source.tar.gz"
+  info "Downloading source from ${REPO}@${BRANCH}..."
+  fetch "$url" "$tarball" || {
+    err "Could not download the source from GitHub. This server may not be able"
+    err "to reach github.com. Clone the repo on a machine that can and run"
+    err "'sudo bash install.sh' inside the clone."
+    exit 1
+  }
+  rm -rf "$INSTALL_DIR/src"; mkdir -p "$INSTALL_DIR/src"
+  tar xzf "$tarball" -C "$INSTALL_DIR/src" --strip-components=1
+  rm -f "$tarball"
+  SCRIPT_DIR="$INSTALL_DIR/src"
+}
+
+if [[ -f "$SCRIPT_DIR/go.mod" && -f "$SCRIPT_DIR/main.go" ]]; then
+  info "Building from the local source checkout."
   build_from_source
-  info "Built and installed -> ${BIN_PATH}"
 else
-  err "Could not download the release, and no source checkout was found here."
-  err "This server may not be able to reach GitHub. Install offline instead:"
-  err "download the archive on a machine that can, copy it over, and follow the"
-  err "offline steps in the README. Or clone the repo and run install.sh inside it."
-  exit 1
+  fetch_source
+  build_from_source
 fi
+info "Built and installed -> ${BIN_PATH}"
 
 chmod +x "$BIN_PATH"
 echo
