@@ -8,7 +8,7 @@ single self-contained binary with an interactive **CLI** and a secured **web
 dashboard**, so you can run and manage everything with or without a terminal.
 
 > 📖 راهنمای فارسی: **[README_FA.md](README_FA.md)** · Telegram: **[@devmahdi_com](https://t.me/devmahdi_com)**
-نکته:این پروژه یک فورم از یک پک می‌باشد (صرفا ظاهر پنل و cli)
+نکته:این پروژه یک فورک از بک پک می‌باشد (صرفا ظاهر پنل و cli)
 ---
 
 ## How it works
