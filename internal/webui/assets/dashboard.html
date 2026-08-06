@@ -462,6 +462,37 @@
 
   /* ---------- tunnels ---------- */
   .grid-tun{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(310px,1fr))}
+
+  /* ---------- pages (Overview / Control Center) ---------- */
+  .pagehdr{display:flex;align-items:center;gap:10px;margin:2px 2px 18px}
+  .pagehdr h2{font-size:19px;font-weight:800;letter-spacing:-.02em}
+  .helpq{width:26px;height:26px;flex:none;border-radius:50%;border:1px solid var(--stroke);
+    background:rgba(255,255,255,.05);color:var(--muted);font:700 14px inherit;cursor:pointer;transition:.2s}
+  .helpq:hover{background:rgba(var(--accent-rgb),.16);color:var(--red-soft);border-color:rgba(var(--accent-rgb),.35)}
+  .sec h3{font-size:15px;font-weight:700;letter-spacing:-.01em}
+  .ccnote{font-size:12.5px;color:var(--muted);margin:-8px 2px 18px}
+  /* ---------- tunnel-type chooser ---------- */
+  .typegrid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .typecard{position:relative;text-align:start;padding:14px;border-radius:16px;border:1px solid var(--stroke);
+    background:rgba(255,255,255,.03);color:var(--txt);cursor:pointer;transition:.2s;font:inherit}
+  .typecard:hover{border-color:rgba(var(--accent-rgb),.4);background:rgba(var(--accent-rgb),.06);transform:translateY(-1px)}
+  .typecard .tc-name{font-size:14px;font-weight:700;margin-bottom:4px;padding-inline-end:52px}
+  .typecard .tc-desc{font-size:11.5px;color:var(--muted);line-height:1.45}
+  .typecard.soon{opacity:.8}
+  .tc-badge{position:absolute;top:10px;inset-inline-end:10px;font-size:9px;font-weight:700;letter-spacing:.03em;
+    padding:3px 7px;border-radius:999px;text-transform:uppercase}
+  .tc-badge.ready{background:rgba(var(--accent-rgb),.16);color:var(--red-soft);border:1px solid rgba(var(--accent-rgb),.3)}
+  .tc-badge.soon{background:rgba(255,255,255,.06);color:var(--muted);border:1px solid var(--stroke)}
+  /* ---------- tutorial + page help ---------- */
+  .tutbody{font-size:13.5px;line-height:1.7;color:var(--txt);max-height:60vh;overflow-y:auto}
+  .tutbody h4{font-size:13.5px;font-weight:700;margin:14px 0 6px;color:var(--red-soft)}
+  .tutbody p{margin-bottom:10px;color:var(--muted)}
+  .tutbody ol,.tutbody ul{margin:0 0 10px;padding-inline-start:1.3em;color:var(--muted)}
+  .tutbody li{margin-bottom:6px}
+  .tutbody b{color:var(--txt)}
+  .tutbody code{background:rgba(255,255,255,.06);border:1px solid var(--stroke);border-radius:6px;padding:1px 6px;font-size:12px}
+  #phbody{font-size:13.5px;line-height:1.75;color:var(--muted)}
+  #phbody b{color:var(--txt)}
   .tun{background:var(--card);border:1px solid var(--stroke);border-radius:var(--radius);
     padding:18px;backdrop-filter:blur(20px);transition:transform .3s,background .3s,border-color .3s;
     position:relative;overflow:hidden;animation:rise .5s cubic-bezier(.16,1,.3,1) both}
@@ -863,6 +894,16 @@
 
     <div class="mp-hr"></div>
 
+    <button class="menuitem" role="menuitem" onclick="menuGo(function(){go('overview')})">
+      <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+      <span class="lbl" data-i18n>Overview</span>
+      <svg class="chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+    </button>
+    <button class="menuitem" role="menuitem" onclick="menuGo(function(){go('control')})">
+      <svg class="ic" viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/><circle cx="12" cy="12" r="3"/></svg>
+      <span class="lbl" data-i18n>Control Center</span>
+      <svg class="chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+    </button>
     <button class="menuitem" role="menuitem" onclick="menuGo(openSettings)">
       <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
       <span class="lbl" data-i18n>Settings</span>
@@ -915,6 +956,14 @@
     <button class="btn-sm" onclick="openSettings();checkUpdate()" data-i18n>Update now</button>
   </div>
 
+  <!-- ===== Overview page ===== -->
+  <section id="view-overview">
+  <div class="pagehdr">
+    <h2 data-i18n>Overview</h2>
+    <button class="helpq" onclick="openPageHelp('overview')" aria-label="What does this page do?" title="What does this page do?">?</button>
+    <button class="btn-sm" style="margin-inline-start:auto" onclick="go('control')" aria-label="Go to Control Center" data-i18n>Control Center →</button>
+  </div>
+
   <div class="grid-meters">
     <div class="meter"><div class="ring" id="ring-cpu"></div>
       <div class="label"><svg class="ic" viewBox="0 0 24 24"><rect x="9" y="9" width="6" height="6"/><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></svg>CPU</div>
@@ -943,11 +992,25 @@
     <div class="pill"><div class="ico"><svg class="ic" viewBox="0 0 24 24"><path d="M8 6V5a4 4 0 018 0v1"/><path d="M5 8h14a2 2 0 012 2v8a3 3 0 01-3 3H6a3 3 0 01-3-3v-8a2 2 0 012-2z"/><path d="M9 12h6"/></svg></div><div><div class="k" data-i18n>Version</div><div class="v" id="ver">—</div></div></div>
   </div>
 
-  <div class="sec"><h2 data-i18n>Tunnels</h2><span class="count" id="tsum">0</span>
-    <button class="btn-sm" style="margin-left:auto" onclick="openNewTunnel()" aria-label="Create a new tunnel" data-i18n>New tunnel</button>
+  </section>
+
+  <!-- ===== Control Center page ===== -->
+  <section id="view-control" style="display:none">
+  <div class="pagehdr">
+    <button class="btn-sm" onclick="go('overview')" aria-label="Back to Overview" data-i18n>← Overview</button>
+    <h2 style="margin-inline-start:4px" data-i18n>Control Center</h2>
+    <button class="helpq" onclick="openPageHelp('control')" aria-label="What does this page do?" title="What does this page do?">?</button>
   </div>
+
+  <div class="sec"><h3 data-i18n>Build</h3>
+    <button class="btn-sm" style="margin-inline-start:auto" onclick="openChooser()" aria-label="Add a tunnel" data-i18n>Add tunnel</button>
+  </div>
+  <p class="ccnote" data-i18n>Pick a tunnel type, read the short setup guide, then create it.</p>
+
+  <div class="sec"><h3 data-i18n>Control</h3><span class="count" id="tsum">0</span></div>
   <div class="grid-tun" id="tunnels"></div>
-  <div class="empty" id="empty" style="display:none" data-i18n>No tunnels yet. Create one with the “New tunnel” button above.</div>
+  <div class="empty" id="empty" style="display:none" data-i18n>No tunnels yet. Use the “Add tunnel” button above to create one.</div>
+  </section>
 </div>
 
 <div class="modal" id="settings" onclick="if(event.target===this)closeSettings()">
@@ -1230,6 +1293,42 @@
   </div>
 </div>
 
+<!-- Tunnel-type chooser: the first step of Add tunnel. -->
+<div class="modal" id="chooser" onclick="if(event.target===this)closeChooser()">
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="chtitle" style="width:min(94vw,560px)">
+    <h3 id="chtitle" data-i18n>Add tunnel</h3>
+    <p data-i18n>Choose the tunnel type you want to create.</p>
+    <div class="typegrid" id="typegrid"></div>
+    <div class="actions" style="margin-top:16px">
+      <button class="btn-ghost" onclick="closeChooser()" data-i18n>Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Setup guide, shown before the create form so the tunnel is built with the
+     roles and steps understood rather than guessed. -->
+<div class="modal" id="tut" onclick="if(event.target===this)closeTut()">
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="tuttitle" style="width:min(94vw,600px)">
+    <h3 id="tuttitle">—</h3>
+    <div id="tutbody" class="tutbody"></div>
+    <div class="actions" style="margin-top:16px">
+      <button class="btn-ghost" onclick="tutBack()" data-i18n>Back</button>
+      <button class="btn-primary" id="tut-go" onclick="tutProceed()" data-i18n>Got it — continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- Per-page help: what the current page is for. -->
+<div class="modal" id="pagehelp" onclick="if(event.target===this)closePageHelp()">
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="phtitle" style="width:min(92vw,460px)">
+    <h3 id="phtitle">—</h3>
+    <div id="phbody"></div>
+    <div class="actions" style="margin-top:14px">
+      <button class="btn-ghost" onclick="closePageHelp()" data-i18n>Close</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="newtun" onclick="if(event.target===this)closeNewTunnel()">
   <div class="box" role="dialog" aria-modal="true" aria-labelledby="nttitle" style="width:min(94vw,460px)">
     <h3 id="nttitle" data-i18n>New tunnel</h3>
@@ -1237,8 +1336,8 @@
 
     <label for="nt-role" data-i18n>Side</label>
     <select id="nt-role" class="sel" onchange="ntRoleChange()">
-      <option value="server" data-i18n>Server — Iran/edge, exposes ports</option>
-      <option value="client" data-i18n>Client — kharej/origin, dials out</option>
+      <option value="server" data-i18n>🇮🇷 Iran server — exposes the ports (users connect here)</option>
+      <option value="client" data-i18n>🌍 Abroad / kharej — runs the service, dials out</option>
     </select>
 
     <label for="nt-transport" data-i18n>Transport</label>
@@ -1669,8 +1768,8 @@ const FA={
   "Build a tunnel the same way the CLI does — it is written, enabled and started right away.":
     "تونل را دقیقاً مثل خط فرمان بساز — نوشته، فعال و بلافاصله اجرا می‌شود.",
   "Side":"سمت",
-  "Server — Iran/edge, exposes ports":"سرور — ایران/لبه، پورت‌ها را نمایش می‌دهد",
-  "Client — kharej/origin, dials out":"کلاینت — خارج/مبدأ، اتصال بیرونی می‌زند",
+  "🇮🇷 Iran server — exposes the ports (users connect here)":"🇮🇷 سرور ایران — پورت‌ها را نمایش می‌دهد (کاربران به این وصل می‌شوند)",
+  "🌍 Abroad / kharej — runs the service, dials out":"🌍 خارج / kharej — سرویس را اجرا می‌کند و بیرون dial می‌زند",
   "Transport":"ترنسپورت",
   "Performance preset":"پیش‌تنظیم کارایی",
   "Balance — light on CPU/RAM":"متعادل — کم‌مصرف برای CPU/RAM",
@@ -1738,6 +1837,21 @@ const FA={
   "deleted.":"حذف شد.",
   "Restart failed.":"ری‌استارت ناموفق بود.",
   "Delete failed.":"حذف ناموفق بود.",
+  // pages + control center + add-tunnel flow
+  "Overview":"Overview",
+  "Control Center":"Control Center",
+  "Control Center →":"Control Center →",
+  "← Overview":"← Overview",
+  "Build":"ساخت",
+  "Control":"کنترل",
+  "Add tunnel":"افزودن تانل",
+  "Pick a tunnel type, read the short setup guide, then create it.":"یک نوع تانل انتخاب کن، راهنمای کوتاه را بخوان، سپس بسازش.",
+  "No tunnels yet. Use the “Add tunnel” button above to create one.":"هنوز تانلی نیست. با دکمهٔ «Add tunnel» بالا یکی بساز.",
+  "Choose the tunnel type you want to create.":"نوع تانلی که می‌خواهی بسازی را انتخاب کن.",
+  "Back":"بازگشت",
+  "Got it — continue":"متوجه شدم — ادامه",
+  "ready":"آماده",
+  "soon":"به‌زودی",
 };
 let LANG=localStorage.getItem('bp_lang')==='fa'?'fa':'en';
 
@@ -2424,6 +2538,118 @@ function toast(msg,isErr){
   clearTimeout(toastTimer);
   toastTimer=setTimeout(()=>{ el.className='toast'+(isErr?' err':''); },3400);
 }
+
+// ===== Pages: Overview / Control Center =====
+//
+// Real URLs (/overview, /control) with client-side switching — the Go panel
+// serves the dashboard for any path, so these are bookmarkable without a server
+// round-trip. The view is chosen from location.pathname and kept in step with
+// the browser's Back/Forward.
+const VIEWS={overview:'view-overview', control:'view-control'};
+function viewFromPath(p){ return p.indexOf('/control')===0 ? 'control' : 'overview'; }
+function go(view, push){
+  if(!VIEWS[view]) view='overview';
+  for(const v in VIEWS){ const el=$(VIEWS[v]); if(el) el.style.display = (v===view?'':'none'); }
+  const path='/'+view;
+  if(push!==false && location.pathname!==path){ try{ history.pushState({view:view},'',path); }catch(e){} }
+  document.title=(view==='control'?'Control Center':'Overview')+' · Arange-tun';
+  window.scrollTo(0,0);
+}
+window.addEventListener('popstate', function(e){
+  go((e.state&&e.state.view)||viewFromPath(location.pathname), false);
+});
+
+// ===== Per-page help ("?" on each page) =====
+const PAGEHELP={
+  overview:{title:{en:'Overview',fa:'Overview'},body:{
+    en:'<p>This page shows the <b>server\'s live health</b> — CPU, memory, disk and swap, plus download, upload and total traffic and the running version.</p><p>It is read-only. To <b>build or manage tunnels</b>, open the <b>Control Center</b> (button top-right, or the menu).</p>',
+    fa:'<p>این صفحه <b>سلامت زندهٔ سرور</b> را نشان می‌دهد — CPU، حافظه، دیسک و swap، به‌همراه دانلود، آپلود و کل ترافیک و نسخهٔ در حال اجرا.</p><p>فقط‌خواندنی است. برای <b>ساخت یا مدیریت تانل‌ها</b> وارد <b>Control Center</b> شوید (دکمهٔ بالا، یا منو).</p>'}},
+  control:{title:{en:'Control Center',fa:'Control Center'},body:{
+    en:'<p>Everything about tunnels lives here, in two parts:</p><p><b>Build</b> — the <b>Add tunnel</b> button lets you pick a tunnel type, read a short setup guide, then create it.</p><p><b>Control</b> — the list of your tunnels with live state, ping and logs. Open a tunnel\'s <b>Details</b> to restart or delete it.</p>',
+    fa:'<p>هرچیزی مربوط به تانل‌ها اینجاست، در دو بخش:</p><p><b>ساخت (Build)</b> — دکمهٔ <b>Add tunnel</b> اجازه می‌دهد نوع تانل را انتخاب کنی، یک راهنمای کوتاه بخوانی و بسازی.</p><p><b>کنترل (Control)</b> — فهرست تانل‌هایت با وضعیت زنده، پینگ و لاگ. برای ری‌استارت یا حذف، <b>Details</b> هر تانل را باز کن.</p>'}}
+};
+function openPageHelp(page){
+  const h=PAGEHELP[page]||PAGEHELP.overview;
+  $('phtitle').textContent=(h.title[LANG]||h.title.en);
+  $('phbody').innerHTML=(h.body[LANG]||h.body.en);
+  $('pagehelp').classList.add('on');
+}
+function closePageHelp(){ $('pagehelp').classList.remove('on'); }
+
+// ===== Tunnel types + Add-tunnel flow =====
+//
+// Only "Amin Tunnel" — the built-in Go engine — is buildable today. The rest
+// are shown as choices with their own guide and a "soon" badge, so the flow is
+// ready for them to be filled in one type at a time.
+const TUN_TYPES=[
+  {id:'amin', name:'Amin Tunnel', ready:true,  desc:{en:'The built-in engine — TCP/UDP/WS, KCP, Stealth.', fa:'موتور داخلی — TCP/UDP/WS، KCP، Stealth.'}},
+  {id:'frp', name:'frp', ready:false,          desc:{en:'Fast reverse proxy.', fa:'ریورس‌پراکسی سریع.'}},
+  {id:'rathole', name:'Rathole v2', ready:false,desc:{en:'Lightweight reverse proxy.', fa:'ریورس‌پراکسی سبک.'}},
+  {id:'backhaul', name:'Backhaul', ready:false, desc:{en:'High-performance reverse tunnel.', fa:'تونل معکوس پرسرعت.'}},
+  {id:'packet', name:'Packet', ready:false,     desc:{en:'Packet-level tunnel.', fa:'تونل در سطح پکت.'}},
+  {id:'openvpn', name:'OpenVPN Tunnel', ready:false, desc:{en:'OpenVPN-based tunnel.', fa:'تونل مبتنی بر OpenVPN.'}},
+  {id:'wireguard', name:'WireGuard Tunnel', ready:false, desc:{en:'WireGuard-based tunnel.', fa:'تونل مبتنی بر WireGuard.'}}
+];
+function openChooser(){
+  const g=$('typegrid'); g.innerHTML='';
+  TUN_TYPES.forEach(function(t){
+    const card=document.createElement('button');
+    card.className='typecard'+(t.ready?'':' soon');
+    card.type='button';
+    card.innerHTML='<span class="tc-badge '+(t.ready?'ready':'soon')+'">'+(t.ready?T('ready'):T('soon'))+'</span>'+
+      '<div class="tc-name">'+esc(t.name)+'</div>'+
+      '<div class="tc-desc">'+esc(t.desc[LANG]||t.desc.en)+'</div>';
+    card.onclick=function(){ chooseType(t.id); };
+    g.appendChild(card);
+  });
+  $('chooser').classList.add('on');
+}
+function closeChooser(){ $('chooser').classList.remove('on'); }
+
+let tutType=null;
+function chooseType(id){
+  tutType=id;
+  const t=TUN_TYPES.find(function(x){return x.id===id;})||{name:id,ready:false};
+  const tut=TUTORIALS[id]||TUTORIALS._soon(t.name);
+  $('tuttitle').textContent=(tut.title[LANG]||tut.title.en);
+  $('tutbody').innerHTML=(tut.body[LANG]||tut.body.en);
+  // Only a ready type proceeds to a create form.
+  $('tut-go').style.display=t.ready?'':'none';
+  closeChooser();
+  $('tut').classList.add('on');
+}
+function closeTut(){ $('tut').classList.remove('on'); }
+function tutBack(){ closeTut(); openChooser(); }
+function tutProceed(){ closeTut(); if(tutType==='amin') openNewTunnel(); }
+
+// Tutorials shown before the create form. _soon builds a short placeholder for
+// the types that are not buildable yet.
+const TUTORIALS={
+  amin:{title:{en:'Amin Tunnel — setup guide', fa:'امین‌تانل — راهنمای راه‌اندازی'},body:{
+    en:'<p>Amin Tunnel is a <b>reverse tunnel</b>: the client always dials out, so the machine behind it needs no open inbound port.</p>'+
+      '<h4>The two sides</h4><ul>'+
+      '<li><b>🇮🇷 Iran server</b> — the entry point. It <b>exposes the ports</b>; your users connect to the Iran IP.</li>'+
+      '<li><b>🌍 Abroad / kharej</b> — runs the real service (panel, app) and <b>dials out</b> to the Iran server.</li></ul>'+
+      '<h4>Steps</h4><ol>'+
+      '<li>Create the <b>Iran server</b> first: pick a transport and preset, set the tunnel port and the exposed ports, and copy the generated <b>64-char token</b>.</li>'+
+      '<li>Create the <b>abroad / kharej</b> side: enter the Iran server IP, the tunnel port, and the <b>same token</b>.</li>'+
+      '<li>Both ends must use the <b>same transport and token</b>. Turbo is the recommended preset.</li></ol>'+
+      '<p>Close this guide to open the form and create the tunnel.</p>',
+    fa:'<p>امین‌تانل یک <b>تونل معکوس</b> است: کلاینت همیشه به بیرون dial می‌کند، پس ماشین پشت آن نیازی به پورت ورودی باز ندارد.</p>'+
+      '<h4>دو سمت</h4><ul>'+
+      '<li><b>🇮🇷 سرور ایران</b> — نقطهٔ ورود. <b>پورت‌ها را نمایش می‌دهد</b>؛ کاربران به آی‌پی ایران وصل می‌شوند.</li>'+
+      '<li><b>🌍 خارج / kharej</b> — سرویس واقعی (پنل، اپ) را اجرا می‌کند و به سرور ایران <b>dial بیرونی</b> می‌زند.</li></ul>'+
+      '<h4>مراحل</h4><ol>'+
+      '<li>اول <b>سرور ایران</b> را بساز: ترنسپورت و پیش‌تنظیم را انتخاب کن، پورت تونل و پورت‌های نمایش‌داده‌شده را بگذار و <b>توکن ۶۴ کاراکتری</b> ساخته‌شده را کپی کن.</li>'+
+      '<li>سپس سمت <b>خارج / kharej</b> را بساز: آی‌پی سرور ایران، پورت تونل و <b>همان توکن</b> را وارد کن.</li>'+
+      '<li>هر دو سمت باید <b>ترنسپورت و توکن یکسان</b> داشته باشند. پیش‌تنظیم پیشنهادی Turbo است.</li></ol>'+
+      '<p>برای باز شدن فرم و ساخت تانل، این راهنما را ببند.</p>'}},
+  _soon:function(name){ return {
+    title:{en:name+' — coming soon', fa:name+' — به‌زودی'},body:{
+      en:'<p><b>'+esc(name)+'</b> cannot be created from the panel yet.</p><p>The chooser and this guide are in place for it; the create flow will be added in a later phase. For now, use <b>Amin Tunnel</b>.</p>',
+      fa:'<p>ساخت <b>'+esc(name)+'</b> از پنل هنوز در دسترس نیست.</p><p>منوی انتخاب و این راهنما برایش آماده است؛ روند ساخت در فازهای بعد اضافه می‌شود. فعلاً از <b>امین‌تانل</b> استفاده کن.</p>'}};
+  }
+};
 
 function openNewTunnel(){
   ntMsg('');
@@ -3472,6 +3698,11 @@ function offerInstall(){
 setTimeout(function(){
   if(document.body.classList.contains('loaded')) offerInstall();
 }, 3500);
+
+// Route to the view named by the URL (default Overview). On "/" upgrade the URL
+// to /overview so the address bar always names a page.
+try{ if(location.pathname==='/'||location.pathname===''){ history.replaceState({view:'overview'},'','/overview'); } }catch(e){}
+go(viewFromPath(location.pathname), false);
 
 setInterval(loadStats,4000);
 setInterval(loadTunnels,6000);
