@@ -56,6 +56,58 @@ func (s *server) handleTunnelCreate(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleTunnelGet returns an existing tunnel's config in the same shape the
+// create form uses, so the panel can prefill it for editing.
+func (s *server) handleTunnelGet(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimSpace(r.URL.Query().Get("name"))
+	if name == "" {
+		http.Error(w, "missing tunnel name", http.StatusBadRequest)
+		return
+	}
+	if _, ok := manage.Find(name); !ok {
+		http.Error(w, "no tunnel named "+name, http.StatusNotFound)
+		return
+	}
+	req, err := manage.TunnelForEdit(name)
+	if err != nil {
+		http.Error(w, "could not read the tunnel: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, req)
+}
+
+// handleTunnelUpdate rewrites an existing tunnel from an edited request and
+// restarts it — the web equivalent of the CLI's Edit flow, so a change no longer
+// means delete-and-recreate.
+func (s *server) handleTunnelUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxTunnelBody)
+
+	var req manage.TunnelRequest
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		http.Error(w, "could not read the request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	res, err := manage.UpdateTunnel(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]any{
+		"status":  "ok",
+		"name":    res.Name,
+		"service": res.Service,
+		"active":  res.Active,
+		"token":   res.Token,
+	})
+}
+
 // tunnelNameRequest is the body shared by the delete and restart endpoints.
 type tunnelNameRequest struct {
 	Name string `json:"name"`
