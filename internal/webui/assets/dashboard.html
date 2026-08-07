@@ -1286,6 +1286,7 @@
     <div id="histwrap"></div>
     <div id="ltwrap"></div>
     <div class="actions" style="margin-top:14px">
+      <button class="btn-ghost" onclick="editTunnel(detName)" data-i18n>Edit</button>
       <button class="btn-ghost" onclick="restartTunnel(detName)" data-i18n>Restart</button>
       <button class="btn-ghost dngr" onclick="deleteTunnel(detName)" data-i18n>Delete</button>
       <button class="btn-ghost" onclick="closeDetails()" data-i18n>Close</button>
@@ -1325,6 +1326,25 @@
     <div id="phbody"></div>
     <div class="actions" style="margin-top:14px">
       <button class="btn-ghost" onclick="closePageHelp()" data-i18n>Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Shown after a successful create, so the form does not linger. Carries the
+     generated server token, which the panel reveals only this once. -->
+<div class="modal" id="created" onclick="if(event.target===this)closeCreated()">
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="cdtitle" style="width:min(92vw,440px)">
+    <h3 id="cdtitle" data-i18n>Tunnel created</h3>
+    <p id="cdmsg"></p>
+    <div id="cdtokwrap" style="display:none">
+      <label data-i18n>Security token — copy it to the client</label>
+      <div class="upd" style="margin-bottom:6px">
+        <input id="cdtok" type="text" readonly style="margin:0" onclick="this.select()">
+        <button class="btn-sm" type="button" onclick="copyText($('cdtok').value,this)" data-i18n>Copy</button>
+      </div>
+    </div>
+    <div class="actions" style="margin-top:14px">
+      <button class="btn-primary" onclick="closeCreated()" data-i18n>Done</button>
     </div>
   </div>
 </div>
@@ -1852,6 +1872,16 @@ const FA={
   "Got it — continue":"متوجه شدم — ادامه",
   "ready":"آماده",
   "soon":"به‌زودی",
+  // edit + create result
+  "Edit":"ویرایش",
+  "Edit tunnel":"ویرایش تانل",
+  "Save changes":"ذخیرهٔ تغییرات",
+  "Saving…":"در حال ذخیره…",
+  "updated.":"به‌روزرسانی شد.",
+  "Could not load the tunnel.":"بارگذاری تانل ناموفق بود.",
+  "Tunnel created":"تانل ساخته شد",
+  "Security token — copy it to the client":"توکن امنیتی — برای کلاینت کپی کنید",
+  "Done":"تمام",
 };
 let LANG=localStorage.getItem('bp_lang')==='fa'?'fa':'en';
 
@@ -2653,6 +2683,9 @@ const TUTORIALS={
 
 function openNewTunnel(){
   ntMsg('');
+  ntEditMode='';
+  $('nttitle').textContent=T('New tunnel');
+  const nm0=$('nt-name'); nm0.readOnly=false;
   $('nt-submit').disabled=false;
   $('nt-submit').textContent=T('Create tunnel');
   // A clean form every time, so a previous attempt never leaks into the next.
@@ -2811,23 +2844,102 @@ async function submitNewTunnel(){
   }
   const adv=ntAdvanced(); if(adv) req.advanced=adv;
 
+  const editing=!!ntEditMode;
   const btn=$('nt-submit'); btn.disabled=true;
-  ntMsg(T('Creating…'));
+  ntMsg(editing?T('Saving…'):T('Creating…'));
   try{
-    const r=await fetch('/api/tunnels/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(req)});
+    const r=await fetch(editing?'/api/tunnels/update':'/api/tunnels/create',
+      {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(req)});
     if(!r.ok){ ntMsg((await r.text())||('HTTP '+r.status),true); btn.disabled=false; return; }
     const res=await r.json();
+    // Leave the form rather than lingering on it, land on the tunnel list.
+    closeNewTunnel();
     loadTunnels();
-    // The generated token is shown once, here — it is what the other side needs
-    // and the panel never reveals it again.
-    if(res.token) $('nt-token').value=res.token;
+    go('control');
     const up=res.active?T('created and started.'):T('created — check its logs, it is not active yet.');
-    ntMsg('“'+res.name+'” '+up+(req.role==='server'&&res.token?' '+T('Copy the token above for the client.'):''));
-    btn.disabled=false;
-    btn.textContent=T('Create another');
-    // Next click starts a fresh form rather than resubmitting the same one.
-    btn.onclick=()=>{ openNewTunnel(); btn.onclick=submitNewTunnel; };
+    if(editing){
+      toast('“'+res.name+'” '+T('updated.'));
+    }else if(req.role==='server' && res.token){
+      // The generated token is shown once — the client needs it — so it gets a
+      // small dialog with a copy button rather than a toast that fades.
+      $('cdmsg').textContent='“'+res.name+'” '+up;
+      $('cdtok').value=res.token;
+      $('cdtokwrap').style.display='';
+      $('created').classList.add('on');
+    }else{
+      toast('“'+res.name+'” '+up);
+    }
   }catch(e){ ntMsg(T('Network error.'),true); btn.disabled=false; }
+}
+function closeCreated(){ $('created').classList.remove('on'); }
+
+// Edit reuses the create form: the tunnel's current config is loaded into it,
+// the name is locked, and submit routes to the update endpoint instead.
+let ntEditMode='';
+async function editTunnel(name){
+  if(!name) return;
+  let req;
+  try{
+    const r=await fetch('/api/tunnels/get?name='+encodeURIComponent(name));
+    if(!r.ok){ toast((await r.text())||T('Could not load the tunnel.'),true); return; }
+    req=await r.json();
+  }catch(e){ toast(T('Network error.'),true); return; }
+  closeDetails();
+  openNewTunnel();               // start from a clean form, then fill it
+  ntEditMode=name;
+  $('nttitle').textContent=T('Edit tunnel');
+  $('nt-submit').textContent=T('Save changes');
+  const nm=$('nt-name'); nm.value=name; nm.readOnly=true; nm.dataset.touched='1';
+  ntFill(req);
+  $('newtun').classList.add('on');
+}
+function ntSetNum(id,v){ if($(id)&&v) $(id).value=v; }
+function ntFill(req){
+  $('nt-role').value=req.role||'server';
+  $('nt-transport').value=req.transport||'tcp';
+  $('nt-preset').value=req.preset||'turbo';
+  $('nt-token').value=req.token||'';
+  if(req.role==='server'){
+    $('nt-port').value=req.port||'';
+    $('nt-ipv6').checked=!!req.ipv6;
+    $('nt-ports').value=(req.ports||[]).join(', ');
+    $('nt-pp').checked=!!req.proxyProtocol;
+    if(req.tlsMode) $('nt-tlsmode').value=req.tlsMode;
+    $('nt-tlshost').value=req.tlsHost||'';
+    $('nt-acmedomain').value=req.acmeDomain||'';
+    $('nt-acmeemail').value=req.acmeEmail||'';
+    $('nt-tlscert').value=req.tlsCert||'';
+    $('nt-tlskey').value=req.tlsKey||'';
+  }else{
+    $('nt-host').value=req.serverHost||'';
+    $('nt-sport').value=req.serverPort||'';
+    $('nt-edge').value=req.edgeIP||'';
+    $('nt-proxy').value=req.proxy||'';
+    $('nt-iface').value=req.iface||'';
+    $('nt-localaddr').value=req.localAddr||'';
+    $('nt-fallback').value=(req.fallbackAddrs||[]).join(', ');
+    $('nt-lb').checked=!!req.loadBalance;
+  }
+  $('nt-simpleauth').checked=!!req.simpleAuth;
+  const a=req.advanced;
+  if(a){
+    $('nt-adv-on').checked=true;
+    if(typeof a.nodelay==='boolean') $('nt-nodelay').value=a.nodelay?'on':'off';
+    ntSetNum('nt-keepalive',a.keepAlive); ntSetNum('nt-heartbeat',a.heartbeat);
+    if(a.logLevel) $('nt-loglevel').value=a.logLevel;
+    if(a.logFormat) $('nt-logformat').value=a.logFormat;
+    ntSetNum('nt-maxconn',a.maxConnections); ntSetNum('nt-bw',a.bandwidthMbps);
+    ntSetNum('nt-channelsize',a.channelSize);
+    if(typeof a.acceptUDP==='boolean') $('nt-acceptudp').checked=a.acceptUDP;
+    ntSetNum('nt-connpool',a.connectionPool);
+    if(typeof a.aggressivePool==='boolean') $('nt-aggpool').checked=a.aggressivePool;
+    ntSetNum('nt-muxcon',a.muxCon); ntSetNum('nt-muxver',a.muxVersion); ntSetNum('nt-muxframe',a.muxFrameSize);
+    ntSetNum('nt-muxrecv',a.muxRecvBuffer); ntSetNum('nt-muxstream',a.muxStreamBuffer);
+    ntSetNum('nt-kcpmtu',a.kcpMTU); ntSetNum('nt-kcpint',a.kcpInterval); ntSetNum('nt-kcpsnd',a.kcpSndWnd);
+    ntSetNum('nt-kcprcv',a.kcpRcvWnd); ntSetNum('nt-kcpdata',a.kcpDataShards); ntSetNum('nt-kcpparity',a.kcpParityShards);
+    if(typeof a.zeroCopy==='boolean') $('nt-zerocopy').checked=a.zeroCopy;
+  }
+  ntSync();
 }
 
 async function restartTunnel(name){

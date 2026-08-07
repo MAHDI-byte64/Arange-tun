@@ -193,6 +193,8 @@ func Serve() error {
 	mux.HandleFunc("/api/tunnels", srv.requireReadAuth(srv.handleTunnels))
 	// Tunnel lifecycle — admin-only, since these build and tear down tunnels.
 	mux.HandleFunc("/api/tunnels/create", srv.requireAuth(srv.handleTunnelCreate))
+	mux.HandleFunc("/api/tunnels/get", srv.requireAuth(srv.handleTunnelGet))
+	mux.HandleFunc("/api/tunnels/update", srv.requireAuth(srv.handleTunnelUpdate))
 	mux.HandleFunc("/api/tunnels/delete", srv.requireAuth(srv.handleTunnelDelete))
 	mux.HandleFunc("/api/tunnels/restart", srv.requireAuth(srv.handleTunnelRestart))
 	mux.HandleFunc("/metrics", srv.requireReadAuth(srv.handlePrometheus))
