@@ -408,54 +408,23 @@ func extractBinary(archive string) error {
 	return fmt.Errorf("no `arange-tun` binary found inside the archive")
 }
 
-// ApplyUpdate downloads the latest release and installs it safely:
-// a full snapshot is taken first, the new binary is put in place, every service
-// is restarted and health-checked, and if anything fails to come back up the
-// snapshot is rolled back automatically — so a broken release can never leave
-// the server without working tunnels.
+// ApplyUpdate rebuilds arange-tun from the current source on main and installs
+// it safely: a full snapshot is taken first, the freshly built binary is put in
+// place, every service is restarted and health-checked, and if anything fails
+// to come back up the snapshot is rolled back automatically — so a broken build
+// can never leave the server without working tunnels. There are no release
+// binaries; the update always compiles from source (see buildFromSource).
 func ApplyUpdate(logf func(string)) error {
 	if logf == nil {
 		logf = func(string) {}
 	}
-	tag, err := latestTag()
-	if err != nil {
-		return err
+	// There are no release binaries to download — the update rebuilds from the
+	// current source on the repo's main branch. Naming the target version is
+	// best-effort, for the log only, so a failure to read it is not fatal.
+	target := "the latest source"
+	if tag, err := latestTag(); err == nil {
+		target = tag
 	}
-	if !newerVersion(tag, app.Version) {
-		logf("Already up to date (" + app.Version + ").")
-		return nil
-	}
-
-	archive, err := downloadAsset(tag, app.InstallDir, logf)
-	if err != nil {
-		return err
-	}
-
-	// Confirm the archive is the file the release actually publishes before it
-	// replaces the binary that runs every tunnel on this machine.
-	//
-	// This refuses rather than warns. A warning here is worth very little: the
-	// caller that matters most is the web panel, which drives the update from a
-	// browser where a logged line is easy to miss, and the thing being installed
-	// runs as root. Declining to install is recoverable — the offline install in
-	// the README always works — while installing an archive nobody vouched for
-	// is not.
-	want, cerr := fetchChecksums(tag, filepath.Base(archive))
-	if cerr != nil {
-		os.Remove(archive)
-		return fmt.Errorf("could not fetch the checksum list for %s, so the download cannot be "+
-			"verified: %w\nInstall offline instead — see the README", tag, cerr)
-	}
-	if want == "" {
-		os.Remove(archive)
-		return fmt.Errorf("release %s publishes no checksum for %s, so the download cannot be "+
-			"verified\nInstall offline instead — see the README", tag, filepath.Base(archive))
-	}
-	if verr := verifyChecksum(archive, want); verr != nil {
-		os.Remove(archive)
-		return fmt.Errorf("the downloaded release failed verification: %w", verr)
-	}
-	logf("Checksum verified.")
 
 	// Snapshot BEFORE touching anything, so we can always get back.
 	logf("Taking a safety snapshot...")
@@ -466,8 +435,8 @@ func ApplyUpdate(logf func(string)) error {
 	}
 	logf("Snapshot saved: " + filepath.Base(snap.Dir))
 
-	logf("Installing " + tag + "...")
-	if err := extractBinary(archive); err != nil {
+	logf("Building " + target + " from source...")
+	if err := buildFromSource(logf); err != nil {
 		return err
 	}
 
@@ -501,11 +470,11 @@ func ApplyUpdate(logf func(string)) error {
 				"restore manually from %s", strings.Join(bad, ", "), rerr, snap.Dir)
 		}
 		return fmt.Errorf("update to %s failed health check (%s) — rolled back to %s",
-			tag, strings.Join(bad, ", "), snap.Meta.Version)
+			target, strings.Join(bad, ", "), snap.Meta.Version)
 	}
 
 	logf("Health check passed.")
-	logf("Update complete — now running " + tag + ".")
+	logf("Update complete — now running " + target + ".")
 	return nil
 }
 

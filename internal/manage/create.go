@@ -119,6 +119,9 @@ type CreateResult struct {
 // finishSetup. It returns an error describing the first problem rather than
 // leaving a half-built tunnel behind, so the caller can surface it as-is.
 func CreateTunnel(req TunnelRequest) (CreateResult, error) {
+	if name := strings.TrimSpace(req.Name); name != "" && fileExists(app.ConfigPath(name)) {
+		return CreateResult{}, fmt.Errorf("a tunnel named %q already exists", name)
+	}
 	spec, err := buildSpec(req)
 	if err != nil {
 		return CreateResult{}, err
@@ -149,9 +152,6 @@ func buildSpec(req TunnelRequest) (TunnelSpec, error) {
 	name := strings.TrimSpace(req.Name)
 	if !validName(name) {
 		return TunnelSpec{}, fmt.Errorf("invalid tunnel name %q — use letters, digits, dots, dashes (max 40)", name)
-	}
-	if fileExists(app.ConfigPath(name)) {
-		return TunnelSpec{}, fmt.Errorf("a tunnel named %q already exists", name)
 	}
 
 	transport := strings.TrimSpace(req.Transport)
