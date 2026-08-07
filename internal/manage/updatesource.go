@@ -15,11 +15,74 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/mahdi-byte64/arange-tun/internal/app"
 )
+
+// installedCommitFile records the git commit the running binary was built from,
+// so an update can tell "there are new commits on main" apart from "nothing
+// changed" — the version string in VERSION rarely moves, but every push does.
+var installedCommitFile = app.ConfigDir + "/installed_commit"
+
+// commitSHARe pulls the first 40-hex "sha" out of the GitHub commits API JSON —
+// which is the commit's own SHA, since it is the first field of the object.
+var commitSHARe = regexp.MustCompile(`"sha"\s*:\s*"([0-9a-f]{7,40})"`)
+
+// latestCommitSHA returns the SHA of the newest commit on the default branch,
+// trying the direct path and then the tunnel relay so it works from Iran.
+func latestCommitSHA() (string, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/commits/main", app.RepoOwner, app.RepoName)
+	var lastErr error = fmt.Errorf("no source reachable")
+	for _, s := range sources(20 * time.Second) {
+		resp, err := s.client.Get(url)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+		resp.Body.Close()
+		if resp.StatusCode != 200 {
+			lastErr = fmt.Errorf("%s returned status %d", s.name, resp.StatusCode)
+			continue
+		}
+		if m := commitSHARe.FindStringSubmatch(string(body)); m != nil {
+			return m[1], nil
+		}
+		lastErr = fmt.Errorf("no commit sha in the response from %s", s.name)
+	}
+	return "", lastErr
+}
+
+// installedCommitSHA reads the recorded build commit, or "" when none is stored
+// (an install from before this was tracked).
+func installedCommitSHA() string {
+	b, err := os.ReadFile(installedCommitFile)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(b))
+}
+
+// writeInstalledCommit records the commit a fresh build came from.
+func writeInstalledCommit(sha string) {
+	sha = strings.TrimSpace(sha)
+	if sha == "" {
+		return
+	}
+	_ = os.MkdirAll(app.ConfigDir, 0755)
+	_ = os.WriteFile(installedCommitFile, []byte(sha+"\n"), 0644)
+}
+
+// shortSHA trims a commit to its first 7 characters for display.
+func shortSHA(s string) string {
+	if len(s) > 7 {
+		return s[:7]
+	}
+	return s
+}
 
 // buildFromSource downloads main's source, compiles it, and atomically replaces
 // the installed binary. It restarts nothing — ApplyUpdate owns the snapshot,
@@ -78,6 +141,12 @@ func buildFromSource(logf func(string)) error {
 		return fmt.Errorf("could not replace the binary: %w", err)
 	}
 	logf("New binary installed.")
+	// Record the commit just built, so the next check can tell it apart from a
+	// later push. Best-effort: a missing record only means the next check offers
+	// a rebuild it did not strictly need.
+	if sha, err := latestCommitSHA(); err == nil {
+		writeInstalledCommit(sha)
+	}
 	return nil
 }
 
