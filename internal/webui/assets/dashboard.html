@@ -493,6 +493,14 @@
   .tutbody code{background:rgba(255,255,255,.06);border:1px solid var(--stroke);border-radius:6px;padding:1px 6px;font-size:12px}
   #phbody{font-size:13.5px;line-height:1.75;color:var(--muted)}
   #phbody b{color:var(--txt)}
+  /* ---------- frp port-mapping rows ---------- */
+  .et-proxy{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .et-proxy .sel{margin:0;flex:none;width:auto;padding:9px 10px}
+  .et-proxy input{margin:0;padding:9px 10px;font-size:13px;min-width:0}
+  .et-proxy .etp-arrow{color:var(--muted);flex:none}
+  .et-proxy .etp-del{flex:none;background:none;border:1px solid var(--stroke);color:var(--muted);
+    border-radius:9px;width:34px;height:34px;cursor:pointer;transition:.2s}
+  .et-proxy .etp-del:hover{color:var(--red-soft);border-color:rgba(var(--accent-rgb),.4)}
   .tun{background:var(--card);border:1px solid var(--stroke);border-radius:var(--radius);
     padding:18px;backdrop-filter:blur(20px);transition:transform .3s,background .3s,border-color .3s;
     position:relative;overflow:hidden;animation:rise .5s cubic-bezier(.16,1,.3,1) both}
@@ -1010,6 +1018,9 @@
   <div class="sec"><h3 data-i18n>Control</h3><span class="count" id="tsum">0</span></div>
   <div class="grid-tun" id="tunnels"></div>
   <div class="empty" id="empty" style="display:none" data-i18n>No tunnels yet. Use the “Add tunnel” button above to create one.</div>
+
+  <div class="sec" id="ext-sec" style="display:none;margin-top:26px"><h3 data-i18n>frp / Backhaul tunnels</h3><span class="count" id="extsum">0</span></div>
+  <div class="grid-tun" id="exttunnels"></div>
   </section>
 </div>
 
@@ -1332,6 +1343,68 @@
 
 <!-- Shown after a successful create, so the form does not linger. Carries the
      generated server token, which the panel reveals only this once. -->
+<!-- External-tunnel form (frp / backhaul). Fields adapt to the kind and side. -->
+<div class="modal" id="exttun" onclick="if(event.target===this)closeExt()">
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="ettitle" style="width:min(94vw,480px)">
+    <h3 id="ettitle" data-i18n>New tunnel</h3>
+    <p data-i18n>The panel downloads the official binary and runs it for you.</p>
+
+    <label for="et-role" data-i18n>Side</label>
+    <select id="et-role" class="sel" onchange="etSync()">
+      <option value="server" data-i18n>🇮🇷 Iran server — exposes the ports (users connect here)</option>
+      <option value="client" data-i18n>🌍 Abroad / kharej — runs the service, dials out</option>
+    </select>
+
+    <label for="et-transport" data-i18n>Transport</label>
+    <select id="et-transport" class="sel"></select>
+
+    <label for="et-name" data-i18n>Tunnel name</label>
+    <input id="et-name" type="text" autocomplete="off" spellcheck="false" maxlength="40" placeholder="frp-7000">
+
+    <div id="et-server">
+      <label for="et-bindport" data-i18n>Bind port</label>
+      <input id="et-bindport" type="number" min="1" max="65535" step="1" placeholder="7000">
+      <label class="tg" id="et-ipv6-row" style="margin-bottom:14px"><input type="checkbox" id="et-ipv6"><span data-i18n>Listen on IPv6 as well</span></label>
+      <div id="et-ports-row">
+        <label for="et-ports" data-i18n>Forwarded ports</label>
+        <input id="et-ports" type="text" autocomplete="off" spellcheck="false" placeholder="443, 8080=127.0.0.1:8080">
+        <p class="hint" style="margin:-8px 0 14px;font-size:11.5px;color:var(--muted2)" data-i18n>Comma separated.</p>
+      </div>
+      <label class="tg" id="et-au-row" style="margin-bottom:14px"><input type="checkbox" id="et-acceptudp"><span data-i18n>Accept UDP over the TCP transport</span></label>
+    </div>
+
+    <div id="et-client" style="display:none">
+      <label for="et-host" data-i18n>Server address (IP or domain)</label>
+      <input id="et-host" type="text" autocomplete="off" spellcheck="false" placeholder="203.0.113.10">
+      <label for="et-sport" data-i18n>Server bind port</label>
+      <input id="et-sport" type="number" min="1" max="65535" step="1" placeholder="7000">
+      <div id="et-edge-row">
+        <label for="et-edge" data-i18n>Edge IP (optional, CDN)</label>
+        <input id="et-edge" type="text" autocomplete="off" spellcheck="false" placeholder="leave empty to skip">
+      </div>
+      <div id="et-proxies-wrap">
+        <label data-i18n>Port mappings — local service → remote port on the server</label>
+        <div id="et-proxies"></div>
+        <button class="btn-sm" type="button" onclick="etAddProxy()" data-i18n>+ Add mapping</button>
+        <div style="height:14px"></div>
+      </div>
+    </div>
+
+    <label for="et-token" data-i18n>Security token</label>
+    <div class="upd" style="margin-bottom:14px">
+      <input id="et-token" type="text" autocomplete="off" spellcheck="false" style="margin:0" placeholder="shared secret">
+      <button class="btn-sm" type="button" onclick="etGenToken()" data-i18n>Generate</button>
+    </div>
+    <p class="hint" style="margin:-8px 0 14px;font-size:11.5px;color:var(--muted2)" data-i18n>The other side must use the exact same token.</p>
+
+    <div class="msg" id="et-msg"></div>
+    <div class="actions" style="margin-top:6px">
+      <button class="btn-primary" id="et-submit" onclick="submitExt()" data-i18n>Create tunnel</button>
+      <button class="btn-ghost" onclick="closeExt()" data-i18n>Close</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="created" onclick="if(event.target===this)closeCreated()">
   <div class="box" role="dialog" aria-modal="true" aria-labelledby="cdtitle" style="width:min(92vw,440px)">
     <h3 id="cdtitle" data-i18n>Tunnel created</h3>
@@ -1882,6 +1955,17 @@ const FA={
   "Tunnel created":"تانل ساخته شد",
   "Security token — copy it to the client":"توکن امنیتی — برای کلاینت کپی کنید",
   "Done":"تمام",
+  // external tunnels (frp / backhaul)
+  "The panel downloads the official binary and runs it for you.":"پنل باینری رسمی را دانلود و اجرا می‌کند.",
+  "Bind port":"پورت bind",
+  "Forwarded ports":"پورت‌های فوروارد",
+  "Comma separated.":"با کاما جدا کنید.",
+  "Server bind port":"پورت bind سرور",
+  "Port mappings — local service → remote port on the server":"نگاشت پورت‌ها — سرویس محلی ← پورت remote روی سرور",
+  "+ Add mapping":"+ افزودن نگاشت",
+  "The other side must use the exact same token.":"سمت دیگر باید دقیقاً همین توکن را داشته باشد.",
+  "frp / Backhaul tunnels":"تانل‌های frp / Backhaul",
+  "Creating… (installing the binary may take a moment)":"در حال ساخت… (نصب باینری کمی طول می‌کشد)",
 };
 let LANG=localStorage.getItem('bp_lang')==='fa'?'fa':'en';
 
@@ -2613,9 +2697,9 @@ function closePageHelp(){ $('pagehelp').classList.remove('on'); }
 // ready for them to be filled in one type at a time.
 const TUN_TYPES=[
   {id:'amin', name:'Amin Tunnel', ready:true,  desc:{en:'The built-in engine — TCP/UDP/WS, KCP, Stealth.', fa:'موتور داخلی — TCP/UDP/WS، KCP، Stealth.'}},
-  {id:'frp', name:'frp', ready:false,          desc:{en:'Fast reverse proxy.', fa:'ریورس‌پراکسی سریع.'}},
+  {id:'frp', name:'frp', ready:true,          desc:{en:'Fast reverse proxy.', fa:'ریورس‌پراکسی سریع.'}},
   {id:'rathole', name:'Rathole v2', ready:false,desc:{en:'Lightweight reverse proxy.', fa:'ریورس‌پراکسی سبک.'}},
-  {id:'backhaul', name:'Backhaul', ready:false, desc:{en:'High-performance reverse tunnel.', fa:'تونل معکوس پرسرعت.'}},
+  {id:'backhaul', name:'Backhaul', ready:true, desc:{en:'High-performance reverse tunnel.', fa:'تونل معکوس پرسرعت.'}},
   {id:'packet', name:'Packet', ready:false,     desc:{en:'Packet-level tunnel.', fa:'تونل در سطح پکت.'}},
   {id:'openvpn', name:'OpenVPN Tunnel', ready:false, desc:{en:'OpenVPN-based tunnel.', fa:'تونل مبتنی بر OpenVPN.'}},
   {id:'wireguard', name:'WireGuard Tunnel', ready:false, desc:{en:'WireGuard-based tunnel.', fa:'تونل مبتنی بر WireGuard.'}}
@@ -2650,7 +2734,11 @@ function chooseType(id){
 }
 function closeTut(){ $('tut').classList.remove('on'); }
 function tutBack(){ closeTut(); openChooser(); }
-function tutProceed(){ closeTut(); if(tutType==='amin') openNewTunnel(); }
+function tutProceed(){
+  closeTut();
+  if(tutType==='amin') openNewTunnel();
+  else if(tutType==='frp'||tutType==='backhaul') openExt(tutType);
+}
 
 // Tutorials shown before the create form. _soon builds a short placeholder for
 // the types that are not buildable yet.
@@ -2674,6 +2762,42 @@ const TUTORIALS={
       '<li>سپس سمت <b>خارج / kharej</b> را بساز: آی‌پی سرور ایران، پورت تونل و <b>همان توکن</b> را وارد کن.</li>'+
       '<li>هر دو سمت باید <b>ترنسپورت و توکن یکسان</b> داشته باشند. پیش‌تنظیم پیشنهادی Turbo است.</li></ol>'+
       '<p>برای باز شدن فرم و ساخت تانل، این راهنما را ببند.</p>'}},
+  frp:{title:{en:'frp — setup guide', fa:'frp — راهنمای راه‌اندازی'},body:{
+    en:'<p><b>frp</b> is a reverse proxy. The panel downloads the official binary and runs it for you.</p>'+
+      '<h4>The two sides</h4><ul>'+
+      '<li><b>🇮🇷 Iran server</b> — runs <code>frps</code>. Set its <b>bind port</b> (e.g. 7000) and a <b>token</b>.</li>'+
+      '<li><b>🌍 Abroad / kharej</b> — runs <code>frpc</code>. Point it at the Iran server IP and bind port, use the <b>same token</b>, and add <b>port mappings</b> (a local port on this machine → a remote port opened on the Iran server).</li></ul>'+
+      '<h4>Steps</h4><ol>'+
+      '<li>Create the <b>Iran server</b> first (bind port + token).</li>'+
+      '<li>Create the <b>abroad / kharej</b> side: Iran IP, bind port, the same token, and one or more mappings.</li>'+
+      '<li>Users then connect to the Iran server on each mapping\'s <b>remote port</b>.</li></ol>'+
+      '<p>Close this guide to open the form.</p>',
+    fa:'<p><b>frp</b> یک ریورس‌پراکسی است. پنل باینری رسمی را دانلود و اجرا می‌کند.</p>'+
+      '<h4>دو سمت</h4><ul>'+
+      '<li><b>🇮🇷 سرور ایران</b> — <code>frps</code> را اجرا می‌کند. <b>پورت bind</b> (مثلاً 7000) و یک <b>توکن</b> بگذار.</li>'+
+      '<li><b>🌍 خارج / kharej</b> — <code>frpc</code> را اجرا می‌کند. آی‌پی و پورت سرور ایران را بده، <b>همان توکن</b>، و <b>نگاشت پورت‌ها</b> را اضافه کن (یک پورت محلی این ماشین → یک پورت remote روی سرور ایران).</li></ul>'+
+      '<h4>مراحل</h4><ol>'+
+      '<li>اول <b>سرور ایران</b> را بساز (پورت bind + توکن).</li>'+
+      '<li>سپس سمت <b>خارج</b> را بساز: آی‌پی ایران، پورت bind، همان توکن، و یک یا چند نگاشت.</li>'+
+      '<li>کاربران به <b>remote port</b> هر نگاشت روی سرور ایران وصل می‌شوند.</li></ol>'+
+      '<p>برای باز شدن فرم، این راهنما را ببند.</p>'}},
+  backhaul:{title:{en:'Backhaul — setup guide', fa:'Backhaul — راهنمای راه‌اندازی'},body:{
+    en:'<p><b>Backhaul</b> is a high-performance reverse tunnel. The panel downloads the official binary and runs it for you.</p>'+
+      '<h4>The two sides</h4><ul>'+
+      '<li><b>🇮🇷 Iran server</b> — set the <b>bind port</b>, a <b>token</b>, the <b>transport</b>, and the <b>forwarded ports</b> (e.g. <code>443</code>, <code>8080=127.0.0.1:8080</code>).</li>'+
+      '<li><b>🌍 Abroad / kharej</b> — enter the Iran server IP and bind port, the <b>same token</b> and the <b>same transport</b>.</li></ul>'+
+      '<h4>Steps</h4><ol>'+
+      '<li>Create the <b>Iran server</b> first (port, token, transport, forwarded ports).</li>'+
+      '<li>Create the <b>abroad / kharej</b> side with the same token and transport.</li></ol>'+
+      '<p>Close this guide to open the form.</p>',
+    fa:'<p><b>Backhaul</b> یک تونل معکوس پرسرعت است. پنل باینری رسمی را دانلود و اجرا می‌کند.</p>'+
+      '<h4>دو سمت</h4><ul>'+
+      '<li><b>🇮🇷 سرور ایران</b> — <b>پورت bind</b>، <b>توکن</b>، <b>ترنسپورت</b> و <b>پورت‌های فوروارد</b> را بگذار (مثل <code>443</code> یا <code>8080=127.0.0.1:8080</code>).</li>'+
+      '<li><b>🌍 خارج / kharej</b> — آی‌پی و پورت سرور ایران، <b>همان توکن</b> و <b>همان ترنسپورت</b> را وارد کن.</li></ul>'+
+      '<h4>مراحل</h4><ol>'+
+      '<li>اول <b>سرور ایران</b> را بساز (پورت، توکن، ترنسپورت، پورت‌های فوروارد).</li>'+
+      '<li>سپس سمت <b>خارج</b> را با همان توکن و ترنسپورت بساز.</li></ol>'+
+      '<p>برای باز شدن فرم، این راهنما را ببند.</p>'}},
   _soon:function(name){ return {
     title:{en:name+' — coming soon', fa:name+' — به‌زودی'},body:{
       en:'<p><b>'+esc(name)+'</b> cannot be created from the panel yet.</p><p>The chooser and this guide are in place for it; the create flow will be added in a later phase. For now, use <b>Amin Tunnel</b>.</p>',
@@ -2872,6 +2996,181 @@ async function submitNewTunnel(){
   }catch(e){ ntMsg(T('Network error.'),true); btn.disabled=false; }
 }
 function closeCreated(){ $('created').classList.remove('on'); }
+
+// ===== External tunnels (frp / backhaul) =====
+const ET_TRANSPORTS={
+  frp:[['tcp','TCP'],['kcp','KCP'],['quic','QUIC']],
+  backhaul:[['tcp','TCP'],['tcpmux','TCP Mux'],['ws','WS'],['wss','WSS'],['wsmux','WS Mux'],['wssmux','WSS Mux'],['udp','UDP']]
+};
+const ET_WS=['ws','wss','wsmux','wssmux'];
+let etKind='frp', etEdit='';
+
+function etGenToken(){
+  const cs='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const a=new Uint32Array(32); crypto.getRandomValues(a);
+  $('et-token').value=Array.from(a,n=>cs[n%cs.length]).join('');
+}
+function etMsg(text,isErr){ const m=$('et-msg'); m.textContent=text||''; m.className='msg'+(text?(isErr?' err':' ok'):''); }
+function etFillTransport(sel){
+  const s=$('et-transport'); s.innerHTML=''; s.onchange=etSync;
+  (ET_TRANSPORTS[etKind]||[]).forEach(function(o){
+    const opt=document.createElement('option'); opt.value=o[0]; opt.textContent=o[1];
+    if(o[0]===sel) opt.selected=true; s.appendChild(opt);
+  });
+}
+function openExt(kind){
+  etKind=kind; etEdit='';
+  const nice=kind==='frp'?'frp':'Backhaul';
+  $('ettitle').textContent=nice+' — '+T('New tunnel');
+  $('et-submit').textContent=T('Create tunnel');
+  ['et-name','et-bindport','et-ports','et-host','et-sport','et-edge','et-token'].forEach(id=>$(id).value='');
+  ['et-ipv6','et-acceptudp'].forEach(id=>$(id).checked=false);
+  $('et-name').readOnly=false;
+  $('et-role').value='server';
+  etFillTransport('tcp');
+  $('et-proxies').innerHTML='';
+  etMsg('');
+  etSync();
+  if(kind==='frp') etAddProxy();
+  $('exttun').classList.add('on');
+}
+function closeExt(){ $('exttun').classList.remove('on'); }
+function etSync(){
+  const role=$('et-role').value, tr=$('et-transport').value;
+  $('et-server').style.display=role==='server'?'':'none';
+  $('et-client').style.display=role==='client'?'':'none';
+  $('et-ipv6-row').style.display=(role==='server'&&etKind==='backhaul')?'':'none';
+  $('et-ports-row').style.display=(role==='server'&&etKind==='backhaul')?'':'none';
+  $('et-au-row').style.display=(role==='server'&&etKind==='backhaul'&&tr==='tcp')?'':'none';
+  $('et-edge-row').style.display=(role==='client'&&etKind==='backhaul'&&ET_WS.includes(tr))?'':'none';
+  $('et-proxies-wrap').style.display=(role==='client'&&etKind==='frp')?'':'none';
+}
+function etAddProxy(data){
+  data=data||{};
+  const row=document.createElement('div');
+  row.className='et-proxy';
+  row.innerHTML='<select class="sel etp-type"><option value="tcp">TCP</option><option value="udp">UDP</option></select>'+
+    '<input class="etp-local" type="number" min="1" max="65535" placeholder="local">'+
+    '<span class="etp-arrow">→</span>'+
+    '<input class="etp-remote" type="number" min="1" max="65535" placeholder="remote">'+
+    '<button class="etp-del" type="button" aria-label="Remove" onclick="this.closest(\'.et-proxy\').remove()">✕</button>';
+  $('et-proxies').appendChild(row);
+  if(data.type) row.querySelector('.etp-type').value=data.type;
+  if(data.localPort) row.querySelector('.etp-local').value=data.localPort;
+  if(data.remotePort) row.querySelector('.etp-remote').value=data.remotePort;
+  if(data.name) row.dataset.name=data.name;
+}
+function etCollectProxies(){
+  return Array.from($('et-proxies').querySelectorAll('.et-proxy')).map(function(r){
+    return {name:r.dataset.name||'', type:r.querySelector('.etp-type').value, localIP:'127.0.0.1',
+      localPort:r.querySelector('.etp-local').value.trim(), remotePort:r.querySelector('.etp-remote').value.trim()};
+  }).filter(p=>p.localPort&&p.remotePort);
+}
+async function submitExt(){
+  const role=$('et-role').value, tr=$('et-transport').value;
+  const t={name:$('et-name').value.trim(), kind:etKind, role:role, transport:tr, token:$('et-token').value.trim()};
+  if(role==='server'){
+    t.bindPort=$('et-bindport').value.trim();
+    if(etKind==='backhaul'){
+      t.ipv6=$('et-ipv6').checked;
+      t.ports=$('et-ports').value.split(',').map(s=>s.trim()).filter(Boolean);
+      if(tr==='tcp') t.acceptUDP=$('et-acceptudp').checked;
+    }
+  }else{
+    t.serverHost=$('et-host').value.trim();
+    t.serverPort=$('et-sport').value.trim();
+    if(etKind==='backhaul'&&ET_WS.includes(tr)) t.edgeIP=$('et-edge').value.trim();
+    if(etKind==='frp') t.proxies=etCollectProxies();
+  }
+  const editing=!!etEdit;
+  const btn=$('et-submit'); btn.disabled=true;
+  etMsg(editing?T('Saving…'):T('Creating… (installing the binary may take a moment)'));
+  try{
+    const r=await fetch(editing?'/api/exttun/update':'/api/exttun/create',
+      {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(t)});
+    if(!r.ok){ etMsg((await r.text())||('HTTP '+r.status),true); btn.disabled=false; return; }
+    closeExt(); loadExtTunnels(); go('control');
+    toast('“'+t.name+'” '+(editing?T('updated.'):T('created and started.')));
+  }catch(e){ etMsg(T('Network error.'),true); btn.disabled=false; }
+}
+async function editExt(name){
+  let t;
+  try{
+    const r=await fetch('/api/exttun/get?name='+encodeURIComponent(name));
+    if(!r.ok){ toast((await r.text())||T('Could not load the tunnel.'),true); return; }
+    t=await r.json();
+  }catch(e){ toast(T('Network error.'),true); return; }
+  openExt(t.kind);
+  etEdit=name;
+  $('ettitle').textContent=T('Edit tunnel');
+  $('et-submit').textContent=T('Save changes');
+  const nm=$('et-name'); nm.value=name; nm.readOnly=true;
+  $('et-role').value=t.role||'server';
+  etFillTransport(t.transport||'tcp');
+  $('et-token').value=t.token||'';
+  if(t.role==='server'){
+    $('et-bindport').value=t.bindPort||'';
+    $('et-ipv6').checked=!!t.ipv6;
+    $('et-ports').value=(t.ports||[]).join(', ');
+    $('et-acceptudp').checked=!!t.acceptUDP;
+  }else{
+    $('et-host').value=t.serverHost||'';
+    $('et-sport').value=t.serverPort||'';
+    $('et-edge').value=t.edgeIP||'';
+    $('et-proxies').innerHTML='';
+    (t.proxies||[]).forEach(etAddProxy);
+    if(!(t.proxies||[]).length && t.kind==='frp') etAddProxy();
+  }
+  etSync();
+}
+async function loadExtTunnels(){
+  let list;
+  try{ list=await (await fetch('/api/exttun/list')).json()||[]; }catch(e){ return; }
+  const box=$('exttunnels'); if(!box) return;
+  box.innerHTML='';
+  $('extsum').textContent=list.length;
+  $('ext-sec').style.display=list.length?'':'none';
+  list.forEach(function(t){ box.appendChild(renderExtCard(t)); });
+}
+function renderExtCard(t){
+  const el=document.createElement('div');
+  const st=t.state||'stopped';
+  el.className='tun '+st;
+  const side=t.role==='server'?'🇮🇷 '+T('Server'):'🌍 '+T('Client');
+  const detail=t.role==='server'
+    ? '<div class="r full"><div class="k">'+T('Bind port')+'</div><div class="v">'+esc(t.bindPort||'—')+'</div></div>'
+    : '<div class="r full"><div class="k">'+T('Server')+'</div><div class="v">'+esc((t.serverHost||'')+':'+(t.serverPort||''))+'</div></div>';
+  el.innerHTML='<div class="top"><span class="dot '+st+'" title="'+esc(st)+'"></span>'+
+    '<span class="name" title="'+esc(t.name)+'">'+esc(t.name)+'</span>'+
+    '<span class="badge tr">'+esc((t.kind||'').toUpperCase())+'</span></div>'+
+    '<div class="rows">'+
+      '<div class="r"><div class="k">'+T('Side')+'</div><div class="v">'+side+'</div></div>'+
+      '<div class="r"><div class="k">'+T('Transport')+'</div><div class="v">'+esc((t.transport||'').toUpperCase())+'</div></div>'+
+      detail+
+    '</div>'+
+    '<div class="cardbtns">'+
+      '<button class="logbtn" onclick="editExt(\''+esc(t.name)+'\')" data-i18n>Edit</button>'+
+      '<button class="logbtn" onclick="restartExt(\''+esc(t.name)+'\')" data-i18n>Restart</button>'+
+      '<button class="logbtn" onclick="deleteExt(\''+esc(t.name)+'\')" data-i18n>Delete</button>'+
+    '</div>';
+  return el;
+}
+async function restartExt(name){
+  if(!name||!confirm(T('Restart tunnel')+' “'+name+'”?')) return;
+  try{
+    const r=await fetch('/api/exttun/restart',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})});
+    if(!r.ok){ toast((await r.text())||T('Restart failed.'),true); return; }
+    toast('“'+name+'” '+T('restarted.')); loadExtTunnels();
+  }catch(e){ toast(T('Network error.'),true); }
+}
+async function deleteExt(name){
+  if(!name||!confirm(T('Delete tunnel')+' “'+name+'”?\n\n'+T('This stops the service and removes its configuration.'))) return;
+  try{
+    const r=await fetch('/api/exttun/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})});
+    if(!r.ok){ toast((await r.text())||T('Delete failed.'),true); return; }
+    toast('“'+name+'” '+T('deleted.')); loadExtTunnels();
+  }catch(e){ toast(T('Network error.'),true); }
+}
 
 // Edit reuses the create form: the tunnel's current config is loaded into it,
 // the name is locked, and submit routes to the update endpoint instead.
@@ -3668,6 +3967,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLogs();closeSe
     }, Math.max(0, MIN-(Date.now()-start)));
   }
   Promise.allSettled([loadStats(), loadTunnels()]).then(reveal);
+  loadExtTunnels();
   setTimeout(reveal, MAX);
   pollAlertBadge();
 })();
@@ -3818,6 +4118,7 @@ go(viewFromPath(location.pathname), false);
 
 setInterval(loadStats,4000);
 setInterval(loadTunnels,6000);
+setInterval(loadExtTunnels,7000);
 setInterval(pollAlertBadge,30000);
 </script>
 </body>

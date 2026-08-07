@@ -108,6 +108,13 @@ else
 fi
 info "Built and installed -> ${BIN_PATH}"
 
+# Record the commit just built, so the panel's update check can tell a later
+# push apart from "nothing changed". Best-effort — a miss only means the first
+# check offers a rebuild it did not strictly need.
+sha="$(curl -fsSL --connect-timeout 15 "https://api.github.com/repos/${REPO}/commits/${BRANCH}" 2>/dev/null \
+  | grep -oE '"sha"[[:space:]]*:[[:space:]]*"[0-9a-f]{7,40}"' | head -1 | grep -oE '[0-9a-f]{7,40}' | head -1)"
+[ -n "$sha" ] && echo "$sha" > /etc/arange-tun/installed_commit || true
+
 chmod +x "$BIN_PATH"
 echo
 echo -e "${WHITE}Done!${NC}"

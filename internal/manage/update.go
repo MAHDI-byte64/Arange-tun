@@ -211,18 +211,32 @@ func newerVersion(remote, local string) bool {
 	return false
 }
 
-// CheckUpdate reports whether a newer release is published on GitHub. It works
-// the same regardless of how arange-tun was installed (release or git clone) —
-// the update itself always comes from the release assets.
+// CheckUpdate reports whether there is anything newer to build. Because there
+// are no releases, "newer" means new commits on main rather than a higher
+// version tag: the VERSION string rarely changes, but every push does, so a
+// version-only check kept saying "up to date" while the source moved on. The
+// installed commit is compared to the newest on main; if the commit API cannot
+// be reached, it falls back to the VERSION comparison so the check still works.
 func CheckUpdate() (bool, string, error) {
-	tag, err := latestTag()
+	remote, err := latestCommitSHA()
 	if err != nil {
-		return false, "", err
+		tag, terr := latestTag()
+		if terr != nil {
+			return false, "", err
+		}
+		if newerVersion(tag, app.Version) {
+			return true, fmt.Sprintf("Version %s is available (current %s).", tag, app.Version), nil
+		}
+		return false, fmt.Sprintf("Already up to date (%s).", app.Version), nil
 	}
-	if !newerVersion(tag, app.Version) {
-		return false, fmt.Sprintf("Already up to date (%s, latest release %s).", app.Version, tag), nil
+	local := installedCommitSHA()
+	if local == "" {
+		return true, "A source update is available — rebuild to get the latest code on main.", nil
 	}
-	return true, fmt.Sprintf("Version %s is available (current %s).", tag, app.Version), nil
+	if !strings.EqualFold(local, remote) {
+		return true, fmt.Sprintf("New commits are available on main (installed %s).", shortSHA(local)), nil
+	}
+	return false, "Already up to date (latest source on main).", nil
 }
 
 // pickTag chooses a version from a GitHub releases response.
