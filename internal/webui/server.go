@@ -197,6 +197,8 @@ func Serve() error {
 	mux.HandleFunc("/api/tunnels/update", srv.requireAuth(srv.handleTunnelUpdate))
 	mux.HandleFunc("/api/tunnels/delete", srv.requireAuth(srv.handleTunnelDelete))
 	mux.HandleFunc("/api/tunnels/restart", srv.requireAuth(srv.handleTunnelRestart))
+	mux.HandleFunc("/api/tunnels/stop", srv.requireAuth(srv.handleTunnelStop))
+	mux.HandleFunc("/api/tunnels/start", srv.requireAuth(srv.handleTunnelStart))
 	// WireGuard has its own create endpoints (a server generates a config, a
 	// client is given one); delete/restart/logs are shared with every tunnel.
 	mux.HandleFunc("/api/wg/server", srv.requireAuth(srv.handleWGServerCreate))

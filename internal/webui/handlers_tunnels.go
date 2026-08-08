@@ -209,6 +209,51 @@ func (s *server) handleTunnelRestart(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"status": "ok"})
 }
 
+// handleTunnelStop stops a tunnel and disables it, so it stays down until it is
+// started again (and does not come back on reboot). The config is left in place.
+func (s *server) handleTunnelStop(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	name := decodeTunnelName(r)
+	if name == "" {
+		http.Error(w, "missing tunnel name", http.StatusBadRequest)
+		return
+	}
+	if _, ok := manage.Find(name); !ok {
+		http.Error(w, "no tunnel named "+name, http.StatusNotFound)
+		return
+	}
+	if err := manage.DisableService(app.ServiceName(name)); err != nil {
+		http.Error(w, "could not stop the tunnel: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]string{"status": "ok"})
+}
+
+// handleTunnelStart starts (and enables) a previously stopped tunnel.
+func (s *server) handleTunnelStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	name := decodeTunnelName(r)
+	if name == "" {
+		http.Error(w, "missing tunnel name", http.StatusBadRequest)
+		return
+	}
+	if _, ok := manage.Find(name); !ok {
+		http.Error(w, "no tunnel named "+name, http.StatusNotFound)
+		return
+	}
+	if err := manage.StartService(app.ServiceName(name)); err != nil {
+		http.Error(w, "could not start the tunnel: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]string{"status": "ok"})
+}
+
 // decodeTunnelName pulls the tunnel name from a JSON body, falling back to a
 // form value when the body is not JSON. It caps the body first: a name is tiny,
 // so a large body is never legitimate here.

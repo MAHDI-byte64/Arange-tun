@@ -1301,6 +1301,7 @@
     <div id="ltwrap"></div>
     <div class="actions" style="margin-top:14px">
       <button class="btn-ghost" onclick="editTunnel(detName)" data-i18n>Edit</button>
+      <button class="btn-ghost" id="det-stopbtn"></button>
       <button class="btn-ghost" onclick="restartTunnel(detName)" data-i18n>Restart</button>
       <button class="btn-ghost dngr" onclick="deleteTunnel(detName)" data-i18n>Delete</button>
       <button class="btn-ghost" onclick="closeDetails()" data-i18n>Close</button>
@@ -1954,6 +1955,13 @@ const FA={
   "Network error.":"خطای شبکه.",
   "Restart":"ری‌استارت","Delete":"حذف",
   "Restart tunnel":"ری‌استارت تونل",
+  "Stop":"توقف",
+  "Start":"شروع",
+  "Stop tunnel":"توقف تونل",
+  "stopped.":"متوقف شد.",
+  "started.":"شروع شد.",
+  "Could not stop the tunnel.":"توقف تونل ممکن نشد.",
+  "Could not start the tunnel.":"شروع تونل ممکن نشد.",
   "Delete tunnel":"حذف تونل",
   "This stops the service and removes its configuration.":"این سرویس را متوقف و پیکربندی‌اش را حذف می‌کند.",
   "restarted.":"ری‌استارت شد.",
@@ -2621,6 +2629,10 @@ function openDetails(name){
   if(!t) return;
   $('dettitle').textContent=name+' · Details';
   $('detbody').innerHTML=renderDetails(t); relang();
+  // The stop/start button reflects the tunnel's current state.
+  const sb=$('det-stopbtn');
+  if(t.state==='stopped'){ sb.textContent=T('Start'); sb.className='btn-ghost'; sb.onclick=function(){ startTunnel(name); }; }
+  else { sb.textContent=T('Stop'); sb.className='btn-ghost'; sb.onclick=function(){ stopTunnel(name); }; }
   loadHistory(name);
   renderLinkTestBox(t);
   $('details').classList.add('on');
@@ -3235,6 +3247,24 @@ async function restartTunnel(name){
     const r=await fetch('/api/tunnels/restart',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
     if(!r.ok){ toast((await r.text())||T('Restart failed.'),true); return; }
     toast('“'+name+'” '+T('restarted.')); loadTunnels();
+  }catch(e){ toast(T('Network error.'),true); }
+}
+
+async function stopTunnel(name){
+  if(!name) return;
+  if(!confirm(T('Stop tunnel')+' “'+name+'”?')) return;
+  try{
+    const r=await fetch('/api/tunnels/stop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+    if(!r.ok){ toast((await r.text())||T('Could not stop the tunnel.'),true); return; }
+    toast('“'+name+'” '+T('stopped.')); closeDetails(); loadTunnels();
+  }catch(e){ toast(T('Network error.'),true); }
+}
+async function startTunnel(name){
+  if(!name) return;
+  try{
+    const r=await fetch('/api/tunnels/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+    if(!r.ok){ toast((await r.text())||T('Could not start the tunnel.'),true); return; }
+    toast('“'+name+'” '+T('started.')); closeDetails(); loadTunnels();
   }catch(e){ toast(T('Network error.'),true); }
 }
 
