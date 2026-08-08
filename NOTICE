@@ -12,3 +12,10 @@ Portions of the tunnel data-plane are derived from prior AGPL-3.0 / GPL-3.0
 open-source work. This single line is retained only to satisfy the copyleft
 attribution requirement of that license; all product branding, CLI, web UI, and
 management code are original to Arange-tun by Amin Mohammadi.
+
+The built-in "Rathole v2" tunnel (internal/rathole) is a Go reimplementation of
+the rathole reverse-proxy protocol by rapiz1 and contributors
+(https://github.com/rapiz1/rathole), which is licensed under the Apache License
+2.0. No rathole source code is copied; the protocol — its control/data-channel
+handshake, message framing, and forwarding design — was reimplemented in Go from
+the published specification and source.

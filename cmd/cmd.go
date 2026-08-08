@@ -11,6 +11,7 @@ import (
 	"github.com/mahdi-byte64/arange-tun/config"
 	"github.com/mahdi-byte64/arange-tun/internal/client"
 	"github.com/mahdi-byte64/arange-tun/internal/frp"
+	"github.com/mahdi-byte64/arange-tun/internal/rathole"
 
 	"github.com/mahdi-byte64/arange-tun/internal/server"
 	"github.com/mahdi-byte64/arange-tun/internal/utils"
@@ -119,14 +120,22 @@ func runEngine(cfg *config.Config, ctx context.Context, configPath string, apply
 
 		startMetrics(ctx, configPath, string(cfg.Server.Transport), "server")
 
-		// frp is Arange-tun's own reverse-proxy protocol, not part of the Amin
-		// engine's transport set, so it runs its own server here. "frpu" is the
-		// same protocol carrying UDP on the exposed ports instead of TCP.
+		// frp and rathole are Arange-tun's own reverse-proxy protocols, not part
+		// of the Amin engine's transport set, so they run their own server here.
+		// The "…u" variant is the same protocol carrying UDP on the exposed ports
+		// instead of TCP.
 		if t := cfg.Server.Transport; t == "frp" || t == "frpu" {
 			log := utils.NewLoggerWithFormat(cfg.Server.LogLevel, cfg.Server.LogFormat)
 			go frp.RunServer(ctx, &cfg.Server, log, t == "frpu")
 			<-ctx.Done()
 			logger.Println("shutting down frp server...")
+			return
+		}
+		if t := cfg.Server.Transport; t == "rathole" || t == "ratholeu" {
+			log := utils.NewLoggerWithFormat(cfg.Server.LogLevel, cfg.Server.LogFormat)
+			go rathole.RunServer(ctx, &cfg.Server, log, t == "ratholeu")
+			<-ctx.Done()
+			logger.Println("shutting down rathole server...")
 			return
 		}
 
@@ -146,15 +155,22 @@ func runEngine(cfg *config.Config, ctx context.Context, configPath string, apply
 
 		startMetrics(ctx, configPath, string(cfg.Client.Transport), "client")
 
-		// frp is Arange-tun's own reverse-proxy protocol, not part of the Amin
-		// engine's transport set, so it runs its own client here. The client is
-		// mode-agnostic — the server tells it per stream whether to dial TCP or
-		// UDP — so "frp" and "frpu" share the same client.
+		// frp and rathole are Arange-tun's own reverse-proxy protocols, not part
+		// of the Amin engine's transport set, so they run their own client here.
+		// The client is mode-agnostic — the server tells it per stream whether to
+		// dial TCP or UDP — so a protocol and its "…u" variant share one client.
 		if t := cfg.Client.Transport; t == "frp" || t == "frpu" {
 			log := utils.NewLoggerWithFormat(cfg.Client.LogLevel, cfg.Client.LogFormat)
 			go frp.RunClient(ctx, &cfg.Client, log)
 			<-ctx.Done()
 			logger.Println("shutting down frp client...")
+			return
+		}
+		if t := cfg.Client.Transport; t == "rathole" || t == "ratholeu" {
+			log := utils.NewLoggerWithFormat(cfg.Client.LogLevel, cfg.Client.LogFormat)
+			go rathole.RunClient(ctx, &cfg.Client, log)
+			<-ctx.Done()
+			logger.Println("shutting down rathole client...")
 			return
 		}
 

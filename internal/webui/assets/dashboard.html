@@ -1391,6 +1391,8 @@
       </optgroup>
       <option value="frp" hidden>frp</option>
       <option value="frpu" hidden>frp (udp)</option>
+      <option value="rathole" hidden>rathole</option>
+      <option value="ratholeu" hidden>rathole (udp)</option>
     </select>
     </div>
 
@@ -1806,6 +1808,8 @@ const FA={
   "New tunnel":"تونل جدید",
   "New frp tunnel":"تونل frp جدید",
   "Edit frp tunnel":"ویرایش تونل frp",
+  "New rathole tunnel":"تونل rathole جدید",
+  "Edit rathole tunnel":"ویرایش تونل rathole",
   "Protocol":"پروتکل",
   "TCP — for the usual x-ui / Xray inbounds":"TCP — برای اینباندهای معمول x-ui / Xray",
   "UDP — for WireGuard, Hysteria, QUIC and other datagram services":"UDP — برای WireGuard، Hysteria، QUIC و سرویس‌های دیتاگرامی دیگر",
@@ -2264,12 +2268,15 @@ const STATE_LABEL={online:'ONLINE',offline:'OFFLINE',stopped:'STOPPED'};
 function pingClass(p){ return p<0?'':p<80?'good':p<200?'mid':'bad'; }
 function pingText(p){ return p<0?'—':p+' ms'; }
 function esc(s){ return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-// trLabel is the human-facing name of a transport. Only frp needs dressing up:
-// its two modes share the "frp" name and differ by the carried protocol.
+// trLabel is the human-facing name of a transport. The built-in reverse-proxy
+// tunnels need dressing up: their two modes share one name and differ by the
+// carried protocol.
 function trLabel(t){
   t=t||'';
   if(t==='frp') return 'FRP (TCP)';
   if(t==='frpu') return 'FRP (UDP)';
+  if(t==='rathole') return 'Rathole v2 (TCP)';
+  if(t==='ratholeu') return 'Rathole v2 (UDP)';
   return t.toUpperCase();
 }
 
@@ -2658,7 +2665,7 @@ function closePageHelp(){ $('pagehelp').classList.remove('on'); }
 const TUN_TYPES=[
   {id:'amin', name:'Amin Tunnel', ready:true,  desc:{en:'The built-in engine — TCP/UDP/WS, KCP, Stealth.', fa:'موتور داخلی — TCP/UDP/WS، KCP، Stealth.'}},
   {id:'frp', name:'frp', ready:true,          desc:{en:'Fast reverse proxy.', fa:'ریورس‌پراکسی سریع.'}},
-  {id:'rathole', name:'Rathole v2', ready:false,desc:{en:'Lightweight reverse proxy.', fa:'ریورس‌پراکسی سبک.'}},
+  {id:'rathole', name:'Rathole v2', ready:true,  desc:{en:'Pooled data-channel reverse proxy.', fa:'ریورس‌پراکسی با کانال دادهٔ مجزا.'}},
   {id:'backhaul', name:'Backhaul', ready:false, desc:{en:'High-performance reverse tunnel.', fa:'تونل معکوس پرسرعت.'}},
   {id:'packet', name:'Packet', ready:false,     desc:{en:'Packet-level tunnel.', fa:'تونل در سطح پکت.'}},
   {id:'openvpn', name:'OpenVPN Tunnel', ready:false, desc:{en:'OpenVPN-based tunnel.', fa:'تونل مبتنی بر OpenVPN.'}},
@@ -2698,6 +2705,7 @@ function tutProceed(){
   closeTut();
   if(tutType==='amin') openNewTunnel();
   else if(tutType==='frp') openFrp();
+  else if(tutType==='rathole') openRathole();
 }
 
 // Tutorials shown before the create form. _soon builds a short placeholder for
@@ -2739,6 +2747,25 @@ const TUTORIALS={
       '<li>اول <b>سرور ایران</b> را بساز: پورت تانل و پورت‌های نمایش‌داده‌شده (مثل <code>443</code> یا <code>8080=127.0.0.1:8080</code>) را بگذار و توکن ساخته‌شده را کپی کن.</li>'+
       '<li>سپس سمت <b>خارج</b> را بساز: آی‌پی سرور ایران، پورت تانل، و <b>همان توکن</b>.</li></ol>'+
       '<p>برای باز شدن فرم، این راهنما را ببند.</p>'}},
+  rathole:{title:{en:'Rathole v2 — setup guide', fa:'Rathole v2 — راهنمای راه‌اندازی'},body:{
+    en:'<p><b>Rathole v2</b> is a Go port of the rathole protocol, built into Arange-tun — no external binary. Unlike frp it does not multiplex: a control channel carries only commands and each forwarded connection gets its own data channel (rathole’s design), with a <code>sha256(token‖nonce)</code> handshake. It works and is managed exactly like an Amin tunnel.</p>'+
+      '<h4>The two sides</h4><ul>'+
+      '<li><b>🇮🇷 Iran server</b> — the entry point. Set the tunnel port and the <b>exposed ports</b>; users connect to the Iran IP.</li>'+
+      '<li><b>🌍 Abroad / kharej</b> — dials out to the Iran server and forwards traffic to the real service.</li></ul>'+
+      '<h4>Steps</h4><ol>'+
+      '<li>Create the <b>Iran server</b> first: set the tunnel port and exposed ports (e.g. <code>443</code>, <code>8080=127.0.0.1:8080</code>) and copy the generated token.</li>'+
+      '<li>Create the <b>abroad / kharej</b> side: the Iran server IP, the tunnel port, and the <b>same token</b>.</li>'+
+      '<li>Pick the <b>protocol</b> — TCP for the usual inbounds, UDP for WireGuard/Hysteria/QUIC — the same on both sides.</li></ol>'+
+      '<p>Close this guide to open the form.</p>',
+    fa:'<p><b>Rathole v2</b> یک پورت پروتکل rathole به زبان Go است که داخل آرنج‌تان پیاده شده — بدون باینری خارجی. برخلاف frp مالتی‌پلکس نمی‌کند: یک کانال کنترل فقط دستورها را می‌برد و هر اتصال یک <b>کانال دادهٔ مجزا</b> می‌گیرد (طراحی خود rathole)، با هندشیک <code>sha256(token‖nonce)</code>. دقیقاً مثل تانل امین کار و مدیریت می‌شود.</p>'+
+      '<h4>دو سمت</h4><ul>'+
+      '<li><b>🇮🇷 سرور ایران</b> — نقطهٔ ورود. پورت تانل و <b>پورت‌های نمایش‌داده‌شده</b> را بگذار؛ کاربران به آی‌پی ایران وصل می‌شوند.</li>'+
+      '<li><b>🌍 خارج / kharej</b> — به سرور ایران dial می‌کند و ترافیک را به سرویس واقعی می‌رساند.</li></ul>'+
+      '<h4>مراحل</h4><ol>'+
+      '<li>اول <b>سرور ایران</b> را بساز: پورت تانل و پورت‌های نمایش‌داده‌شده (مثل <code>443</code> یا <code>8080=127.0.0.1:8080</code>) را بگذار و توکن ساخته‌شده را کپی کن.</li>'+
+      '<li>سپس سمت <b>خارج</b> را بساز: آی‌پی سرور ایران، پورت تانل، و <b>همان توکن</b>.</li>'+
+      '<li><b>پروتکل</b> را انتخاب کن — TCP برای اینباندهای معمول، UDP برای WireGuard/Hysteria/QUIC — روی هر دو سمت یکسان.</li></ol>'+
+      '<p>برای باز شدن فرم، این راهنما را ببند.</p>'}},
   _soon:function(name){ return {
     title:{en:name+' — coming soon', fa:name+' — به‌زودی'},body:{
       en:'<p><b>'+esc(name)+'</b> cannot be created from the panel yet.</p><p>The chooser and this guide are in place for it; the create flow will be added in a later phase. For now, use <b>Amin Tunnel</b>.</p>',
@@ -2766,32 +2793,42 @@ function openNewTunnel(){
   // The submit button may have been repurposed to "Create another" by a prior
   // success; put it back to a create action.
   $('nt-submit').onclick=submitNewTunnel;
-  // A plain Amin form always shows the transport picker and never the frp-only
-  // protocol picker; openFrp flips both.
+  // A plain Amin form always shows the transport picker and never the
+  // reverse-proxy protocol picker; openProto flips both.
+  ntProtoBase='';
   $('nt-transport-row').style.display='';
   $('nt-frp-proto-row').style.display='none';
   ntSync(); ntSuggestName();
   $('newtun').classList.add('on');
 }
 
-// openFrp reuses the Amin create form for the built-in frp tunnel. frp is just
-// another transport, so the whole create/edit/list/logs lifecycle is shared;
-// the differences are that the transport is fixed to frp (its picker hidden) and
-// a small TCP/UDP protocol picker takes its place.
-function openFrp(){
+// ntProtoBase is the base transport of the built-in reverse-proxy tunnels that
+// reuse the Amin create form — "frp" or "rathole" — while the TCP/UDP picker
+// chooses between it and its "…u" (UDP) variant. Empty for a plain Amin tunnel.
+let ntProtoBase='';
+
+// openProto reuses the Amin create form for a built-in reverse-proxy tunnel:
+// frp or rathole. The whole create/edit/list/logs lifecycle is shared; the
+// differences are that the transport is fixed (its picker hidden) and a small
+// TCP/UDP protocol picker takes its place.
+function openProto(base,title){
   openNewTunnel();
-  $('nttitle').textContent=T('New frp tunnel');
+  ntProtoBase=base;
+  $('nttitle').textContent=T(title);
   $('nt-transport-row').style.display='none';
   $('nt-frp-proto').value='tcp';
   $('nt-frp-proto-row').style.display='';
-  $('nt-transport').value='frp';
+  $('nt-transport').value=base;
   ntSync();
 }
+function openFrp(){ openProto('frp','New frp tunnel'); }
+function openRathole(){ openProto('rathole','New rathole tunnel'); }
 
-// ntFrpProtoChange maps the TCP/UDP choice onto the real transport value: "frp"
-// carries TCP on the exposed ports, "frpu" carries UDP.
+// ntFrpProtoChange maps the TCP/UDP choice onto the real transport value: the
+// base carries TCP on the exposed ports, base+"u" carries UDP.
 function ntFrpProtoChange(){
-  $('nt-transport').value=$('nt-frp-proto').value==='udp'?'frpu':'frp';
+  const base=ntProtoBase||'frp';
+  $('nt-transport').value=$('nt-frp-proto').value==='udp'?base+'u':base;
   ntSync();
 }
 function closeNewTunnel(){ $('newtun').classList.remove('on'); }
@@ -3030,12 +3067,16 @@ function ntFill(req){
     ntSetNum('nt-kcprcv',a.kcpRcvWnd); ntSetNum('nt-kcpdata',a.kcpDataShards); ntSetNum('nt-kcpparity',a.kcpParityShards);
     if(typeof a.zeroCopy==='boolean') $('nt-zerocopy').checked=a.zeroCopy;
   }
-  // frp has no transport choice — keep its picker hidden through edits and show
-  // the TCP/UDP protocol picker instead, set from the stored transport.
-  if((req.transport||'')==='frp'||(req.transport||'')==='frpu'){
-    $('nttitle').textContent=T('Edit frp tunnel');
+  // The built-in reverse-proxy tunnels have no transport choice — keep the
+  // picker hidden through edits and show the TCP/UDP protocol picker instead,
+  // set from the stored transport.
+  const tr=req.transport||'';
+  if(tr==='frp'||tr==='frpu'||tr==='rathole'||tr==='ratholeu'){
+    const udp=tr.endsWith('u');
+    ntProtoBase=udp?tr.slice(0,-1):tr;
+    $('nttitle').textContent=T(ntProtoBase==='rathole'?'Edit rathole tunnel':'Edit frp tunnel');
     $('nt-transport-row').style.display='none';
-    $('nt-frp-proto').value=req.transport==='frpu'?'udp':'tcp';
+    $('nt-frp-proto').value=udp?'udp':'tcp';
     $('nt-frp-proto-row').style.display='';
   }
   ntSync();
