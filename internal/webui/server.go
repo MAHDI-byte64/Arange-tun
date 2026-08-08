@@ -197,13 +197,6 @@ func Serve() error {
 	mux.HandleFunc("/api/tunnels/update", srv.requireAuth(srv.handleTunnelUpdate))
 	mux.HandleFunc("/api/tunnels/delete", srv.requireAuth(srv.handleTunnelDelete))
 	mux.HandleFunc("/api/tunnels/restart", srv.requireAuth(srv.handleTunnelRestart))
-	// External tunnels (frp, backhaul) — admin-only, same as the built-in ones.
-	mux.HandleFunc("/api/exttun/create", srv.requireAuth(srv.handleExtCreate))
-	mux.HandleFunc("/api/exttun/update", srv.requireAuth(srv.handleExtUpdate))
-	mux.HandleFunc("/api/exttun/list", srv.requireReadAuth(srv.handleExtList))
-	mux.HandleFunc("/api/exttun/get", srv.requireAuth(srv.handleExtGet))
-	mux.HandleFunc("/api/exttun/delete", srv.requireAuth(srv.handleExtDelete))
-	mux.HandleFunc("/api/exttun/restart", srv.requireAuth(srv.handleExtRestart))
 	mux.HandleFunc("/metrics", srv.requireReadAuth(srv.handlePrometheus))
 	mux.HandleFunc("/api/logs", srv.requireAuth(srv.handleLogs))
 	mux.HandleFunc("/api/password", srv.requireAuth(srv.handlePassword))
