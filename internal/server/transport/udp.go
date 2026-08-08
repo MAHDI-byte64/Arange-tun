@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mahdi-byte64/arange-tun/internal/metrics"
 	"github.com/mahdi-byte64/arange-tun/internal/utils"
 	"github.com/mahdi-byte64/arange-tun/internal/web"
 	"github.com/sirupsen/logrus"
@@ -142,6 +143,9 @@ func (s *UdpTransport) Restart() {
 	s.usageMonitor = web.NewDataStore(fmt.Sprintf(":%v", s.config.WebPort), ctx, s.config.SnifferLog, s.config.Sniffer, &s.config.TunnelStatus, s.logger)
 	s.config.TunnelStatus = ""
 	s.controlChannel.Clear()
+	// The peer is gone until a new control channel arrives; a stale address
+	// would otherwise be shown as if it were current.
+	metrics.ClearPeer()
 	s.activeConnections = map[string]*TunnelUDPConn{}
 	s.activeMu = sync.Mutex{}
 
@@ -214,6 +218,11 @@ loop:
 			}
 
 			s.controlChannel.Set(conn)
+			// A UDP listener is one unconnected socket, so the socket table can
+			// never say who is on the other end. Recording the peer here is what
+			// lets the panel show the tunnel as online — and show its ping and
+			// location — instead of reporting a connected UDP server as offline.
+			metrics.ReportPeer(conn.RemoteAddr().String())
 
 			s.logger.Info("control channel successfully established.")
 
