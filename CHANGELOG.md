@@ -2,6 +2,30 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.8.0 — 2026-08-08
+
+Two new tunnel types, built into the engine and managed from the panel exactly
+like an Amin tunnel — same list, status, logs, and create/edit/delete/restart.
+Neither uses an external binary.
+
+- **frp** — Arange-tun's own reverse-proxy tunnel: its own token handshake and
+  smux-multiplexed streams. Choose **TCP** for the usual x-ui / Xray inbounds or
+  **UDP** for WireGuard, Hysteria, QUIC and other datagram services.
+- **Rathole v2** — a Go port of the rathole protocol (rapiz1/rathole,
+  Apache-2.0), reimplemented from source rather than shelling out. Unlike frp it
+  does not multiplex: a control channel carries only commands and each forwarded
+  connection gets its own data channel, with rathole's `sha256(token‖nonce)`
+  handshake. TCP and UDP both supported. See NOTICE for attribution.
+
+Fixes:
+
+- **Panel update no longer fails with "module cache not found".** The
+  source-build now pins Go's caches to writable paths, so it works from the
+  systemd service where `HOME` is unset.
+- **A UDP server no longer shows offline while a client is connected.** The UDP
+  transport now records its peer, the way KCP already did, so the datagram
+  health check reads it correctly.
+
 ## v1.7.0 — 2026-08-04
 
 This one started from a report that the tunnel worked on most servers and not on
