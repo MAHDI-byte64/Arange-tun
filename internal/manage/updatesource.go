@@ -122,11 +122,27 @@ func buildFromSource(logf func(string)) error {
 	cmd.Dir = srcDir
 	// Direct module fetching first, Iran-friendly mirrors as a fallback — the
 	// same order the installer uses.
+	//
+	// The panel runs the build from the systemd service, whose environment has
+	// no HOME. Without it Go cannot derive GOPATH ($HOME/go) or its module and
+	// build caches and fails before it compiles a line — "module cache not
+	// found: neither GOMODCACHE nor GOPATH is set". So the caches are pinned to
+	// explicit writable paths under the install dir, which makes the build work
+	// the same whether it is launched from a login shell or a bare service.
+	goCache := filepath.Join(app.InstallDir, "go")
+	gopath := filepath.Join(goCache, "path")
+	_ = os.MkdirAll(gopath, 0755)
+	_ = os.MkdirAll(filepath.Join(goCache, "mod"), 0755)
+	_ = os.MkdirAll(filepath.Join(goCache, "build"), 0755)
 	cmd.Env = append(os.Environ(),
 		"CGO_ENABLED=0",
 		"GOPROXY=https://proxy.golang.org,https://mirror-go.runflare.com,https://goproxy.cn,direct",
 		"GOSUMDB=off",
 		"GOTOOLCHAIN=local",
+		"HOME="+app.InstallDir,
+		"GOPATH="+gopath,
+		"GOMODCACHE="+filepath.Join(goCache, "mod"),
+		"GOCACHE="+filepath.Join(goCache, "build"),
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		os.Remove(tmpBin)

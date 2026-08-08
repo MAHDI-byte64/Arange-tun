@@ -1390,6 +1390,15 @@
         <option value="xdi">xDi (ICMP)</option>
       </optgroup>
       <option value="frp" hidden>frp</option>
+      <option value="frpu" hidden>frp (udp)</option>
+    </select>
+    </div>
+
+    <div id="nt-frp-proto-row" style="display:none">
+    <label for="nt-frp-proto" data-i18n>Protocol</label>
+    <select id="nt-frp-proto" class="sel" onchange="ntFrpProtoChange()">
+      <option value="tcp" data-i18n>TCP — for the usual x-ui / Xray inbounds</option>
+      <option value="udp" data-i18n>UDP — for WireGuard, Hysteria, QUIC and other datagram services</option>
     </select>
     </div>
 
@@ -1797,6 +1806,9 @@ const FA={
   "New tunnel":"تونل جدید",
   "New frp tunnel":"تونل frp جدید",
   "Edit frp tunnel":"ویرایش تونل frp",
+  "Protocol":"پروتکل",
+  "TCP — for the usual x-ui / Xray inbounds":"TCP — برای اینباندهای معمول x-ui / Xray",
+  "UDP — for WireGuard, Hysteria, QUIC and other datagram services":"UDP — برای WireGuard، Hysteria، QUIC و سرویس‌های دیتاگرامی دیگر",
   "No tunnels yet. Create one with the “New tunnel” button above.":"هنوز تونلی نیست. با دکمهٔ «تونل جدید» بالا یکی بسازید.",
   "Build a tunnel the same way the CLI does — it is written, enabled and started right away.":
     "تونل را دقیقاً مثل خط فرمان بساز — نوشته، فعال و بلافاصله اجرا می‌شود.",
@@ -2252,6 +2264,14 @@ const STATE_LABEL={online:'ONLINE',offline:'OFFLINE',stopped:'STOPPED'};
 function pingClass(p){ return p<0?'':p<80?'good':p<200?'mid':'bad'; }
 function pingText(p){ return p<0?'—':p+' ms'; }
 function esc(s){ return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+// trLabel is the human-facing name of a transport. Only frp needs dressing up:
+// its two modes share the "frp" name and differ by the carried protocol.
+function trLabel(t){
+  t=t||'';
+  if(t==='frp') return 'FRP (TCP)';
+  if(t==='frpu') return 'FRP (UDP)';
+  return t.toUpperCase();
+}
 
 // Cards are created once and then updated in place, so nodes don't flicker or
 // re-animate on every poll.
@@ -2298,7 +2318,7 @@ function updateCard(el,t){
   const fl=el.querySelector('.flag'), fe=cc?flagEmoji(cc):'';
   if(fl.textContent!==fe){ fl.textContent=fe; fl.title=cc?countryName(cc):''; }
 
-  setText(el.querySelector('.badge.tr'),(t.transport||'').toUpperCase());
+  setText(el.querySelector('.badge.tr'),trLabel(t.transport));
   el.querySelector('.badge.bot').style.display=t.botRelay?'':'none';
 
   const pe=el.querySelector('.ping'), pc='v ping '+pingClass(t.ping);
@@ -2443,7 +2463,7 @@ function renderDetails(t){
   h+=dRow('Traffic In',t.bytesIn);
   h+=dRow('Traffic Out',t.bytesOut);
   h+=dRow('Preset',t.preset);
-  h+=dRow('Transport',(t.transport||'').toUpperCase());
+  h+=dRow('Transport',trLabel(t.transport));
   h+='</div>';
 
   const lim=[];
@@ -2746,20 +2766,32 @@ function openNewTunnel(){
   // The submit button may have been repurposed to "Create another" by a prior
   // success; put it back to a create action.
   $('nt-submit').onclick=submitNewTunnel;
-  // A plain Amin form always shows the transport picker; openFrp hides it again.
+  // A plain Amin form always shows the transport picker and never the frp-only
+  // protocol picker; openFrp flips both.
   $('nt-transport-row').style.display='';
+  $('nt-frp-proto-row').style.display='none';
   ntSync(); ntSuggestName();
   $('newtun').classList.add('on');
 }
 
 // openFrp reuses the Amin create form for the built-in frp tunnel. frp is just
 // another transport, so the whole create/edit/list/logs lifecycle is shared;
-// the only difference is the transport is fixed to "frp" and its picker hidden.
+// the differences are that the transport is fixed to frp (its picker hidden) and
+// a small TCP/UDP protocol picker takes its place.
 function openFrp(){
   openNewTunnel();
   $('nttitle').textContent=T('New frp tunnel');
-  $('nt-transport').value='frp';
   $('nt-transport-row').style.display='none';
+  $('nt-frp-proto').value='tcp';
+  $('nt-frp-proto-row').style.display='';
+  $('nt-transport').value='frp';
+  ntSync();
+}
+
+// ntFrpProtoChange maps the TCP/UDP choice onto the real transport value: "frp"
+// carries TCP on the exposed ports, "frpu" carries UDP.
+function ntFrpProtoChange(){
+  $('nt-transport').value=$('nt-frp-proto').value==='udp'?'frpu':'frp';
   ntSync();
 }
 function closeNewTunnel(){ $('newtun').classList.remove('on'); }
@@ -2998,10 +3030,13 @@ function ntFill(req){
     ntSetNum('nt-kcprcv',a.kcpRcvWnd); ntSetNum('nt-kcpdata',a.kcpDataShards); ntSetNum('nt-kcpparity',a.kcpParityShards);
     if(typeof a.zeroCopy==='boolean') $('nt-zerocopy').checked=a.zeroCopy;
   }
-  // frp has no transport choice — keep its picker hidden through edits too.
-  if((req.transport||'')==='frp'){
+  // frp has no transport choice — keep its picker hidden through edits and show
+  // the TCP/UDP protocol picker instead, set from the stored transport.
+  if((req.transport||'')==='frp'||(req.transport||'')==='frpu'){
     $('nttitle').textContent=T('Edit frp tunnel');
     $('nt-transport-row').style.display='none';
+    $('nt-frp-proto').value=req.transport==='frpu'?'udp':'tcp';
+    $('nt-frp-proto-row').style.display='';
   }
   ntSync();
 }

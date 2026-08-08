@@ -33,6 +33,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mahdi-byte64/arange-tun/config"
@@ -47,15 +48,32 @@ import (
 // a token. It is not a secret; the token is.
 var magic = []byte("ARANGE-FRP/1")
 
-// maxFrame caps a length-framed control blob (handshake token, target address).
-// These are tiny by nature; the cap is only there so a malformed length can
+// maxFrame caps a length-framed blob. Control blobs (handshake token, target
+// address) are tiny; a UDP datagram frame can be as large as a UDP payload
+// gets, so the cap is the datagram ceiling. It exists so a malformed length can
 // never ask for an unbounded allocation.
-const maxFrame = 4096
+const maxFrame = 65535
 
 // handshakeTimeout bounds how long a half-open connection may sit mid-handshake
 // before it is dropped, so a peer that connects and then says nothing cannot tie
 // up the accept path.
 const handshakeTimeout = 10 * time.Second
+
+// A stream opens with a one-byte mode telling the kharej side how to carry it:
+// as a raw TCP connection, or as a run of framed UDP datagrams.
+const (
+	modeTCP byte = 0
+	modeUDP byte = 1
+)
+
+// udpIdleTimeout retires a UDP flow that has gone quiet. UDP has no close, so a
+// flow is only ever known to be over by its silence; without this a busy server
+// would accumulate a stream per source address forever.
+const udpIdleTimeout = 60 * time.Second
+
+// udpBufSize is the read buffer for one datagram — large enough for any single
+// UDP payload.
+const udpBufSize = 65535
 
 // smuxConfig is the multiplexer tuning both ends must agree on. The keepalive is
 // what lets each side notice a silently dead peer and tear the session down.
@@ -106,6 +124,7 @@ type server struct {
 	cfg    *config.ServerConfig
 	logger *logrus.Logger
 	token  []byte
+	udp    bool // expose the ports as UDP instead of TCP
 
 	mu      sync.Mutex
 	session *smux.Session // the current kharej client, or nil when none is up
@@ -113,8 +132,9 @@ type server struct {
 
 // RunServer runs the Iran side until ctx ends. It listens on the tunnel bind
 // address for the kharej client, and on every exposed port for user traffic.
-func RunServer(ctx context.Context, cfg *config.ServerConfig, logger *logrus.Logger) {
-	s := &server{cfg: cfg, logger: logger, token: []byte(cfg.Token)}
+// When udp is set the exposed ports carry UDP; otherwise they carry TCP.
+func RunServer(ctx context.Context, cfg *config.ServerConfig, logger *logrus.Logger, udp bool) {
+	s := &server{cfg: cfg, logger: logger, token: []byte(cfg.Token), udp: udp}
 
 	var lc net.ListenConfig
 	ln, err := lc.Listen(ctx, "tcp", cfg.BindAddr)
@@ -129,7 +149,11 @@ func RunServer(ctx context.Context, cfg *config.ServerConfig, logger *logrus.Log
 	// client session exists, so users get a clean refusal rather than a hang
 	// while the kharej side is still connecting.
 	for _, mapping := range s.mappings() {
-		go s.serveExposed(ctx, mapping)
+		if s.udp {
+			go s.serveExposedUDP(ctx, mapping)
+		} else {
+			go s.serveExposed(ctx, mapping)
+		}
 	}
 
 	go func() {
@@ -247,25 +271,98 @@ func (s *server) serveExposed(ctx context.Context, m mapping) {
 }
 
 // forward carries one user connection to the client over a fresh stream. The
-// target address is sent first, then the two are spliced together.
+// mode and target are sent first, then the two are spliced together.
 func (s *server) forward(user net.Conn, target string) {
 	defer user.Close()
 
+	stream := s.openTargetStream(modeTCP, target)
+	if stream == nil {
+		return
+	}
+	defer stream.Close()
+	pipe(user, stream)
+}
+
+// openTargetStream opens a stream to the current client and writes the opening
+// preamble — one mode byte then the target address. It returns nil when no
+// client is connected or the stream could not be set up.
+func (s *server) openTargetStream(mode byte, target string) *smux.Stream {
 	sess := s.current()
 	if sess == nil {
-		return // no client connected yet — drop it, the user can retry
+		return nil // no client connected yet — drop it, the user can retry
 	}
 	stream, err := sess.OpenStream()
 	if err != nil {
 		s.logger.Debugf("frp server: cannot open stream: %v", err)
-		return
+		return nil
 	}
-	defer stream.Close()
-
+	if _, err := stream.Write([]byte{mode}); err != nil {
+		stream.Close()
+		return nil
+	}
 	if err := writeFrame(stream, []byte(target)); err != nil {
+		stream.Close()
+		return nil
+	}
+	return stream
+}
+
+// serveExposedUDP listens on one exposed port as UDP and relays each source's
+// datagrams over its own stream. UDP is connectionless, so a "flow" is invented
+// per source address: the first datagram from an address opens a stream, and
+// datagrams keep flowing over it until the flow falls idle.
+func (s *server) serveExposedUDP(ctx context.Context, m mapping) {
+	var lc net.ListenConfig
+	pc, err := lc.ListenPacket(ctx, "udp", m.listen)
+	if err != nil {
+		s.logger.Errorf("frp server: cannot listen (udp) on %s: %v", m.listen, err)
 		return
 	}
-	pipe(user, stream)
+	defer pc.Close()
+	go func() {
+		<-ctx.Done()
+		pc.Close()
+	}()
+	s.logger.Infof("frp server: exposing %s → %s (udp)", m.listen, m.target)
+
+	flows := newUDPFlows()
+	defer flows.closeAll()
+	go flows.reap(ctx)
+
+	buf := make([]byte, udpBufSize)
+	for {
+		n, src, err := pc.ReadFrom(buf)
+		if err != nil {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				continue
+			}
+		}
+		flow := flows.get(src.String())
+		if flow == nil {
+			stream := s.openTargetStream(modeUDP, m.target)
+			if stream == nil {
+				continue
+			}
+			flow = flows.add(src, stream)
+			// Datagrams coming back from the service are written to the same
+			// source address the flow was opened for.
+			go func(f *udpFlow) {
+				streamToPacket(f, pc)
+				flows.remove(f.key)
+			}(flow)
+		}
+		flow.touch()
+		payload := make([]byte, n)
+		copy(payload, buf[:n])
+		if err := writeFrame(flow.stream, payload); err != nil {
+			flows.remove(flow.key)
+			continue
+		}
+		metrics.AddBytes(0, uint64(n))
+	}
 }
 
 // mapping is one exposed-port rule: a local listen address on the Iran side and
@@ -428,18 +525,28 @@ func dialAndServe(ctx context.Context, cfg *config.ClientConfig, logger *logrus.
 	}
 }
 
-// serveStream reads the target from a stream and pipes it to the local service.
+// serveStream reads the opening preamble — a mode byte then the target — and
+// forwards the stream to the local service as TCP or UDP accordingly.
 func serveStream(stream *smux.Stream, logger *logrus.Logger) {
 	defer stream.Close()
 
 	_ = stream.SetReadDeadline(time.Now().Add(handshakeTimeout))
+	var mode [1]byte
+	if _, err := io.ReadFull(stream, mode[:]); err != nil {
+		return
+	}
 	tgt, err := readFrame(stream)
 	if err != nil {
 		return
 	}
 	_ = stream.SetReadDeadline(time.Time{})
-
 	target := string(tgt)
+
+	if mode[0] == modeUDP {
+		serveStreamUDP(stream, target, logger)
+		return
+	}
+
 	local, err := net.DialTimeout("tcp", target, 10*time.Second)
 	if err != nil {
 		logger.Debugf("frp client: cannot reach %s: %v", target, err)
@@ -447,6 +554,54 @@ func serveStream(stream *smux.Stream, logger *logrus.Logger) {
 	}
 	defer local.Close()
 	pipe(local, stream)
+}
+
+// serveStreamUDP dials the local service over UDP and shuttles datagrams both
+// ways: framed datagrams arriving on the stream are written to the socket, and
+// replies are framed back onto the stream. The flow ends when the stream closes
+// or the socket falls idle.
+func serveStreamUDP(stream *smux.Stream, target string, logger *logrus.Logger) {
+	uconn, err := net.DialTimeout("udp", target, 10*time.Second)
+	if err != nil {
+		logger.Debugf("frp client: cannot reach %s (udp): %v", target, err)
+		return
+	}
+	defer uconn.Close()
+
+	done := make(chan struct{})
+
+	// Socket → stream: replies from the service, until the socket falls idle.
+	go func() {
+		defer close(done)
+		buf := make([]byte, udpBufSize)
+		for {
+			_ = uconn.SetReadDeadline(time.Now().Add(udpIdleTimeout))
+			n, err := uconn.Read(buf)
+			if n > 0 {
+				if werr := writeFrame(stream, buf[:n]); werr != nil {
+					return
+				}
+				metrics.AddBytes(uint64(n), 0)
+			}
+			if err != nil {
+				return
+			}
+		}
+	}()
+
+	// Stream → socket: datagrams from the user side.
+	for {
+		payload, err := readFrame(stream)
+		if err != nil {
+			break
+		}
+		if _, err := uconn.Write(payload); err != nil {
+			break
+		}
+		metrics.AddBytes(0, uint64(len(payload)))
+	}
+	uconn.Close()
+	<-done
 }
 
 // ---------------------------------------------------------------------------
@@ -503,6 +658,101 @@ func copyCounted(dst io.Writer, src io.Reader, inbound bool) {
 		if rerr != nil {
 			return
 		}
+	}
+}
+
+// udpFlow is one source address's run of datagrams, carried on its own stream.
+type udpFlow struct {
+	key    string
+	src    net.Addr
+	stream *smux.Stream
+	last   atomic.Int64 // unix-nano of the most recent datagram either way
+}
+
+func (f *udpFlow) touch() { f.last.Store(time.Now().UnixNano()) }
+
+// udpFlows tracks the live flows for one exposed UDP port, keyed by source
+// address, and reaps the ones that fall idle.
+type udpFlows struct {
+	mu sync.Mutex
+	m  map[string]*udpFlow
+}
+
+func newUDPFlows() *udpFlows { return &udpFlows{m: make(map[string]*udpFlow)} }
+
+func (u *udpFlows) get(key string) *udpFlow {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.m[key]
+}
+
+func (u *udpFlows) add(src net.Addr, stream *smux.Stream) *udpFlow {
+	f := &udpFlow{key: src.String(), src: src, stream: stream}
+	f.touch()
+	u.mu.Lock()
+	u.m[f.key] = f
+	u.mu.Unlock()
+	return f
+}
+
+func (u *udpFlows) remove(key string) {
+	u.mu.Lock()
+	f := u.m[key]
+	delete(u.m, key)
+	u.mu.Unlock()
+	if f != nil {
+		f.stream.Close()
+	}
+}
+
+func (u *udpFlows) closeAll() {
+	u.mu.Lock()
+	for _, f := range u.m {
+		f.stream.Close()
+	}
+	u.m = make(map[string]*udpFlow)
+	u.mu.Unlock()
+}
+
+// reap closes flows that have gone quiet for longer than udpIdleTimeout, so a
+// server that has served many short UDP exchanges does not keep a stream open
+// for every source address it has ever seen.
+func (u *udpFlows) reap(ctx context.Context) {
+	t := time.NewTicker(udpIdleTimeout / 2)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			cutoff := time.Now().Add(-udpIdleTimeout).UnixNano()
+			u.mu.Lock()
+			for key, f := range u.m {
+				if f.last.Load() < cutoff {
+					f.stream.Close()
+					delete(u.m, key)
+				}
+			}
+			u.mu.Unlock()
+		}
+	}
+}
+
+// streamToPacket reads framed datagrams from a flow's stream and writes each
+// back to its source address over the shared packet socket, until the stream
+// ends. Each datagram refreshes the flow's idle timer, so a long download with
+// no upstream traffic is not reaped mid-transfer.
+func streamToPacket(f *udpFlow, pc net.PacketConn) {
+	for {
+		payload, err := readFrame(f.stream)
+		if err != nil {
+			return
+		}
+		if _, err := pc.WriteTo(payload, f.src); err != nil {
+			return
+		}
+		f.touch()
+		metrics.AddBytes(uint64(len(payload)), 0)
 	}
 }
 
