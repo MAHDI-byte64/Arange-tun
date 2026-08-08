@@ -45,6 +45,7 @@ import (
 
 	"github.com/mahdi-byte64/arange-tun/config"
 	"github.com/mahdi-byte64/arange-tun/internal/metrics"
+	"github.com/mahdi-byte64/arange-tun/internal/utils/network"
 
 	"github.com/sirupsen/logrus"
 )
@@ -259,6 +260,17 @@ func RunServer(ctx context.Context, cfg *config.ServerConfig, logger *logrus.Log
 // hello starts an authentication, a data hello joins an existing control
 // channel's pool.
 func (s *server) handleIncoming(ctx context.Context, conn net.Conn) {
+	// Stealth: wrap every connection — control and data channels alike — in the
+	// Noise record layer first, so nothing after the TCP connect has a
+	// fingerprint and a peer without the token is dropped without a reply.
+	if s.cfg.Stealth {
+		wrapped, err := network.NoiseServerConn(conn, s.token, handshakeTimeout)
+		if err != nil {
+			conn.Close()
+			return
+		}
+		conn = wrapped
+	}
 	_ = conn.SetDeadline(time.Now().Add(handshakeTimeout))
 	variant, d, err := readHello(conn)
 	if err != nil {
@@ -657,6 +669,15 @@ func runControlClient(ctx context.Context, cfg *config.ClientConfig, logger *log
 		return fmt.Errorf("cannot reach server %s: %w", cfg.RemoteAddr, err)
 	}
 
+	if cfg.Stealth {
+		wrapped, werr := network.NoiseClientConn(conn, cfg.Token, handshakeTimeout)
+		if werr != nil {
+			conn.Close()
+			return fmt.Errorf("stealth handshake failed: %w", werr)
+		}
+		conn = wrapped
+	}
+
 	_ = conn.SetDeadline(time.Now().Add(handshakeTimeout))
 	// The Hello's digest field would normally be sha256(service name) — a
 	// constant, and therefore a DPI signature. With a single logical service the
@@ -734,6 +755,14 @@ func openDataChannel(ctx context.Context, cfg *config.ClientConfig, key [32]byte
 	if err != nil {
 		logger.Debugf("rathole client: data channel dial failed: %v", err)
 		return
+	}
+	if cfg.Stealth {
+		wrapped, werr := network.NoiseClientConn(conn, cfg.Token, handshakeTimeout)
+		if werr != nil {
+			conn.Close()
+			return
+		}
+		conn = wrapped
 	}
 	defer conn.Close()
 

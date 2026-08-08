@@ -78,6 +78,10 @@ type TunnelSpec struct {
 	// per-user device/IP limits. The backend must be configured to expect it.
 	ProxyProtocol bool
 
+	// Stealth wraps an frp/rathole tunnel in the Noise record layer for DPI
+	// resistance. Ignored by the other transports.
+	Stealth bool
+
 	// MaxConnections caps simultaneous forwarded connections (0 = unlimited).
 	MaxConnections int
 	// BandwidthMbps caps total tunnel throughput in Mbit/s (0 = unlimited).
@@ -194,6 +198,16 @@ func needsTLS(t string) bool {
 	return t == "wss" || t == "wssmux"
 }
 
+// isReverseProxy reports whether t is one of Arange-tun's own reverse-proxy
+// tunnels (frp/rathole and their UDP variants), which support the stealth wrap.
+func isReverseProxy(t string) bool {
+	switch t {
+	case "frp", "frpu", "rathole", "ratholeu":
+		return true
+	}
+	return false
+}
+
 // validTransport reports whether t is one of the engine's supported transports.
 func validTransport(t string) bool {
 	switch t {
@@ -219,6 +233,9 @@ func (s TunnelSpec) Render() string {
 			p("preset = %q\n", s.Preset)
 		}
 		p("token = %q\n", s.Token)
+		if s.Stealth {
+			p("stealth = true\n")
+		}
 		p("channel_size = %d\n", s.ChannelSize)
 		p("keepalive_period = %d\n", s.KeepAlive)
 		p("nodelay = %t\n", s.Nodelay)
@@ -297,6 +314,9 @@ func (s TunnelSpec) Render() string {
 		p("preset = %q\n", s.Preset)
 	}
 	p("token = %q\n", s.Token)
+	if s.Stealth {
+		p("stealth = true\n")
+	}
 	p("connection_pool = %d\n", s.ConnectionPool)
 	p("aggressive_pool = %t\n", s.AggressivePool)
 	p("keepalive_period = %d\n", s.KeepAlive)

@@ -129,6 +129,11 @@ type ServerConfig struct {
 	ZeroCopy bool `toml:"zero_copy"`
 
 	ProxyProtocol bool `toml:"proxy_protocol"`
+	// Stealth wraps the frp/rathole tunnel in the Noise record layer — a
+	// random-looking, PSK-authenticated stream with no handshake fingerprint,
+	// the same obfuscation the "stealth" transport uses. Off by default; the
+	// panel turns it on for new frp/rathole tunnels.
+	Stealth bool `toml:"stealth"`
 	// MaxConnections caps simultaneous forwarded connections (0 = unlimited).
 	MaxConnections int `toml:"max_connections"`
 	// BandwidthMbps caps total tunnel throughput in Mbit/s (0 = unlimited).
@@ -221,6 +226,9 @@ type ClientConfig struct {
 	// must reach the SAME server, since the control channel — and therefore
 	// the tunnel's identity — lives on one of them.
 	LoadBalance bool `toml:"load_balance"`
+	// Stealth wraps the frp/rathole tunnel in the Noise record layer. Must match
+	// the server. See ServerConfig.Stealth.
+	Stealth bool `toml:"stealth"`
 	// Embedded so the kcp_* keys sit at the top level of the [client] table
 	// alongside every other tuning key.
 	KCPConfig

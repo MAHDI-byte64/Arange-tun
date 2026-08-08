@@ -2,6 +2,21 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.11.0 — 2026-08-08
+
+**Stealth mode for frp and rathole.** New frp/rathole tunnels are now wrapped in
+the Noise record layer — the same obfuscation the `stealth` transport uses — on
+by default (a toggle in the create form). The whole connection becomes a
+random-looking, PSK-authenticated stream with no handshake fingerprint, its
+record lengths padded so the traffic shape leaks nothing, and a peer without the
+token is dropped without a reply so an active probe finds a dead port. The
+overhead is a fast AEAD and a one-time handshake — throughput is unaffected.
+
+Combined with the previous release's de-fingerprinting and AmneziaWG support,
+the built-in tunnels now have a strong, low-overhead answer to DPI. For the
+very strongest blending, `wss` behind a CDN and the `stealth` transport remain
+the top choices.
+
 ## v1.10.0 — 2026-08-08
 
 **Stop / start a tunnel from the panel.** A tunnel's details now has a Stop

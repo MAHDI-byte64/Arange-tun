@@ -47,6 +47,7 @@ import (
 
 	"github.com/mahdi-byte64/arange-tun/config"
 	"github.com/mahdi-byte64/arange-tun/internal/metrics"
+	"github.com/mahdi-byte64/arange-tun/internal/utils/network"
 
 	"github.com/sirupsen/logrus"
 	"github.com/xtaci/smux"
@@ -205,6 +206,18 @@ func RunServer(ctx context.Context, cfg *config.ServerConfig, logger *logrus.Log
 // handleControl runs the handshake on an incoming connection and, if it checks
 // out, installs it as the live session — displacing any previous one.
 func (s *server) handleControl(ctx context.Context, conn net.Conn) {
+	// Stealth: wrap the whole connection in the Noise record layer first, so
+	// everything after the TCP connect — this handshake, the smux session, all
+	// forwarded traffic — is a random-looking, PSK-authenticated stream with no
+	// fingerprint. A peer without the token is dropped here without a reply.
+	if s.cfg.Stealth {
+		wrapped, err := network.NoiseServerConn(conn, string(s.token), handshakeTimeout)
+		if err != nil {
+			conn.Close()
+			return
+		}
+		conn = wrapped
+	}
 	_ = conn.SetDeadline(time.Now().Add(handshakeTimeout))
 	var hs [saltLen + proofLen]byte
 	if _, err := io.ReadFull(conn, hs[:]); err != nil {
@@ -498,6 +511,17 @@ func dialAndServe(ctx context.Context, cfg *config.ClientConfig, logger *logrus.
 	cancel()
 	if err != nil {
 		return fmt.Errorf("cannot reach server %s: %w", cfg.RemoteAddr, err)
+	}
+
+	// Stealth: upgrade to the Noise record layer before anything else, matching
+	// the server.
+	if cfg.Stealth {
+		wrapped, werr := network.NoiseClientConn(conn, cfg.Token, handshakeTimeout)
+		if werr != nil {
+			conn.Close()
+			return fmt.Errorf("stealth handshake failed: %w", werr)
+		}
+		conn = wrapped
 	}
 
 	// Handshake: a random salt and the token proof, no constant bytes, then wait
