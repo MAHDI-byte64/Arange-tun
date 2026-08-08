@@ -61,11 +61,6 @@ const (
 	tcpPoolWarm       = 2 // data channels pre-requested for latency, like rathole's pool
 )
 
-// serviceName is the single logical service a tunnel represents. rathole matches
-// services by sha256(name); with one tunnel there is exactly one service, so the
-// name is fixed and only its digest travels the wire.
-const serviceName = "arange-tun"
-
 // Hello enum discriminants (bincode u32).
 const (
 	helloControl uint32 = 0
@@ -91,8 +86,14 @@ const (
 	cmdStartForwardUDP uint32 = 1
 )
 
-// digest is rathole's sha256.
-func digest(b []byte) [32]byte { return sha256.Sum256(b) }
+// sinkAndClose swallows whatever a rejected connection sends for a moment, then
+// closes it — so a failed handshake produces no distinctive response for an
+// active probe to fingerprint.
+func sinkAndClose(conn net.Conn) {
+	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	_, _ = io.Copy(io.Discard, io.LimitReader(conn, 1<<16))
+	conn.Close()
+}
 
 // sessionKey is sha256(token ‖ nonce) — the value that both authenticates the
 // control channel and, echoed back in a DataChannelHello, routes a data channel
@@ -297,9 +298,9 @@ func (s *server) controlHandshake(ctx context.Context, conn net.Conn) {
 	}
 	key := sessionKey(s.token, nonce[:])
 	if subtle.ConstantTimeCompare(got[:], key[:]) != 1 {
-		s.logger.Warnf("rathole server: rejected client %s — bad token", conn.RemoteAddr())
-		_ = writeU32(conn, ackAuthFailed)
-		conn.Close()
+		// No distinctive rejection (the AuthFailed ack is a fingerprint an active
+		// probe could match); drain quietly and drop instead.
+		sinkAndClose(conn)
 		return
 	}
 	if err := writeU32(conn, ackOk); err != nil {
@@ -657,8 +658,15 @@ func runControlClient(ctx context.Context, cfg *config.ClientConfig, logger *log
 	}
 
 	_ = conn.SetDeadline(time.Now().Add(handshakeTimeout))
-	// Hello with the service digest.
-	svc := digest([]byte(serviceName))
+	// The Hello's digest field would normally be sha256(service name) — a
+	// constant, and therefore a DPI signature. With a single logical service the
+	// server does not look it up, so a random value goes here instead and nothing
+	// fixed travels the wire.
+	var svc [32]byte
+	if _, err := rand.Read(svc[:]); err != nil {
+		conn.Close()
+		return fmt.Errorf("hello salt failed: %w", err)
+	}
 	if err := writeHello(conn, helloControl, svc); err != nil {
 		conn.Close()
 		return fmt.Errorf("hello write failed: %w", err)

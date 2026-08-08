@@ -21,11 +21,20 @@
 // One kharej client is served at a time: a fresh successful handshake replaces
 // the previous session (most-recent-wins), which is what lets a restarted client
 // take over cleanly without the server needing to notice the old one has gone.
+//
+// The opening handshake carries no constant bytes, so deep packet inspection has
+// no fixed signature to match: the client sends a random 16-byte salt followed
+// by HMAC-SHA256(token, salt), and the server recomputes it. A connection that
+// fails the check is not answered with a distinctive rejection — it is drained
+// quietly and dropped, so an active probe cannot tell the port apart from a dead
+// one.
 package frp
 
 import (
 	"context"
-	"crypto/subtle"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -43,10 +52,27 @@ import (
 	"github.com/xtaci/smux"
 )
 
-// magic prefixes the handshake so a stray connection — a health probe, a port
-// scanner, the wrong protocol — is rejected immediately instead of being read as
-// a token. It is not a secret; the token is.
-var magic = []byte("ARANGE-FRP/1")
+const (
+	saltLen  = 16
+	proofLen = 32 // sha256 output
+)
+
+// authProof is HMAC-SHA256(token, salt): the value a client proves it knows the
+// token by. It looks random on the wire and differs every connection.
+func authProof(token, salt []byte) []byte {
+	h := hmac.New(sha256.New, token)
+	h.Write(salt)
+	return h.Sum(nil)
+}
+
+// sinkAndClose swallows whatever a rejected connection sends for a moment, then
+// closes it — so a bad handshake produces no distinctive response for a probe to
+// fingerprint, just a socket that accepted data and went quiet.
+func sinkAndClose(conn net.Conn) {
+	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	_, _ = io.Copy(io.Discard, io.LimitReader(conn, 1<<16))
+	conn.Close()
+}
 
 // maxFrame caps a length-framed blob. Control blobs (handshake token, target
 // address) are tiny; a UDP datagram frame can be as large as a UDP payload
@@ -180,20 +206,15 @@ func RunServer(ctx context.Context, cfg *config.ServerConfig, logger *logrus.Log
 // out, installs it as the live session — displacing any previous one.
 func (s *server) handleControl(ctx context.Context, conn net.Conn) {
 	_ = conn.SetDeadline(time.Now().Add(handshakeTimeout))
-	blob, err := readFrame(conn)
-	if err != nil {
+	var hs [saltLen + proofLen]byte
+	if _, err := io.ReadFull(conn, hs[:]); err != nil {
 		conn.Close()
 		return
 	}
-	if len(blob) < len(magic) || subtle.ConstantTimeCompare(blob[:len(magic)], magic) != 1 {
-		conn.Close()
-		return
-	}
-	got := blob[len(magic):]
-	if subtle.ConstantTimeCompare(got, s.token) != 1 {
-		s.logger.Warnf("frp server: rejected client %s — bad token", conn.RemoteAddr())
-		_, _ = conn.Write([]byte{0x00})
-		conn.Close()
+	salt, proof := hs[:saltLen], hs[saltLen:]
+	if !hmac.Equal(proof, authProof(s.token, salt)) {
+		// No distinctive rejection — drain quietly so a probe learns nothing.
+		sinkAndClose(conn)
 		return
 	}
 	if _, err := conn.Write([]byte{0x01}); err != nil {
@@ -479,16 +500,25 @@ func dialAndServe(ctx context.Context, cfg *config.ClientConfig, logger *logrus.
 		return fmt.Errorf("cannot reach server %s: %w", cfg.RemoteAddr, err)
 	}
 
-	// Handshake: announce ourselves, then wait for the one-byte verdict.
+	// Handshake: a random salt and the token proof, no constant bytes, then wait
+	// for the one-byte verdict.
 	_ = conn.SetDeadline(time.Now().Add(handshakeTimeout))
-	if err := writeFrame(conn, append(append([]byte{}, magic...), []byte(cfg.Token)...)); err != nil {
+	hs := make([]byte, 0, saltLen+proofLen)
+	var salt [saltLen]byte
+	if _, err := rand.Read(salt[:]); err != nil {
+		conn.Close()
+		return fmt.Errorf("handshake salt failed: %w", err)
+	}
+	hs = append(hs, salt[:]...)
+	hs = append(hs, authProof([]byte(cfg.Token), salt[:])...)
+	if _, err := conn.Write(hs); err != nil {
 		conn.Close()
 		return fmt.Errorf("handshake write failed: %w", err)
 	}
 	var verdict [1]byte
 	if _, err := io.ReadFull(conn, verdict[:]); err != nil {
 		conn.Close()
-		return fmt.Errorf("handshake read failed: %w", err)
+		return fmt.Errorf("handshake read failed (rejected?): %w", err)
 	}
 	if verdict[0] != 0x01 {
 		conn.Close()
