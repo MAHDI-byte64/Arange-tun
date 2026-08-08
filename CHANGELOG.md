@@ -2,6 +2,27 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.10.0 — 2026-08-08
+
+**Stop / start a tunnel from the panel.** A tunnel's details now has a Stop
+button (Start when it is already stopped) — it disables and stops the service
+without touching its config, so it stays down until you start it again.
+
+**DPI resistance.** Steps so the tunnels are harder to detect and block:
+
+- **frp / rathole** no longer open with constant bytes a DPI rule could match.
+  frp's fixed magic is gone — the client proves the token with a random salt and
+  an HMAC — and rathole's constant service digest is replaced with a random
+  value. A failed handshake is now drained silently instead of being answered,
+  so an active probe cannot tell the port from a dead one.
+- **WireGuard** runs on AmneziaWG in userspace. A plain config behaves exactly
+  as before, but a pasted **AmneziaWG** config's obfuscation parameters
+  (junk packets, header randomization) are now honored — which is what gets past
+  the WireGuard-fingerprint blocking in regions that do it.
+
+For the strongest blending, still prefer `wss` behind a CDN or the `stealth`
+transport, and run tunnels on port 443.
+
 ## v1.9.1 — 2026-08-08
 
 - **WireGuard exit-node traffic is now shown.** The server's data plane is in

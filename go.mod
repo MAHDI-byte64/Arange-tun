@@ -1,9 +1,12 @@
 module github.com/mahdi-byte64/arange-tun
 
-go 1.24.0
+go 1.24.4
+
+toolchain go1.24.7
 
 require (
 	github.com/BurntSushi/toml v1.4.1-0.20240526193622-a339e1f7089c
+	github.com/amnezia-vpn/amneziawg-go v0.2.19
 	github.com/flynn/noise v1.1.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/refraction-networking/utls v1.8.2
@@ -22,7 +25,7 @@ require (
 require (
 	github.com/andybalholm/brotli v1.0.6 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
-	github.com/google/btree v1.1.2 // indirect
+	github.com/google/btree v1.1.3 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/josharian/native v1.1.0 // indirect
 	github.com/klauspost/compress v1.17.4 // indirect

@@ -27,9 +27,13 @@ import (
 	"github.com/mahdi-byte64/arange-tun/internal/metrics"
 
 	"github.com/sirupsen/logrus"
-	"golang.zx2c4.com/wireguard/conn"
-	"golang.zx2c4.com/wireguard/device"
-	"golang.zx2c4.com/wireguard/tun/netstack"
+	// The userspace client runs on AmneziaWG-go, a drop-in fork of wireguard-go:
+	// with no A-params it is wire-compatible with standard WireGuard, and when a
+	// pasted config carries them it applies the junk/obfuscation that defeats the
+	// WireGuard fingerprint DPI blocks in some regions.
+	"github.com/amnezia-vpn/amneziawg-go/conn"
+	"github.com/amnezia-vpn/amneziawg-go/device"
+	"github.com/amnezia-vpn/amneziawg-go/tun/netstack"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
@@ -45,6 +49,10 @@ type ParsedClient struct {
 	Endpoint      string
 	AllowedIPs    string
 	Keepalive     int
+
+	// AmneziaWG parameters (present only in AmneziaWG configs).
+	Jc, Jmin, Jmax, S1, S2 int
+	H1, H2, H3, H4         uint32
 }
 
 // ParseClientConfig reads a standard wg-quick config ([Interface] / [Peer]) and
@@ -79,6 +87,24 @@ func ParseClientConfig(text string) (*ParsedClient, error) {
 				pc.DNS = val
 			case "mtu":
 				pc.MTU, _ = strconv.Atoi(val)
+			case "jc":
+				pc.Jc, _ = strconv.Atoi(val)
+			case "jmin":
+				pc.Jmin, _ = strconv.Atoi(val)
+			case "jmax":
+				pc.Jmax, _ = strconv.Atoi(val)
+			case "s1":
+				pc.S1, _ = strconv.Atoi(val)
+			case "s2":
+				pc.S2, _ = strconv.Atoi(val)
+			case "h1":
+				pc.H1 = parseUint32(val)
+			case "h2":
+				pc.H2 = parseUint32(val)
+			case "h3":
+				pc.H3 = parseUint32(val)
+			case "h4":
+				pc.H4 = parseUint32(val)
 			}
 		case "peer":
 			switch key {
@@ -124,6 +150,16 @@ func GenerateKeypair() (priv, pub string, err error) {
 		return "", "", err
 	}
 	return k.String(), k.PublicKey().String(), nil
+}
+
+// parseUint32 reads an AmneziaWG magic-header value, which is an unsigned
+// 32-bit integer. A malformed value becomes 0 (the param off).
+func parseUint32(s string) uint32 {
+	v, err := strconv.ParseUint(strings.TrimSpace(s), 10, 32)
+	if err != nil {
+		return 0
+	}
+	return uint32(v)
 }
 
 // keyHex converts a base64 WireGuard key to the hex the wireguard-go uapi wants.
@@ -249,6 +285,19 @@ func clientUAPI(wc *config.WireGuardConfig) (string, error) {
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "private_key=%s\n", priv)
+	// AmneziaWG device parameters are interface-level, so they come before the
+	// peer. They are emitted only when configured; absent, this is plain WG.
+	if wc.Jc > 0 {
+		fmt.Fprintf(&b, "jc=%d\n", wc.Jc)
+		fmt.Fprintf(&b, "jmin=%d\n", wc.Jmin)
+		fmt.Fprintf(&b, "jmax=%d\n", wc.Jmax)
+		fmt.Fprintf(&b, "s1=%d\n", wc.S1)
+		fmt.Fprintf(&b, "s2=%d\n", wc.S2)
+		fmt.Fprintf(&b, "h1=%d\n", wc.H1)
+		fmt.Fprintf(&b, "h2=%d\n", wc.H2)
+		fmt.Fprintf(&b, "h3=%d\n", wc.H3)
+		fmt.Fprintf(&b, "h4=%d\n", wc.H4)
+	}
 	fmt.Fprintf(&b, "public_key=%s\n", pub)
 	if strings.TrimSpace(wc.PresharedKey) != "" {
 		psk, err := keyHex(wc.PresharedKey)

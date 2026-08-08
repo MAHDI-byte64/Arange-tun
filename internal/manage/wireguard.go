@@ -139,6 +139,18 @@ func wgRenderClient(name string, pc *wireguard.ParsedClient, socksBind string, s
 	if pc.Keepalive > 0 {
 		fmt.Fprintf(&b, "keepalive = %d\n", pc.Keepalive)
 	}
+	// AmneziaWG obfuscation, emitted only when the pasted config carried it.
+	if pc.Jc > 0 {
+		fmt.Fprintf(&b, "jc = %d\n", pc.Jc)
+		fmt.Fprintf(&b, "jmin = %d\n", pc.Jmin)
+		fmt.Fprintf(&b, "jmax = %d\n", pc.Jmax)
+		fmt.Fprintf(&b, "s1 = %d\n", pc.S1)
+		fmt.Fprintf(&b, "s2 = %d\n", pc.S2)
+		fmt.Fprintf(&b, "h1 = %d\n", pc.H1)
+		fmt.Fprintf(&b, "h2 = %d\n", pc.H2)
+		fmt.Fprintf(&b, "h3 = %d\n", pc.H3)
+		fmt.Fprintf(&b, "h4 = %d\n", pc.H4)
+	}
 	fmt.Fprintf(&b, "socks_bind = %q\n", socksBind)
 	fmt.Fprintf(&b, "socks_port = %d\n", socksPort)
 	return b.String()

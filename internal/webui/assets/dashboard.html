@@ -2914,7 +2914,7 @@ const TUTORIALS={
       '<li><b>🇮🇷 Client</b> — on your panel server. Paste that WireGuard config; Arange-tun brings the tunnel up in userspace and opens a <b>SOCKS5 proxy</b> on the port you choose (bound to 127.0.0.1). Its traffic leaves through the WireGuard endpoint.</li></ul>'+
       '<h4>Using it with x-ui / 3x-ui</h4>'+
       '<p>Create the <b>client</b> on the same server as your panel, then add a <b>SOCKS outbound</b> in the panel pointing at <code>127.0.0.1:&lt;your SOCKS5 port&gt;</code>. Route the users/rules you want through that outbound and they leave by the WireGuard IP.</p>'+
-      '<p>You can also paste any WireGuard config here (WARP, a provider, your own server) — not only one from the “server” side.</p>'+
+      '<p>You can also paste any WireGuard config here (WARP, a provider, your own server) — not only one from the “server” side. <b>AmneziaWG</b> configs work too: their obfuscation parameters are honored, which helps where plain WireGuard is fingerprinted and blocked.</p>'+
       '<p>Close this guide to open the form.</p>',
     fa:'<p><b>وایرگارد</b> اینجا یک خروج VPN است، نه تونل معکوس. دو سمت دارد:</p>'+
       '<ul>'+
@@ -2922,7 +2922,7 @@ const TUTORIALS={
       '<li><b>🇮🇷 کلاینت</b> — روی سرور پنلت. آن کانفیگ وایرگارد را paste کن؛ آرنج‌تان تونل را در فضای کاربر بالا می‌آورد و یک <b>پراکسی SOCKS5</b> روی پورتی که انتخاب می‌کنی باز می‌کند (روی 127.0.0.1). ترافیکش از اندپوینت وایرگارد بیرون می‌رود.</li></ul>'+
       '<h4>استفاده با x-ui / 3x-ui</h4>'+
       '<p><b>کلاینت</b> را روی همان سروری که پنل داری بساز، بعد در پنل یک <b>اوت‌باند SOCKS</b> اضافه کن که به <code>127.0.0.1:&lt;پورت SOCKS5&gt;</code> اشاره کند. هر کاربر/قانونی را که می‌خواهی از آن اوت‌باند رد کن تا با آی‌پی وایرگارد خارج شوند.</p>'+
-      '<p>هر کانفیگ وایرگاردی را هم می‌توانی اینجا paste کنی (WARP، یک سرویس‌دهنده، سرور خودت) — فقط مخصوص سمت «سرور» نیست.</p>'+
+      '<p>هر کانفیگ وایرگاردی را هم می‌توانی اینجا paste کنی (WARP، یک سرویس‌دهنده، سرور خودت) — فقط مخصوص سمت «سرور» نیست. کانفیگ‌های <b>AmneziaWG</b> هم کار می‌کنند: پارامترهای obfuscation آن‌ها اعمال می‌شود که جایی که وایرگارد ساده فینگرپرینت و بلاک می‌شود کمک می‌کند.</p>'+
       '<p>برای باز شدن فرم، این راهنما را ببند.</p>'}},
   _soon:function(name){ return {
     title:{en:name+' — coming soon', fa:name+' — به‌زودی'},body:{

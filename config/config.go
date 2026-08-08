@@ -260,6 +260,19 @@ type WireGuardConfig struct {
 	Keepalive        int    `toml:"keepalive"`
 	SocksBind        string `toml:"socks_bind"` // e.g. "127.0.0.1"
 	SocksPort        int    `toml:"socks_port"`
+
+	// AmneziaWG obfuscation parameters, taken from a pasted AmneziaWG config.
+	// All zero means plain WireGuard (wire-compatible); set together they add the
+	// junk packets and header randomization that hide the WireGuard fingerprint.
+	Jc   int    `toml:"jc"`   // junk packet count
+	Jmin int    `toml:"jmin"` // junk packet min size
+	Jmax int    `toml:"jmax"` // junk packet max size
+	S1   int    `toml:"s1"`   // init packet junk size
+	S2   int    `toml:"s2"`   // response packet junk size
+	H1   uint32 `toml:"h1"`   // magic header — init
+	H2   uint32 `toml:"h2"`   // magic header — response
+	H3   uint32 `toml:"h3"`   // magic header — underload
+	H4   uint32 `toml:"h4"`   // magic header — transport
 }
 
 // Config represents the complete configuration, including both server and client settings.
