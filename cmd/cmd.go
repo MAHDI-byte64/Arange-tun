@@ -10,6 +10,7 @@ import (
 
 	"github.com/mahdi-byte64/arange-tun/config"
 	"github.com/mahdi-byte64/arange-tun/internal/client"
+	"github.com/mahdi-byte64/arange-tun/internal/frp"
 
 	"github.com/mahdi-byte64/arange-tun/internal/server"
 	"github.com/mahdi-byte64/arange-tun/internal/utils"
@@ -118,6 +119,16 @@ func runEngine(cfg *config.Config, ctx context.Context, configPath string, apply
 
 		startMetrics(ctx, configPath, string(cfg.Server.Transport), "server")
 
+		// frp is Arange-tun's own reverse-proxy protocol, not part of the Amin
+		// engine's transport set, so it runs its own server here.
+		if cfg.Server.Transport == config.TransportType("frp") {
+			log := utils.NewLoggerWithFormat(cfg.Server.LogLevel, cfg.Server.LogFormat)
+			go frp.RunServer(ctx, &cfg.Server, log)
+			<-ctx.Done()
+			logger.Println("shutting down frp server...")
+			return
+		}
+
 		srv := server.NewServer(&cfg.Server, ctx) // server
 		reportZeroCopy(ctx)
 		go srv.Start()
@@ -133,6 +144,16 @@ func runEngine(cfg *config.Config, ctx context.Context, configPath string, apply
 		}
 
 		startMetrics(ctx, configPath, string(cfg.Client.Transport), "client")
+
+		// frp is Arange-tun's own reverse-proxy protocol, not part of the Amin
+		// engine's transport set, so it runs its own client here.
+		if cfg.Client.Transport == config.TransportType("frp") {
+			log := utils.NewLoggerWithFormat(cfg.Client.LogLevel, cfg.Client.LogFormat)
+			go frp.RunClient(ctx, &cfg.Client, log)
+			<-ctx.Done()
+			logger.Println("shutting down frp client...")
+			return
+		}
 
 		clnt := client.NewClient(&cfg.Client, ctx) // client
 		reportZeroCopy(ctx)
