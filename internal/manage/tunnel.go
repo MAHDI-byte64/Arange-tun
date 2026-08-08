@@ -1,6 +1,7 @@
 package manage
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -33,6 +34,17 @@ func List() []Tunnel {
 		name := strings.TrimSuffix(filepath.Base(path), ".toml")
 		t := Tunnel{Name: name, Service: app.ServiceName(name)}
 		switch {
+		case cfg.WireGuard.Role != "":
+			// WireGuard is a VPN egress, not a reverse tunnel. For a client the
+			// address is the WG endpoint it dials; for a server it is the UDP
+			// port it listens on.
+			t.Role = cfg.WireGuard.Role
+			t.Transport = "wireguard"
+			if cfg.WireGuard.Role == "client" {
+				t.Addr = cfg.WireGuard.Endpoint
+			} else {
+				t.Addr = fmt.Sprintf(":%d", cfg.WireGuard.ListenPort)
+			}
 		case cfg.Server.BindAddr != "":
 			t.Role = "server"
 			t.Transport = string(cfg.Server.Transport)

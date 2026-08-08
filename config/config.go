@@ -226,8 +226,45 @@ type ClientConfig struct {
 	KCPConfig
 }
 
+// WGPeer is one allowed client on a WireGuard exit server: its public key and
+// the address it is given inside the tunnel.
+type WGPeer struct {
+	PublicKey  string `toml:"public_key"`
+	AllowedIPs string `toml:"allowed_ips"` // e.g. "10.66.66.2/32"
+}
+
+// WireGuardConfig configures a WireGuard tunnel. It is not a reverse tunnel like
+// the others: a "server" is a real kernel WireGuard exit node that NATs its
+// peers out to the internet, and a "client" brings WireGuard up in userspace and
+// exposes a SOCKS5 proxy whose traffic egresses through the tunnel — the proxy a
+// panel like x-ui points an outbound at.
+type WireGuardConfig struct {
+	Role string `toml:"role"` // "server" or "client"
+
+	// Server (exit node) fields.
+	PrivateKey string   `toml:"private_key"` // interface private key (base64)
+	ListenPort int      `toml:"listen_port"` // UDP port the server listens on
+	Address    string   `toml:"address"`     // interface address, e.g. "10.66.66.1/24"
+	Egress     string   `toml:"egress"`      // outbound interface to NAT through; empty = auto-detect
+	Peers      []WGPeer `toml:"peers"`
+
+	// Client fields, parsed from a pasted wg-quick config.
+	ClientPrivateKey string `toml:"client_private_key"`
+	ClientAddress    string `toml:"client_address"` // interface address(es), comma-separated
+	DNS              string `toml:"dns"`            // resolver reached through the tunnel; empty = 1.1.1.1
+	MTU              int    `toml:"mtu"`
+	PeerPublicKey    string `toml:"peer_public_key"`
+	PresharedKey     string `toml:"preshared_key"`
+	Endpoint         string `toml:"endpoint"` // server host:port
+	AllowedIPs       string `toml:"allowed_ips"`
+	Keepalive        int    `toml:"keepalive"`
+	SocksBind        string `toml:"socks_bind"` // e.g. "127.0.0.1"
+	SocksPort        int    `toml:"socks_port"`
+}
+
 // Config represents the complete configuration, including both server and client settings.
 type Config struct {
-	Server ServerConfig `toml:"server"`
-	Client ClientConfig `toml:"client"`
+	Server    ServerConfig    `toml:"server"`
+	Client    ClientConfig    `toml:"client"`
+	WireGuard WireGuardConfig `toml:"wireguard"`
 }

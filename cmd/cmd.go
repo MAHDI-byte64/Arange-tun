@@ -12,6 +12,7 @@ import (
 	"github.com/mahdi-byte64/arange-tun/internal/client"
 	"github.com/mahdi-byte64/arange-tun/internal/frp"
 	"github.com/mahdi-byte64/arange-tun/internal/rathole"
+	"github.com/mahdi-byte64/arange-tun/internal/wireguard"
 
 	"github.com/mahdi-byte64/arange-tun/internal/server"
 	"github.com/mahdi-byte64/arange-tun/internal/utils"
@@ -101,6 +102,25 @@ func Run(configPath string, ctx context.Context) {
 
 // runEngine runs one tunnel until ctx ends.
 func runEngine(cfg *config.Config, ctx context.Context, configPath string, applyTuning bool) {
+	// WireGuard is a VPN egress, not a reverse tunnel, so it has its own config
+	// section and engine — a userspace client with a SOCKS5 proxy, or a kernel
+	// exit-node server.
+	if role := cfg.WireGuard.Role; role != "" {
+		startMetrics(ctx, configPath, "wireguard", role)
+		log := utils.NewLoggerWithFormat(cfg.Server.LogLevel, cfg.Server.LogFormat)
+		switch role {
+		case "client":
+			go wireguard.RunClient(ctx, &cfg.WireGuard, log)
+		case "server":
+			go wireguard.RunServer(ctx, &cfg.WireGuard, log)
+		default:
+			logger.Fatalf("wireguard: unknown role %q", role)
+		}
+		<-ctx.Done()
+		logger.Println("shutting down wireguard...")
+		return
+	}
+
 	configType := ""
 	if cfg.Server.BindAddr != "" {
 		configType = "server"

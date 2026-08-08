@@ -60,6 +60,12 @@ func tunnelHealthWith(t Tunnel, pairs [][2]string) Health {
 		h.State, h.Detail = "stopped", "no systemd unit — the tunnel is not installed"
 	case !h.Active:
 		h.State, h.Detail = "stopped", "service is not running"
+	case t.Transport == "wireguard":
+		// WireGuard is a VPN egress, not a reverse tunnel: there is no peer
+		// socket to observe in the TCP table, so a running service is the
+		// signal. The client only opens its SOCKS5 port once the tunnel is up.
+		h.Connected = true
+		h.State, h.Detail = "online", "running"
 	default:
 		h.Connected = tunnelHealthy(t, pairs)
 		// tunnelHealthy answers the watchdog's question — "is this worth

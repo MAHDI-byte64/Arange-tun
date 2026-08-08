@@ -254,6 +254,10 @@
   .modal input{width:100%;padding:13px 15px;font-size:15px;color:var(--txt);background:rgba(255,255,255,.05);
     border:1px solid var(--stroke);border-radius:12px;outline:none;transition:.2s;margin-bottom:14px}
   .modal input:focus{border-color:var(--red);box-shadow:0 0 0 4px rgba(var(--accent-rgb),.18)}
+  .modal textarea{width:100%;box-sizing:border-box;padding:12px 14px;font-size:12.5px;line-height:1.5;
+    color:var(--txt);background:rgba(255,255,255,.05);border:1px solid var(--stroke);border-radius:12px;
+    outline:none;transition:.2s;margin-bottom:14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical}
+  .modal textarea:focus{border-color:var(--red);box-shadow:0 0 0 4px rgba(var(--accent-rgb),.18)}
   .modal .msg{font-size:12.5px;min-height:18px;margin-bottom:10px}
   /* Matches the CLI, where a success line is bold white and only an error is
      colored — green here would be a second meaning for the status color. */
@@ -1357,6 +1361,59 @@
   </div>
 </div>
 
+<div class="modal" id="wgtun" onclick="if(event.target===this)closeWG()">
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="wgtitle" style="width:min(94vw,520px)">
+    <h3 id="wgtitle" data-i18n>New WireGuard tunnel</h3>
+    <p data-i18n>WireGuard as an outbound: a server is an exit node that generates a config; a client brings WireGuard up and exposes a SOCKS5 proxy through it — point your panel's outbound at that SOCKS5.</p>
+
+    <label for="wg-role" data-i18n>Side</label>
+    <select id="wg-role" onchange="wgSync()">
+      <option value="server" data-i18n>🌍 Server — exit node (generates a WireGuard config)</option>
+      <option value="client" data-i18n>🇮🇷 Client — SOCKS5 proxy through a WireGuard config</option>
+    </select>
+
+    <label for="wg-name" data-i18n>Tunnel name</label>
+    <input id="wg-name" type="text" autocomplete="off" spellcheck="false" placeholder="wg-out" maxlength="40">
+
+    <div id="wg-server-fields">
+      <label for="wg-port" data-i18n>WireGuard listen port</label>
+      <input id="wg-port" type="number" min="1" max="65535" step="1" placeholder="51820">
+      <label for="wg-endpoint" data-i18n>This server's public IP or domain</label>
+      <input id="wg-endpoint" type="text" autocomplete="off" spellcheck="false" placeholder="1.2.3.4">
+      <label for="wg-dns" data-i18n>DNS handed to the client (optional)</label>
+      <input id="wg-dns" type="text" autocomplete="off" spellcheck="false" placeholder="1.1.1.1">
+      <label for="wg-egress" data-i18n>NAT out-interface (optional — auto-detected)</label>
+      <input id="wg-egress" type="text" autocomplete="off" spellcheck="false" placeholder="eth0">
+    </div>
+
+    <div id="wg-client-fields">
+      <label for="wg-config" data-i18n>WireGuard config — paste it here</label>
+      <textarea id="wg-config" rows="9" spellcheck="false" placeholder="[Interface]&#10;PrivateKey = ...&#10;Address = 10.66.66.2/32&#10;DNS = 1.1.1.1&#10;&#10;[Peer]&#10;PublicKey = ...&#10;Endpoint = 1.2.3.4:51820&#10;AllowedIPs = 0.0.0.0/0, ::/0"></textarea>
+      <label for="wg-socksport" data-i18n>SOCKS5 port</label>
+      <input id="wg-socksport" type="number" min="1" max="65535" step="1" placeholder="1080">
+      <p class="hint" style="margin:-8px 0 14px;font-size:11.5px;color:var(--muted2)" data-i18n>The SOCKS5 proxy binds to 127.0.0.1 — set it as an outbound in your panel (x-ui / 3x-ui) on this same server.</p>
+    </div>
+
+    <div id="wg-msg" class="msg"></div>
+    <div class="actions" style="margin-top:6px">
+      <button class="btn-ghost" onclick="closeWG()" data-i18n>Close</button>
+      <button class="btn-primary" id="wg-submit" onclick="submitWG()" data-i18n>Create tunnel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="wgresult" onclick="if(event.target===this)closeWGResult()">
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="wgrtitle" style="width:min(94vw,520px)">
+    <h3 id="wgrtitle" data-i18n>WireGuard server created</h3>
+    <p data-i18n>Copy this client config to the machine that will use the tunnel — there, create a WireGuard “client” tunnel and paste it.</p>
+    <textarea id="wg-clientconf" rows="12" readonly spellcheck="false" onclick="this.select()"></textarea>
+    <div class="actions" style="margin-top:6px">
+      <button class="btn-ghost" type="button" onclick="copyText($('wg-clientconf').value,this)" data-i18n>Copy</button>
+      <button class="btn-primary" onclick="closeWGResult()" data-i18n>Done</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="newtun" onclick="if(event.target===this)closeNewTunnel()">
   <div class="box" role="dialog" aria-modal="true" aria-labelledby="nttitle" style="width:min(94vw,460px)">
     <h3 id="nttitle" data-i18n>New tunnel</h3>
@@ -1810,6 +1867,19 @@ const FA={
   "Edit frp tunnel":"ویرایش تونل frp",
   "New rathole tunnel":"تونل rathole جدید",
   "Edit rathole tunnel":"ویرایش تونل rathole",
+  "New WireGuard tunnel":"تونل وایرگارد جدید",
+  "WireGuard as an outbound: a server is an exit node that generates a config; a client brings WireGuard up and exposes a SOCKS5 proxy through it — point your panel's outbound at that SOCKS5.":"وایرگارد به‌عنوان اوت‌باند: سرور یک اکسیت‌نود است که کانفیگ می‌سازد؛ کلاینت وایرگارد را بالا می‌آورد و یک پراکسی SOCKS5 از داخل تونل باز می‌کند — اوت‌باند پنلت را به آن SOCKS5 وصل کن.",
+  "🌍 Server — exit node (generates a WireGuard config)":"🌍 سرور — اکسیت‌نود (کانفیگ وایرگارد می‌سازد)",
+  "🇮🇷 Client — SOCKS5 proxy through a WireGuard config":"🇮🇷 کلاینت — پراکسی SOCKS5 روی یک کانفیگ وایرگارد",
+  "WireGuard listen port":"پورت شنود وایرگارد",
+  "This server's public IP or domain":"آی‌پی عمومی یا دامنهٔ این سرور",
+  "DNS handed to the client (optional)":"DNS داده‌شده به کلاینت (اختیاری)",
+  "NAT out-interface (optional — auto-detected)":"اینترفیس خروجی NAT (اختیاری — خودکار تشخیص داده می‌شود)",
+  "WireGuard config — paste it here":"کانفیگ وایرگارد — اینجا paste کن",
+  "SOCKS5 port":"پورت SOCKS5",
+  "The SOCKS5 proxy binds to 127.0.0.1 — set it as an outbound in your panel (x-ui / 3x-ui) on this same server.":"پراکسی SOCKS5 روی 127.0.0.1 بایند می‌شود — در پنل (x-ui / 3x-ui) روی همین سرور به‌عنوان اوت‌باند تنظیمش کن.",
+  "WireGuard server created":"سرور وایرگارد ساخته شد",
+  "Copy this client config to the machine that will use the tunnel — there, create a WireGuard “client” tunnel and paste it.":"این کانفیگ کلاینت را روی ماشینی که از تونل استفاده می‌کند کپی کن — آنجا یک تانل وایرگارد «کلاینت» بساز و paste کن.",
   "Protocol":"پروتکل",
   "TCP — for the usual x-ui / Xray inbounds":"TCP — برای اینباندهای معمول x-ui / Xray",
   "UDP — for WireGuard, Hysteria, QUIC and other datagram services":"UDP — برای WireGuard، Hysteria، QUIC و سرویس‌های دیتاگرامی دیگر",
@@ -2277,6 +2347,7 @@ function trLabel(t){
   if(t==='frpu') return 'FRP (UDP)';
   if(t==='rathole') return 'Rathole v2 (TCP)';
   if(t==='ratholeu') return 'Rathole v2 (UDP)';
+  if(t==='wireguard') return 'WireGuard';
   return t.toUpperCase();
 }
 
@@ -2669,7 +2740,7 @@ const TUN_TYPES=[
   {id:'backhaul', name:'Backhaul', ready:false, desc:{en:'High-performance reverse tunnel.', fa:'تونل معکوس پرسرعت.'}},
   {id:'packet', name:'Packet', ready:false,     desc:{en:'Packet-level tunnel.', fa:'تونل در سطح پکت.'}},
   {id:'openvpn', name:'OpenVPN Tunnel', ready:false, desc:{en:'OpenVPN-based tunnel.', fa:'تونل مبتنی بر OpenVPN.'}},
-  {id:'wireguard', name:'WireGuard Tunnel', ready:false, desc:{en:'WireGuard-based tunnel.', fa:'تونل مبتنی بر WireGuard.'}}
+  {id:'wireguard', name:'WireGuard', ready:true,  desc:{en:'VPN egress + SOCKS5 outbound.', fa:'خروج VPN + اوت‌باند SOCKS5.'}}
 ];
 function openChooser(){
   const g=$('typegrid'); g.innerHTML='';
@@ -2706,6 +2777,49 @@ function tutProceed(){
   if(tutType==='amin') openNewTunnel();
   else if(tutType==='frp') openFrp();
   else if(tutType==='rathole') openRathole();
+  else if(tutType==='wireguard') openWireGuard();
+}
+
+// WireGuard is not a reverse tunnel, so it has its own form: a server generates
+// an exit-node config, a client pastes a WireGuard config and exposes a SOCKS5.
+function openWireGuard(){
+  $('wgtitle').textContent=T('New WireGuard tunnel');
+  wgMsg('');
+  $('wg-submit').disabled=false; $('wg-submit').textContent=T('Create tunnel');
+  ['wg-name','wg-port','wg-endpoint','wg-dns','wg-egress','wg-config','wg-socksport'].forEach(id=>{ if($(id)) $(id).value=''; });
+  $('wg-role').value='server';
+  wgSync();
+  $('wgtun').classList.add('on');
+}
+function closeWG(){ $('wgtun').classList.remove('on'); }
+function closeWGResult(){ $('wgresult').classList.remove('on'); }
+function wgSync(){
+  const role=$('wg-role').value;
+  $('wg-server-fields').style.display=role==='server'?'':'none';
+  $('wg-client-fields').style.display=role==='client'?'':'none';
+}
+function wgMsg(text,isErr){ const m=$('wg-msg'); m.textContent=text||''; m.className='msg'+(text?(isErr?' err':' ok'):''); }
+async function submitWG(){
+  const role=$('wg-role').value, name=$('wg-name').value.trim();
+  if(!name){ wgMsg(T('A tunnel name is required.'),true); return; }
+  const btn=$('wg-submit'); btn.disabled=true; wgMsg(T('Creating…'));
+  try{
+    if(role==='server'){
+      const req={name, listenPort:parseInt($('wg-port').value,10)||0, endpoint:$('wg-endpoint').value.trim(), dns:$('wg-dns').value.trim(), egress:$('wg-egress').value.trim()};
+      const r=await fetch('/api/wg/server',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(req)});
+      if(!r.ok){ wgMsg((await r.text())||('HTTP '+r.status),true); btn.disabled=false; return; }
+      const res=await r.json();
+      closeWG(); loadTunnels(); go('control');
+      $('wg-clientconf').value=res.clientConfig||'';
+      $('wgresult').classList.add('on');
+    }else{
+      const req={name, config:$('wg-config').value, socksBind:'127.0.0.1', socksPort:parseInt($('wg-socksport').value,10)||0};
+      const r=await fetch('/api/wg/client',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(req)});
+      if(!r.ok){ wgMsg((await r.text())||('HTTP '+r.status),true); btn.disabled=false; return; }
+      closeWG(); loadTunnels(); go('control');
+      toast('“'+name+'” '+T('created.'));
+    }
+  }catch(e){ wgMsg(T('Network error.'),true); btn.disabled=false; }
 }
 
 // Tutorials shown before the create form. _soon builds a short placeholder for
@@ -2765,6 +2879,23 @@ const TUTORIALS={
       '<li>اول <b>سرور ایران</b> را بساز: پورت تانل و پورت‌های نمایش‌داده‌شده (مثل <code>443</code> یا <code>8080=127.0.0.1:8080</code>) را بگذار و توکن ساخته‌شده را کپی کن.</li>'+
       '<li>سپس سمت <b>خارج</b> را بساز: آی‌پی سرور ایران، پورت تانل، و <b>همان توکن</b>.</li>'+
       '<li><b>پروتکل</b> را انتخاب کن — TCP برای اینباندهای معمول، UDP برای WireGuard/Hysteria/QUIC — روی هر دو سمت یکسان.</li></ol>'+
+      '<p>برای باز شدن فرم، این راهنما را ببند.</p>'}},
+  wireguard:{title:{en:'WireGuard — setup guide', fa:'وایرگارد — راهنمای راه‌اندازی'},body:{
+    en:'<p><b>WireGuard</b> here is a VPN egress, not a reverse tunnel. It has two sides:</p>'+
+      '<ul>'+
+      '<li><b>🌍 Server (exit node)</b> — on a machine abroad. It generates a WireGuard config and runs a real exit server (kernel WireGuard + NAT). Copy the client config it shows you.</li>'+
+      '<li><b>🇮🇷 Client</b> — on your panel server. Paste that WireGuard config; Arange-tun brings the tunnel up in userspace and opens a <b>SOCKS5 proxy</b> on the port you choose (bound to 127.0.0.1). Its traffic leaves through the WireGuard endpoint.</li></ul>'+
+      '<h4>Using it with x-ui / 3x-ui</h4>'+
+      '<p>Create the <b>client</b> on the same server as your panel, then add a <b>SOCKS outbound</b> in the panel pointing at <code>127.0.0.1:&lt;your SOCKS5 port&gt;</code>. Route the users/rules you want through that outbound and they leave by the WireGuard IP.</p>'+
+      '<p>You can also paste any WireGuard config here (WARP, a provider, your own server) — not only one from the “server” side.</p>'+
+      '<p>Close this guide to open the form.</p>',
+    fa:'<p><b>وایرگارد</b> اینجا یک خروج VPN است، نه تونل معکوس. دو سمت دارد:</p>'+
+      '<ul>'+
+      '<li><b>🌍 سرور (اکسیت‌نود)</b> — روی یک ماشین خارج. یک کانفیگ وایرگارد می‌سازد و یک سرور خروج واقعی بالا می‌آورد (وایرگارد کرنلی + NAT). کانفیگ کلاینتی که نشانت می‌دهد را کپی کن.</li>'+
+      '<li><b>🇮🇷 کلاینت</b> — روی سرور پنلت. آن کانفیگ وایرگارد را paste کن؛ آرنج‌تان تونل را در فضای کاربر بالا می‌آورد و یک <b>پراکسی SOCKS5</b> روی پورتی که انتخاب می‌کنی باز می‌کند (روی 127.0.0.1). ترافیکش از اندپوینت وایرگارد بیرون می‌رود.</li></ul>'+
+      '<h4>استفاده با x-ui / 3x-ui</h4>'+
+      '<p><b>کلاینت</b> را روی همان سروری که پنل داری بساز، بعد در پنل یک <b>اوت‌باند SOCKS</b> اضافه کن که به <code>127.0.0.1:&lt;پورت SOCKS5&gt;</code> اشاره کند. هر کاربر/قانونی را که می‌خواهی از آن اوت‌باند رد کن تا با آی‌پی وایرگارد خارج شوند.</p>'+
+      '<p>هر کانفیگ وایرگاردی را هم می‌توانی اینجا paste کنی (WARP، یک سرویس‌دهنده، سرور خودت) — فقط مخصوص سمت «سرور» نیست.</p>'+
       '<p>برای باز شدن فرم، این راهنما را ببند.</p>'}},
   _soon:function(name){ return {
     title:{en:name+' — coming soon', fa:name+' — به‌زودی'},body:{

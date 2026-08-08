@@ -2,6 +2,22 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.9.0 — 2026-08-08
+
+A new tunnel type: **WireGuard**, as a VPN egress rather than a reverse tunnel,
+managed from the panel like every other tunnel.
+
+- **Server** — brings up a real kernel WireGuard exit node (interface + NAT so
+  its peers reach the internet through this machine) and generates a ready
+  client config to copy.
+- **Client** — brings WireGuard up in userspace (no kernel interface, no change
+  to the host's routing) from a pasted WireGuard config, and exposes a **SOCKS5
+  proxy** on a port you choose, bound to 127.0.0.1. Point a panel outbound
+  (x-ui / 3x-ui) at it and those users leave by the WireGuard endpoint's IP. Any
+  WireGuard config works — WARP, a provider, or your own server.
+
+Built on the wireguard-go library (userspace) — no external binary.
+
 ## v1.8.0 — 2026-08-08
 
 Two new tunnel types, built into the engine and managed from the panel exactly

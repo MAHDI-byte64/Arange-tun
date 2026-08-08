@@ -56,6 +56,58 @@ func (s *server) handleTunnelCreate(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleWGServerCreate generates a WireGuard exit-node tunnel and returns the
+// client config to hand out.
+func (s *server) handleWGServerCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxTunnelBody)
+	var req struct {
+		Name       string `json:"name"`
+		ListenPort int    `json:"listenPort"`
+		Endpoint   string `json:"endpoint"`
+		DNS        string `json:"dns"`
+		Egress     string `json:"egress"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "could not read the request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	conf, err := manage.CreateWireGuardServer(req.Name, req.ListenPort, req.Endpoint, req.DNS, req.Egress)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]any{"status": "ok", "name": strings.TrimSpace(req.Name), "clientConfig": conf})
+}
+
+// handleWGClientCreate brings up a userspace WireGuard client from a pasted
+// config and exposes a SOCKS5 proxy.
+func (s *server) handleWGClientCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxTunnelBody)
+	var req struct {
+		Name      string `json:"name"`
+		Config    string `json:"config"`
+		SocksBind string `json:"socksBind"`
+		SocksPort int    `json:"socksPort"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "could not read the request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := manage.CreateWireGuardClient(req.Name, req.Config, req.SocksBind, req.SocksPort); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]any{"status": "ok", "name": strings.TrimSpace(req.Name)})
+}
+
 // handleTunnelGet returns an existing tunnel's config in the same shape the
 // create form uses, so the panel can prefill it for editing.
 func (s *server) handleTunnelGet(w http.ResponseWriter, r *http.Request) {

@@ -440,7 +440,12 @@ func GatherTunnels() []TunnelInfo {
 				Country:    manage.TunnelCountry(t.Name),
 				Ping:       -1,
 			}
-			if t.Role == "server" {
+			if t.Transport == "wireguard" {
+				// WireGuard is a VPN egress: there is no reverse-tunnel peer to
+				// probe or geo-locate. Its state comes from health, and its
+				// traffic from the metrics file below.
+				info.State = health[t.Name].State
+			} else if t.Role == "server" {
 				// Server (e.g. the Iran node): we can't ping our own bind_addr,
 				// but we can detect the connected client(s) — the kharej peers
 				// dialing in — and measure/geo-locate them. This gives the Iran
