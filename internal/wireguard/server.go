@@ -7,8 +7,10 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/mahdi-byte64/arange-tun/config"
+	"github.com/mahdi-byte64/arange-tun/internal/metrics"
 
 	"github.com/sirupsen/logrus"
 	"golang.zx2c4.com/wireguard/wgctrl"
@@ -101,9 +103,62 @@ func RunServer(ctx context.Context, wc *config.WireGuardConfig, logger *logrus.L
 	logger.Infof("wireguard server: exit node up on %s (udp/%d), NAT via %s, %d peer(s)",
 		ifname, wc.ListenPort, egress, len(wc.Peers))
 
+	// The server's data plane is in the kernel, so this process never sees the
+	// bytes. Read the interface's counters and report the deltas, so the panel
+	// shows the exit node's traffic like every other tunnel.
+	go pollTraffic(ctx, ifname)
+
 	<-ctx.Done()
 	logger.Println("wireguard server: shutting down, removing interface and NAT rules")
 	teardown()
+}
+
+// pollTraffic reads the WireGuard interface's byte counters every few seconds
+// and reports the change since the last read to the metrics collector. The
+// counters are cumulative across all peers; "in" is what peers sent, "out" is
+// what was sent to them.
+func pollTraffic(ctx context.Context, ifname string) {
+	cl, err := wgctrl.New()
+	if err != nil {
+		return
+	}
+	defer cl.Close()
+
+	var lastRx, lastTx int64
+	first := true
+	t := time.NewTicker(5 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			dev, err := cl.Device(ifname)
+			if err != nil {
+				continue
+			}
+			var rx, tx int64
+			for _, p := range dev.Peers {
+				rx += p.ReceiveBytes
+				tx += p.TransmitBytes
+			}
+			if !first {
+				// A counter only ever grows; a negative delta means the interface
+				// was recreated, so treat it as no traffic this interval.
+				din, dout := rx-lastRx, tx-lastTx
+				if din < 0 {
+					din = 0
+				}
+				if dout < 0 {
+					dout = 0
+				}
+				if din > 0 || dout > 0 {
+					metrics.AddBytes(uint64(din), uint64(dout))
+				}
+			}
+			lastRx, lastTx, first = rx, tx, false
+		}
+	}
 }
 
 // configureDevice sets the private key, listen port and peers on the interface

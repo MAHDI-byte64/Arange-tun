@@ -477,6 +477,8 @@
   .ccnote{font-size:12.5px;color:var(--muted);margin:-8px 2px 18px}
   /* ---------- tunnel-type chooser ---------- */
   .typegrid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .typegrid .tc-group{grid-column:1/-1;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:6px 2px 0}
+  .typegrid .tc-group:first-child{margin-top:0}
   .typecard{position:relative;text-align:start;padding:14px;border-radius:16px;border:1px solid var(--stroke);
     background:rgba(255,255,255,.03);color:var(--txt);cursor:pointer;transition:.2s;font:inherit}
   .typecard:hover{border-color:rgba(var(--accent-rgb),.4);background:rgba(var(--accent-rgb),.06);transform:translateY(-1px)}
@@ -1867,6 +1869,8 @@ const FA={
   "Edit frp tunnel":"ویرایش تونل frp",
   "New rathole tunnel":"تونل rathole جدید",
   "Edit rathole tunnel":"ویرایش تونل rathole",
+  "Reverse tunnels — port forwarding":"تانل‌های معکوس — فوروارد پورت",
+  "Direct — VPN outbound":"مستقیم — خروجی VPN",
   "New WireGuard tunnel":"تونل وایرگارد جدید",
   "WireGuard as an outbound: a server is an exit node that generates a config; a client brings WireGuard up and exposes a SOCKS5 proxy through it — point your panel's outbound at that SOCKS5.":"وایرگارد به‌عنوان اوت‌باند: سرور یک اکسیت‌نود است که کانفیگ می‌سازد؛ کلاینت وایرگارد را بالا می‌آورد و یک پراکسی SOCKS5 از داخل تونل باز می‌کند — اوت‌باند پنلت را به آن SOCKS5 وصل کن.",
   "🌍 Server — exit node (generates a WireGuard config)":"🌍 سرور — اکسیت‌نود (کانفیگ وایرگارد می‌سازد)",
@@ -2733,26 +2737,37 @@ function closePageHelp(){ $('pagehelp').classList.remove('on'); }
 // Only "Amin Tunnel" — the built-in Go engine — is buildable today. The rest
 // are shown as choices with their own guide and a "soon" badge, so the flow is
 // ready for them to be filled in one type at a time.
+// kind splits the chooser into two families: "reverse" tunnels forward ports
+// back to Iran; "direct" tunnels are VPN egress (connect out, no port forward).
 const TUN_TYPES=[
-  {id:'amin', name:'Amin Tunnel', ready:true,  desc:{en:'The built-in engine — TCP/UDP/WS, KCP, Stealth.', fa:'موتور داخلی — TCP/UDP/WS، KCP، Stealth.'}},
-  {id:'frp', name:'frp', ready:true,          desc:{en:'Fast reverse proxy.', fa:'ریورس‌پراکسی سریع.'}},
-  {id:'rathole', name:'Rathole v2', ready:true,  desc:{en:'Pooled data-channel reverse proxy.', fa:'ریورس‌پراکسی با کانال دادهٔ مجزا.'}},
-  {id:'backhaul', name:'Backhaul', ready:false, desc:{en:'High-performance reverse tunnel.', fa:'تونل معکوس پرسرعت.'}},
-  {id:'packet', name:'Packet', ready:false,     desc:{en:'Packet-level tunnel.', fa:'تونل در سطح پکت.'}},
-  {id:'openvpn', name:'OpenVPN Tunnel', ready:false, desc:{en:'OpenVPN-based tunnel.', fa:'تونل مبتنی بر OpenVPN.'}},
-  {id:'wireguard', name:'WireGuard', ready:true,  desc:{en:'VPN egress + SOCKS5 outbound.', fa:'خروج VPN + اوت‌باند SOCKS5.'}}
+  {id:'amin', name:'Amin Tunnel', ready:true, kind:'reverse', desc:{en:'The built-in engine — TCP/UDP/WS, KCP, Stealth.', fa:'موتور داخلی — TCP/UDP/WS، KCP، Stealth.'}},
+  {id:'frp', name:'frp', ready:true, kind:'reverse', desc:{en:'Fast reverse proxy.', fa:'ریورس‌پراکسی سریع.'}},
+  {id:'rathole', name:'Rathole v2', ready:true, kind:'reverse', desc:{en:'Pooled data-channel reverse proxy.', fa:'ریورس‌پراکسی با کانال دادهٔ مجزا.'}},
+  {id:'backhaul', name:'Backhaul', ready:false, kind:'reverse', desc:{en:'High-performance reverse tunnel.', fa:'تونل معکوس پرسرعت.'}},
+  {id:'packet', name:'Packet', ready:false, kind:'reverse', desc:{en:'Packet-level tunnel.', fa:'تونل در سطح پکت.'}},
+  {id:'wireguard', name:'WireGuard', ready:true, kind:'direct', desc:{en:'VPN egress + SOCKS5 outbound.', fa:'خروج VPN + اوت‌باند SOCKS5.'}},
+  {id:'openvpn', name:'OpenVPN Tunnel', ready:false, kind:'direct', desc:{en:'OpenVPN-based tunnel.', fa:'تونل مبتنی بر OpenVPN.'}}
 ];
 function openChooser(){
   const g=$('typegrid'); g.innerHTML='';
-  TUN_TYPES.forEach(function(t){
-    const card=document.createElement('button');
-    card.className='typecard'+(t.ready?'':' soon');
-    card.type='button';
-    card.innerHTML='<span class="tc-badge '+(t.ready?'ready':'soon')+'">'+(t.ready?T('ready'):T('soon'))+'</span>'+
-      '<div class="tc-name">'+esc(t.name)+'</div>'+
-      '<div class="tc-desc">'+esc(t.desc[LANG]||t.desc.en)+'</div>';
-    card.onclick=function(){ chooseType(t.id); };
-    g.appendChild(card);
+  [{kind:'reverse', label:T('Reverse tunnels — port forwarding')},
+   {kind:'direct',  label:T('Direct — VPN outbound')}].forEach(function(grp){
+    const types=TUN_TYPES.filter(function(t){ return (t.kind||'reverse')===grp.kind; });
+    if(!types.length) return;
+    const head=document.createElement('div');
+    head.className='tc-group';
+    head.textContent=grp.label;
+    g.appendChild(head);
+    types.forEach(function(t){
+      const card=document.createElement('button');
+      card.className='typecard'+(t.ready?'':' soon');
+      card.type='button';
+      card.innerHTML='<span class="tc-badge '+(t.ready?'ready':'soon')+'">'+(t.ready?T('ready'):T('soon'))+'</span>'+
+        '<div class="tc-name">'+esc(t.name)+'</div>'+
+        '<div class="tc-desc">'+esc(t.desc[LANG]||t.desc.en)+'</div>';
+      card.onclick=function(){ chooseType(t.id); };
+      g.appendChild(card);
+    });
   });
   $('chooser').classList.add('on');
 }

@@ -2,6 +2,16 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.9.1 — 2026-08-08
+
+- **WireGuard exit-node traffic is now shown.** The server's data plane is in
+  the kernel, so the process never saw the bytes; it now reads the interface's
+  counters and reports them, so the exit node's traffic appears like any other
+  tunnel's.
+- **The Add-tunnel chooser is split in two:** "Reverse tunnels — port
+  forwarding" (Amin, frp, Rathole v2, Backhaul, Packet) and "Direct — VPN
+  outbound" (WireGuard, OpenVPN).
+
 ## v1.9.0 — 2026-08-08
 
 A new tunnel type: **WireGuard**, as a VPN egress rather than a reverse tunnel,
