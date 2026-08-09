@@ -2,6 +2,15 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.14.2 — 2026-08-09
+
+**Packet tunnels no longer show as offline in the panel.** Packet injects raw
+packets below the kernel stack, so — like WireGuard — it has no socket in the
+kernel's TCP table for the health check to observe. The panel's socket-based
+check therefore reported a perfectly working packet tunnel as offline on both
+ends. Packet is now treated like WireGuard: a running service reports online, and
+the watchdog no longer counts it as a drop.
+
 ## v1.14.1 — 2026-08-09
 
 **Packet tunnel fixes.**

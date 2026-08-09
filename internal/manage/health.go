@@ -66,6 +66,12 @@ func tunnelHealthWith(t Tunnel, pairs [][2]string) Health {
 		// signal. The client only opens its SOCKS5 port once the tunnel is up.
 		h.Connected = true
 		h.State, h.Detail = "online", "running"
+	case t.Transport == "packet":
+		// Packet injects raw TCP packets below the kernel stack, so the tunnel
+		// has no socket in the kernel's TCP table to observe — like WireGuard,
+		// a running service is the only signal available here.
+		h.Connected = true
+		h.State, h.Detail = "online", "running"
 	default:
 		h.Connected = tunnelHealthy(t, pairs)
 		// tunnelHealthy answers the watchdog's question — "is this worth

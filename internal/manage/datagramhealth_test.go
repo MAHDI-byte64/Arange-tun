@@ -42,6 +42,18 @@ func TestDatagramServerIsNotReportedOffline(t *testing.T) {
 	}
 }
 
+// Packet injects raw packets below the kernel stack, so it has no socket in the
+// TCP table either — a running packet tunnel (server or client) must not be
+// reported unhealthy just because the socket check finds nothing.
+func TestPacketTunnelIsNotReportedOffline(t *testing.T) {
+	for _, role := range []string{"server", "client"} {
+		tun := Tunnel{Name: "p", Role: role, Transport: "packet", Addr: "1.2.3.4:8888"}
+		if !tunnelHealthy(tun, nil) {
+			t.Errorf("a running packet %s was reported unhealthy with no TCP sockets", role)
+		}
+	}
+}
+
 // The same tunnel over TCP genuinely is offline with no peer, and must still be
 // reported that way — the fix must not make everything look healthy.
 func TestTCPServerWithNoPeerIsStillOffline(t *testing.T) {

@@ -74,6 +74,14 @@ func RunWatchdog(ctx context.Context) {
 // tunnelHealthy reports whether a running tunnel currently has its connection up,
 // based on the established TCP sockets in `pairs` ([local, peer] address pairs).
 func tunnelHealthy(t Tunnel, pairs [][2]string) bool {
+	// Packet injects raw packets below the kernel stack, so there is no kernel
+	// socket to observe. A running service is treated as healthy — as with
+	// WireGuard — rather than being restarted forever on a check that can never
+	// succeed.
+	if t.Transport == "packet" {
+		return true
+	}
+
 	// UDP-based transports (udp, kcp) hold no TCP sockets at all, so the TCP
 	// table says nothing about them.
 	//
