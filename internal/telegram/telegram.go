@@ -631,8 +631,7 @@ func webUIText() string {
 }
 
 func supportText() string {
-	return "GitHub : https://github.com/mahdi-byte64\n" +
-		"Telegram : https://t.me/devmahdi_com"
+	return "GitHub : https://github.com/mahdi-byte64"
 }
 
 func sleepCtx(ctx context.Context, d time.Duration) {

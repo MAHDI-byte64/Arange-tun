@@ -66,10 +66,12 @@ func TestSystemTextIsTrimmed(t *testing.T) {
 
 func TestSupportTextFormat(t *testing.T) {
 	got := supportText()
-	for _, want := range []string{"GitHub : ", "Telegram : "} {
-		if !strings.Contains(got, want) {
-			t.Errorf("support text is missing %q:\n%s", want, got)
-		}
+	if !strings.Contains(got, "GitHub : ") {
+		t.Errorf("support text is missing %q:\n%s", "GitHub : ", got)
+	}
+	// The Telegram contact was removed everywhere; it must not come back.
+	if strings.Contains(got, "Telegram") {
+		t.Errorf("support text still carries a Telegram contact, which was removed:\n%s", got)
 	}
 }
 

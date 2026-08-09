@@ -70,9 +70,21 @@ func (s *server) handleWGServerCreate(w http.ResponseWriter, r *http.Request) {
 		Endpoint   string `json:"endpoint"`
 		DNS        string `json:"dns"`
 		Egress     string `json:"egress"`
+		Edit       bool   `json:"edit"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "could not read the request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	// An edit preserves the server's keys and peers, so it does not hand back a
+	// new client config — the existing one still works (only its Endpoint port
+	// changes if the listen port did).
+	if req.Edit {
+		if err := manage.UpdateWireGuardServer(req.Name, req.ListenPort, req.Egress); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, map[string]any{"status": "ok", "name": strings.TrimSpace(req.Name), "edit": true})
 		return
 	}
 	conf, err := manage.CreateWireGuardServer(req.Name, req.ListenPort, req.Endpoint, req.DNS, req.Egress)
@@ -81,6 +93,22 @@ func (s *server) handleWGServerCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]any{"status": "ok", "name": strings.TrimSpace(req.Name), "clientConfig": conf})
+}
+
+// handleWGGet returns a WireGuard tunnel's editable fields for the panel's edit
+// form.
+func (s *server) handleWGGet(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimSpace(r.URL.Query().Get("name"))
+	if name == "" {
+		http.Error(w, "missing tunnel name", http.StatusBadRequest)
+		return
+	}
+	view, err := manage.WireGuardForEdit(name)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, view)
 }
 
 // handleWGClientCreate brings up a userspace WireGuard client from a pasted
@@ -96,12 +124,20 @@ func (s *server) handleWGClientCreate(w http.ResponseWriter, r *http.Request) {
 		Config    string `json:"config"`
 		SocksBind string `json:"socksBind"`
 		SocksPort int    `json:"socksPort"`
+		Edit      bool   `json:"edit"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "could not read the request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := manage.CreateWireGuardClient(req.Name, req.Config, req.SocksBind, req.SocksPort); err != nil {
+	var err error
+	if req.Edit {
+		// An empty config on an edit keeps the current one (SOCKS-only change).
+		err = manage.UpdateWireGuardClient(req.Name, req.Config, req.SocksBind, req.SocksPort)
+	} else {
+		err = manage.CreateWireGuardClient(req.Name, req.Config, req.SocksBind, req.SocksPort)
+	}
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -121,17 +157,40 @@ func (s *server) handlePacketServerCreate(w http.ResponseWriter, r *http.Request
 		ListenPort int    `json:"listenPort"`
 		Key        string `json:"key"`
 		Block      string `json:"block"`
+		Edit       bool   `json:"edit"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "could not read the request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	key, err := manage.CreatePacketServer(req.Name, req.ListenPort, req.Key, req.Block)
+	var key string
+	var err error
+	if req.Edit {
+		key, err = manage.UpdatePacketServer(req.Name, req.ListenPort, req.Key, req.Block)
+	} else {
+		key, err = manage.CreatePacketServer(req.Name, req.ListenPort, req.Key, req.Block)
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	writeJSON(w, map[string]any{"status": "ok", "name": strings.TrimSpace(req.Name), "key": key})
+	writeJSON(w, map[string]any{"status": "ok", "name": strings.TrimSpace(req.Name), "key": key, "edit": req.Edit})
+}
+
+// handlePacketGet returns a packet tunnel's config so the panel can prefill its
+// edit form.
+func (s *server) handlePacketGet(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimSpace(r.URL.Query().Get("name"))
+	if name == "" {
+		http.Error(w, "missing tunnel name", http.StatusBadRequest)
+		return
+	}
+	view, err := manage.PacketForEdit(name)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, view)
 }
 
 // handlePacketClientCreate starts a Packet entry node (Iran) that exposes ports
@@ -149,12 +208,19 @@ func (s *server) handlePacketClientCreate(w http.ResponseWriter, r *http.Request
 		Block      string   `json:"block"`
 		Ports      []string `json:"ports"`
 		Socks      string   `json:"socks"`
+		Edit       bool     `json:"edit"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "could not read the request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := manage.CreatePacketClient(req.Name, req.ServerAddr, req.Key, req.Block, req.Ports, req.Socks); err != nil {
+	var err error
+	if req.Edit {
+		err = manage.UpdatePacketClient(req.Name, req.ServerAddr, req.Key, req.Block, req.Ports, req.Socks)
+	} else {
+		err = manage.CreatePacketClient(req.Name, req.ServerAddr, req.Key, req.Block, req.Ports, req.Socks)
+	}
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

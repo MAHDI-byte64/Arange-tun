@@ -1279,11 +1279,8 @@
     <h3 id="suptitle" data-i18n>Support Arange-tun</h3>
     <p data-i18n>Free & open-source. If it helps you, a star on GitHub means a lot. 🙏</p>
     <div class="actions" style="margin-bottom:16px">
-      <button class="btn-ghost" onclick="window.open('https://github.com/mahdi-byte64','_blank','noopener')">
+      <button class="btn-primary" onclick="window.open('https://github.com/mahdi-byte64','_blank','noopener')">
         <svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px;display:inline;vertical-align:-3px;margin-right:6px"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.9a3.4 3.4 0 00-1-2.6c3-.3 6.5-1.5 6.5-7A5.4 5.4 0 0020 4.8 5 5 0 0019.9 1S18.7.6 16 2.5a13.4 13.4 0 00-7 0C6.3.6 5.1 1 5.1 1A5 5 0 005 4.8 5.4 5.4 0 003.5 8.5c0 5.5 3.5 6.7 6.5 7a3.4 3.4 0 00-1 2.6V22"/></svg>GitHub
-      </button>
-      <button class="btn-primary" onclick="window.open('https://t.me/devmahdi_com','_blank','noopener')">
-        <svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px;display:inline;vertical-align:-3px;margin-right:6px"><path d="M22 3L2 11l6 2 2 6 3-4 5 4z"/><path d="M8 13l8-6"/></svg>Telegram
       </button>
     </div>
     <div class="actions" style="margin-top:18px">
@@ -1381,17 +1378,21 @@
     <div id="wg-server-fields">
       <label for="wg-port" data-i18n>WireGuard listen port</label>
       <input id="wg-port" type="number" min="1" max="65535" step="1" placeholder="51820">
-      <label for="wg-endpoint" data-i18n>This server's public IP or domain</label>
-      <input id="wg-endpoint" type="text" autocomplete="off" spellcheck="false" placeholder="1.2.3.4">
-      <label for="wg-dns" data-i18n>DNS handed to the client (optional)</label>
-      <input id="wg-dns" type="text" autocomplete="off" spellcheck="false" placeholder="1.1.1.1">
+      <div id="wg-server-createonly">
+        <label for="wg-endpoint" data-i18n>This server's public IP or domain</label>
+        <input id="wg-endpoint" type="text" autocomplete="off" spellcheck="false" placeholder="1.2.3.4">
+        <label for="wg-dns" data-i18n>DNS handed to the client (optional)</label>
+        <input id="wg-dns" type="text" autocomplete="off" spellcheck="false" placeholder="1.1.1.1">
+      </div>
       <label for="wg-egress" data-i18n>NAT out-interface (optional — auto-detected)</label>
       <input id="wg-egress" type="text" autocomplete="off" spellcheck="false" placeholder="eth0">
+      <p id="wg-edit-note" class="hint" style="display:none;margin:2px 0 14px;font-size:11.5px;color:var(--muted2)" data-i18n>The server keys are kept, so existing clients keep working. If you change the port, update the Endpoint port in the client configs you already handed out.</p>
     </div>
 
     <div id="wg-client-fields">
       <label for="wg-config" data-i18n>WireGuard config — paste it here</label>
       <textarea id="wg-config" rows="9" spellcheck="false" placeholder="[Interface]&#10;PrivateKey = ...&#10;Address = 10.66.66.2/32&#10;DNS = 1.1.1.1&#10;&#10;[Peer]&#10;PublicKey = ...&#10;Endpoint = 1.2.3.4:51820&#10;AllowedIPs = 0.0.0.0/0, ::/0"></textarea>
+      <p id="wg-client-editnote" class="hint" style="display:none;margin:-8px 0 14px;font-size:11.5px;color:var(--muted2)" data-i18n>Leave the config box empty to keep the current one — fill it only to replace the config.</p>
       <label for="wg-socksport" data-i18n>SOCKS5 port</label>
       <input id="wg-socksport" type="number" min="1" max="65535" step="1" placeholder="1080">
       <p class="hint" style="margin:-8px 0 14px;font-size:11.5px;color:var(--muted2)" data-i18n>The SOCKS5 proxy binds to 127.0.0.1 — set it as an outbound in your panel (x-ui / 3x-ui) on this same server.</p>
@@ -1981,6 +1982,11 @@ const FA={
   "WireGuard server created":"سرور وایرگارد ساخته شد",
   "Copy this client config to the machine that will use the tunnel — there, create a WireGuard “client” tunnel and paste it.":"این کانفیگ کلاینت را روی ماشینی که از تونل استفاده می‌کند کپی کن — آنجا یک تانل وایرگارد «کلاینت» بساز و paste کن.",
   "New Packet tunnel":"تونل پکت جدید",
+  "Edit Packet tunnel":"ویرایش تونل پکت",
+  "Edit WireGuard tunnel":"ویرایش تونل وایرگارد",
+  "saved.":"ذخیره شد.",
+  "The server keys are kept, so existing clients keep working. If you change the port, update the Endpoint port in the client configs you already handed out.":"کلیدهای سرور حفظ می‌شوند، پس کلاینت‌های فعلی کار می‌کنند. اگر پورت را عوض کنی، پورت Endpoint را در کانفیگ‌های کلاینتی که قبلاً داده‌ای به‌روزرسانی کن.",
+  "Leave the config box empty to keep the current one — fill it only to replace the config.":"برای نگه‌داشتن کانفیگ فعلی، کادر کانفیگ را خالی بگذار — فقط برای جایگزینی، آن را پر کن.",
   "Packet carries the tunnel inside crafted raw TCP packets, below the kernel's stack, so DPI and stateful firewalls never see it. The server is the abroad exit; the client (Iran) exposes the ports and dials out. Both ends need root and libpcap.":"پکت تونل را داخل پکت‌های TCP خامِ ساختگی و زیر لایهٔ کرنل حمل می‌کند، پس DPI و فایروال‌های stateful آن را نمی‌بینند. سرور اکسیت‌نود خارج است؛ کلاینت (ایران) پورت‌ها را نمایش می‌دهد و به بیرون dial می‌کند. هر دو سمت به root و libpcap نیاز دارند.",
   "🌍 Server — exit node abroad (generates a key)":"🌍 سرور — اکسیت‌نود در خارج (کلید می‌سازد)",
   "🇮🇷 Client — Iran entry that exposes ports":"🇮🇷 کلاینت — ورودی ایران که پورت‌ها را نمایش می‌دهد",
@@ -2924,12 +2930,42 @@ function tutProceed(){
 
 // WireGuard is not a reverse tunnel, so it has its own form: a server generates
 // an exit-node config, a client pastes a WireGuard config and exposes a SOCKS5.
+let wgEditMode='';
 function openWireGuard(){
   $('wgtitle').textContent=T('New WireGuard tunnel');
   wgMsg('');
+  wgEditMode='';
   $('wg-submit').disabled=false; $('wg-submit').textContent=T('Create tunnel');
   ['wg-name','wg-port','wg-endpoint','wg-dns','wg-egress','wg-config','wg-socksport'].forEach(id=>{ if($(id)) $(id).value=''; });
-  $('wg-role').value='server';
+  $('wg-name').readOnly=false;
+  $('wg-role').value='server'; $('wg-role').disabled=false;
+  wgSync();
+  $('wgtun').classList.add('on');
+}
+// openWireGuardEdit reuses the WireGuard form to edit an existing tunnel. A
+// server's keys/peers are preserved server-side (only the port and egress are
+// editable); a client can change its SOCKS port and, optionally, re-paste a
+// whole new config.
+async function openWireGuardEdit(name){
+  let d;
+  try{
+    const r=await fetch('/api/wg/get?name='+encodeURIComponent(name));
+    if(!r.ok){ toast((await r.text())||T('Could not load the tunnel.'),true); return; }
+    d=await r.json();
+  }catch(e){ toast(T('Network error.'),true); return; }
+  closeDetails();
+  openWireGuard();
+  wgEditMode=name;
+  $('wgtitle').textContent=T('Edit WireGuard tunnel');
+  $('wg-submit').textContent=T('Save changes');
+  const nm=$('wg-name'); nm.value=name; nm.readOnly=true;
+  $('wg-role').value=d.role||'server'; $('wg-role').disabled=true;
+  if(d.role==='server'){
+    $('wg-port').value=d.listenPort||'';
+    $('wg-egress').value=d.egress||'';
+  }else{
+    $('wg-socksport').value=d.socksPort||'';
+  }
   wgSync();
   $('wgtun').classList.add('on');
 }
@@ -2937,6 +2973,12 @@ function closeWG(){ $('wgtun').classList.remove('on'); }
 function closeWGResult(){ $('wgresult').classList.remove('on'); }
 function wgSync(){
   const role=$('wg-role').value;
+  const editing=!!wgEditMode;
+  // On an edit the endpoint/DNS are fixed (they live in the client config that
+  // was already handed out), so those fields are create-only.
+  if($('wg-server-createonly')) $('wg-server-createonly').style.display=editing?'none':'';
+  if($('wg-edit-note')) $('wg-edit-note').style.display=(editing&&role==='server')?'':'none';
+  if($('wg-client-editnote')) $('wg-client-editnote').style.display=(editing&&role==='client')?'':'none';
   $('wg-server-fields').style.display=role==='server'?'':'none';
   $('wg-client-fields').style.display=role==='client'?'':'none';
 }
@@ -2944,22 +2986,23 @@ function wgMsg(text,isErr){ const m=$('wg-msg'); m.textContent=text||''; m.class
 async function submitWG(){
   const role=$('wg-role').value, name=$('wg-name').value.trim();
   if(!name){ wgMsg(T('A tunnel name is required.'),true); return; }
-  const btn=$('wg-submit'); btn.disabled=true; wgMsg(T('Creating…'));
+  const editing=!!wgEditMode;
+  const btn=$('wg-submit'); btn.disabled=true; wgMsg(editing?T('Saving…'):T('Creating…'));
   try{
     if(role==='server'){
-      const req={name, listenPort:parseInt($('wg-port').value,10)||0, endpoint:$('wg-endpoint').value.trim(), dns:$('wg-dns').value.trim(), egress:$('wg-egress').value.trim()};
+      const req={name, listenPort:parseInt($('wg-port').value,10)||0, endpoint:$('wg-endpoint').value.trim(), dns:$('wg-dns').value.trim(), egress:$('wg-egress').value.trim(), edit:editing};
       const r=await fetch('/api/wg/server',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(req)});
       if(!r.ok){ wgMsg((await r.text())||('HTTP '+r.status),true); btn.disabled=false; return; }
       const res=await r.json();
       closeWG(); loadTunnels(); go('control');
-      $('wg-clientconf').value=res.clientConfig||'';
-      $('wgresult').classList.add('on');
+      if(editing){ toast('“'+name+'” '+T('saved.')); }
+      else { $('wg-clientconf').value=res.clientConfig||''; $('wgresult').classList.add('on'); }
     }else{
-      const req={name, config:$('wg-config').value, socksBind:'127.0.0.1', socksPort:parseInt($('wg-socksport').value,10)||0};
+      const req={name, config:$('wg-config').value, socksBind:'127.0.0.1', socksPort:parseInt($('wg-socksport').value,10)||0, edit:editing};
       const r=await fetch('/api/wg/client',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(req)});
       if(!r.ok){ wgMsg((await r.text())||('HTTP '+r.status),true); btn.disabled=false; return; }
       closeWG(); loadTunnels(); go('control');
-      toast('“'+name+'” '+T('created.'));
+      toast('“'+name+'” '+(editing?T('saved.'):T('created.')));
     }
   }catch(e){ wgMsg(T('Network error.'),true); btn.disabled=false; }
 }
@@ -2967,12 +3010,44 @@ async function submitWG(){
 // Packet, like WireGuard, is not a reverse-proxy tunnel, so it has its own form.
 // The server (abroad) generates a shared key; the client (Iran) is pointed at
 // the server and told which ports to expose.
+let pktEditMode='';
 function openPacket(){
   $('pkttitle').textContent=T('New Packet tunnel');
   pktMsg('');
+  pktEditMode='';
   $('pkt-submit').disabled=false; $('pkt-submit').textContent=T('Create tunnel');
   ['pkt-name','pkt-port','pkt-skey','pkt-server','pkt-ckey','pkt-ports'].forEach(id=>{ if($(id)) $(id).value=''; });
-  $('pkt-role').value='server'; $('pkt-block').value='aes';
+  $('pkt-name').readOnly=false;
+  $('pkt-role').value='server'; $('pkt-role').disabled=false; $('pkt-block').value='aes';
+  pktSync();
+  $('pkttun').classList.add('on');
+}
+// openPacketEdit reuses the Packet form to edit an existing tunnel: the same
+// fields, prefilled, with the name and side locked and the submit turned into a
+// save.
+async function openPacketEdit(name){
+  let d;
+  try{
+    const r=await fetch('/api/packet/get?name='+encodeURIComponent(name));
+    if(!r.ok){ toast((await r.text())||T('Could not load the tunnel.'),true); return; }
+    d=await r.json();
+  }catch(e){ toast(T('Network error.'),true); return; }
+  closeDetails();
+  openPacket();
+  pktEditMode=name;
+  $('pkttitle').textContent=T('Edit Packet tunnel');
+  $('pkt-submit').textContent=T('Save changes');
+  const nm=$('pkt-name'); nm.value=name; nm.readOnly=true;
+  $('pkt-role').value=d.role||'server'; $('pkt-role').disabled=true;
+  $('pkt-block').value=d.block||'aes';
+  if(d.role==='server'){
+    $('pkt-port').value=d.listenPort||'';
+    $('pkt-skey').value=d.key||'';
+  }else{
+    $('pkt-server').value=d.serverAddr||'';
+    $('pkt-ckey').value=d.key||'';
+    $('pkt-ports').value=(d.ports||[]).join(', ');
+  }
   pktSync();
   $('pkttun').classList.add('on');
 }
@@ -2987,23 +3062,24 @@ function pktMsg(text,isErr){ const m=$('pkt-msg'); m.textContent=text||''; m.cla
 async function submitPacket(){
   const role=$('pkt-role').value, name=$('pkt-name').value.trim();
   if(!name){ pktMsg(T('A tunnel name is required.'),true); return; }
-  const btn=$('pkt-submit'); btn.disabled=true; pktMsg(T('Creating…'));
+  const editing=!!pktEditMode;
+  const btn=$('pkt-submit'); btn.disabled=true; pktMsg(editing?T('Saving…'):T('Creating…'));
   try{
     if(role==='server'){
-      const req={name, listenPort:parseInt($('pkt-port').value,10)||0, key:$('pkt-skey').value.trim(), block:$('pkt-block').value};
+      const req={name, listenPort:parseInt($('pkt-port').value,10)||0, key:$('pkt-skey').value.trim(), block:$('pkt-block').value, edit:editing};
       const r=await fetch('/api/packet/server',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(req)});
       if(!r.ok){ pktMsg((await r.text())||('HTTP '+r.status),true); btn.disabled=false; return; }
       const res=await r.json();
       closePacket(); loadTunnels(); go('control');
-      $('pkt-outkey').value=res.key||'';
-      $('pktresult').classList.add('on');
+      if(editing){ toast('“'+name+'” '+T('saved.')); }
+      else { $('pkt-outkey').value=res.key||''; $('pktresult').classList.add('on'); }
     }else{
       const ports=$('pkt-ports').value.split(',').map(s=>s.trim()).filter(Boolean);
-      const req={name, serverAddr:$('pkt-server').value.trim(), key:$('pkt-ckey').value.trim(), block:$('pkt-block').value, ports};
+      const req={name, serverAddr:$('pkt-server').value.trim(), key:$('pkt-ckey').value.trim(), block:$('pkt-block').value, ports, edit:editing};
       const r=await fetch('/api/packet/client',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(req)});
       if(!r.ok){ pktMsg((await r.text())||('HTTP '+r.status),true); btn.disabled=false; return; }
       closePacket(); loadTunnels(); go('control');
-      toast('“'+name+'” '+T('created.'));
+      toast('“'+name+'” '+(editing?T('saved.'):T('created.')));
     }
   }catch(e){ pktMsg(T('Network error.'),true); btn.disabled=false; }
 }
@@ -3375,6 +3451,10 @@ function closeCreated(){ $('created').classList.remove('on'); }
 let ntEditMode='';
 async function editTunnel(name){
   if(!name) return;
+  // WireGuard and Packet have their own create forms and their own edit path.
+  const tt=(lastTunnels.find(x=>x.name===name)||{}).transport;
+  if(tt==='wireguard'){ openWireGuardEdit(name); return; }
+  if(tt==='packet'){ openPacketEdit(name); return; }
   let req;
   try{
     const r=await fetch('/api/tunnels/get?name='+encodeURIComponent(name));

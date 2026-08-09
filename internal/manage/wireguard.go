@@ -72,6 +72,100 @@ func CreateWireGuardClient(name, wgConfigText, socksBind string, socksPort int) 
 	return err
 }
 
+// WGEdit is a WireGuard tunnel's editable config for the panel's edit form.
+type WGEdit struct {
+	Role       string `json:"role"`
+	ListenPort int    `json:"listenPort"`
+	Egress     string `json:"egress"`
+	SocksBind  string `json:"socksBind"`
+	SocksPort  int    `json:"socksPort"`
+}
+
+// WireGuardForEdit loads a WireGuard tunnel's editable fields. A server's keys,
+// address and peers are not returned — they are preserved across an edit and
+// never surfaced for editing, so changing a server cannot break the clients that
+// already hold its config.
+func WireGuardForEdit(name string) (WGEdit, error) {
+	cfg, err := LoadTunnelConfig(name)
+	if err != nil {
+		return WGEdit{}, err
+	}
+	w := cfg.WireGuard
+	if w.Role == "" {
+		return WGEdit{}, fmt.Errorf("%q is not a WireGuard tunnel", name)
+	}
+	e := WGEdit{Role: w.Role}
+	if w.Role == "server" {
+		e.ListenPort = w.ListenPort
+		e.Egress = w.Egress
+	} else {
+		e.SocksBind = w.SocksBind
+		e.SocksPort = w.SocksPort
+	}
+	return e, nil
+}
+
+// UpdateWireGuardServer changes a WireGuard server's listen port and NAT egress
+// while preserving its keypair, address and peers, so existing clients keep
+// working (they only need their Endpoint port updated if the port changed).
+func UpdateWireGuardServer(name string, listenPort int, egress string) error {
+	name = strings.TrimSpace(name)
+	cfg, err := LoadTunnelConfig(name)
+	if err != nil {
+		return err
+	}
+	w := cfg.WireGuard
+	if w.Role != "server" {
+		return fmt.Errorf("%q is not a WireGuard server", name)
+	}
+	if listenPort < 1 || listenPort > 65535 {
+		return fmt.Errorf("invalid listen port %d", listenPort)
+	}
+	toml := wgRenderServer(name, w.PrivateKey, listenPort, w.Address, strings.TrimSpace(egress), w.Peers)
+	_, err = saveGeneratedTunnel(name, toml)
+	return err
+}
+
+// UpdateWireGuardClient changes a WireGuard client's SOCKS5 binding and,
+// optionally, its whole tunnel config. An empty wgConfigText keeps the current
+// config so a SOCKS-only edit does not require re-pasting it.
+func UpdateWireGuardClient(name, wgConfigText, socksBind string, socksPort int) error {
+	name = strings.TrimSpace(name)
+	cfg, err := LoadTunnelConfig(name)
+	if err != nil {
+		return err
+	}
+	w := cfg.WireGuard
+	if w.Role != "client" {
+		return fmt.Errorf("%q is not a WireGuard client", name)
+	}
+	if socksPort < 1 || socksPort > 65535 {
+		return fmt.Errorf("invalid SOCKS5 port %d", socksPort)
+	}
+	socksBind = strings.TrimSpace(socksBind)
+	if socksBind == "" {
+		socksBind = "127.0.0.1"
+	}
+	var pc *wireguard.ParsedClient
+	if strings.TrimSpace(wgConfigText) != "" {
+		pc, err = wireguard.ParseClientConfig(wgConfigText)
+		if err != nil {
+			return fmt.Errorf("the WireGuard config could not be read: %w", err)
+		}
+	} else {
+		// Keep the current config, changing only the SOCKS binding.
+		pc = &wireguard.ParsedClient{
+			PrivateKey: w.ClientPrivateKey, Address: w.ClientAddress, DNS: w.DNS, MTU: w.MTU,
+			PeerPublicKey: w.PeerPublicKey, PresharedKey: w.PresharedKey, Endpoint: w.Endpoint,
+			AllowedIPs: w.AllowedIPs, Keepalive: w.Keepalive,
+			Jc: w.Jc, Jmin: w.Jmin, Jmax: w.Jmax, S1: w.S1, S2: w.S2, H1: w.H1, H2: w.H2, H3: w.H3, H4: w.H4,
+		}
+	}
+	toml := wgRenderClient(name, pc, socksBind, socksPort)
+	_, err = saveGeneratedTunnel(name, toml)
+	return err
+}
+
 // saveGeneratedTunnel writes the config and unit and starts the service, the same way
 // TunnelSpec.Save does for the reverse tunnels.
 func saveGeneratedTunnel(name, tomlText string) (string, error) {
@@ -88,7 +182,13 @@ func saveGeneratedTunnel(name, tomlText string) (string, error) {
 		return "", err
 	}
 	service := app.ServiceName(name)
-	if err := StartService(service); err != nil {
+	// On a fresh create the service is not up yet, so start it; on an edit it is
+	// already running with the old config, so restart it to load the new one.
+	if IsActive(service) {
+		if err := RestartService(service); err != nil {
+			return service, err
+		}
+	} else if err := StartService(service); err != nil {
 		return service, err
 	}
 	return service, nil

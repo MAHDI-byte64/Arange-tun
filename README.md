@@ -7,7 +7,7 @@ Arange-tun is a high-performance **reverse tunnel** engine written entirely in
 single self-contained binary with an interactive **CLI** and a secured **web
 dashboard**, so you can run and manage everything with or without a terminal.
 
-> 📖 راهنمای فارسی: **[README_FA.md](README_FA.md)** · Telegram: **[@devmahdi_com](https://t.me/devmahdi_com)**
+> 📖 راهنمای فارسی: **[README_FA.md](README_FA.md)**
 نکته:این پروژه یک فورک از بک پک می‌باشد (صرفا ظاهر پنل و cli)
 ---
 
@@ -297,4 +297,4 @@ Released under the **GNU Affero General Public License v3.0 (AGPL-3.0)** — see
 
 ## Contact
 
-Telegram: **[@devmahdi_com](https://t.me/devmahdi_com)**
+GitHub: **[mahdi-byte64](https://github.com/mahdi-byte64)** — open an issue on the repository.

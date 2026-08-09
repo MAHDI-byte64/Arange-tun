@@ -9,7 +9,7 @@
 واحد و مستقل است با یک **CLI تعاملی** و یک **داشبورد وب** امن — یعنی همه‌چیز را با
 ترمینال یا بدون ترمینال می‌توانی مدیریت کنی.
 
-> 📖 English: **[README.md](README.md)** · تلگرام: **[@devmahdi_com](https://t.me/devmahdi_com)**
+> 📖 English: **[README.md](README.md)**
 
 ---
 
@@ -341,6 +341,6 @@ go test ./...                            # اجرای تست‌ها (تست‌ه
 
 ## تماس
 
-تلگرام: **[@devmahdi_com](https://t.me/devmahdi_com)**
+گیت‌هاب: **[mahdi-byte64](https://github.com/mahdi-byte64)** — روی ریپازیتوری issue باز کن.
 
 </div>

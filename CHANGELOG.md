@@ -2,6 +2,25 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.15.0 — 2026-08-09
+
+**WireGuard and Packet tunnels can now be edited from the panel.** They have
+their own create forms (separate from the reverse tunnels), so the Edit button
+did nothing for them before. Editing now reopens the matching form, prefilled:
+
+- **Packet** — change the listen port / key / encryption (server) or the server
+  address, key, encryption and exposed ports (client). An empty key on a server
+  edit keeps the current one.
+- **WireGuard** — change the SOCKS5 port and, optionally, re-paste a whole new
+  config (client), or change the listen port and NAT egress (server). A server
+  edit **preserves the keypair and peers**, so existing clients keep working —
+  only their Endpoint port needs updating if the port changed.
+
+Saving restarts the tunnel so the change takes effect immediately.
+
+**Removed the Telegram contact** from the panel, login page, CLI banner, Telegram
+bot and READMEs; GitHub remains the contact.
+
 ## v1.14.2 — 2026-08-09
 
 **Packet tunnels no longer show as offline in the panel.** Packet injects raw

@@ -13,6 +13,8 @@ import (
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/mahdi-byte64/arange-tun/internal/app"
 )
 
 // CreatePacketServer starts an abroad exit node listening on listenPort and
@@ -65,6 +67,94 @@ func CreatePacketClient(name, serverAddr, key, block string, ports []string, soc
 	}
 	if strings.TrimSpace(key) == "" {
 		return fmt.Errorf("the shared key is required — copy it from the server")
+	}
+	ports = cleanPorts(ports)
+	socks = strings.TrimSpace(socks)
+	if len(ports) == 0 && socks == "" {
+		return fmt.Errorf("give at least one port to expose, or a SOCKS5 listen address")
+	}
+	toml := packetRenderClient(name, serverAddr, strings.TrimSpace(key), strings.TrimSpace(block), ports, socks)
+	_, err := saveGeneratedTunnel(name, toml)
+	return err
+}
+
+// PacketEdit is a packet tunnel's config in the shape the create/edit form uses.
+type PacketEdit struct {
+	Role       string   `json:"role"`
+	ListenPort int      `json:"listenPort"`
+	ServerAddr string   `json:"serverAddr"`
+	Key        string   `json:"key"`
+	Block      string   `json:"block"`
+	Ports      []string `json:"ports"`
+	Socks      string   `json:"socks"`
+}
+
+// PacketForEdit loads a packet tunnel's config so the panel can prefill its form.
+func PacketForEdit(name string) (PacketEdit, error) {
+	cfg, err := LoadTunnelConfig(name)
+	if err != nil {
+		return PacketEdit{}, err
+	}
+	p := cfg.Packet
+	if p.Role == "" {
+		return PacketEdit{}, fmt.Errorf("%q is not a packet tunnel", name)
+	}
+	return PacketEdit{
+		Role:       p.Role,
+		ListenPort: p.ListenPort,
+		ServerAddr: p.ServerAddr,
+		Key:        p.Key,
+		Block:      p.Block,
+		Ports:      p.Ports,
+		Socks:      p.Socks,
+	}, nil
+}
+
+// UpdatePacketServer overwrites an existing packet server and restarts it. An
+// empty key keeps the current one, so an edit that does not touch the key does
+// not silently rotate it.
+func UpdatePacketServer(name string, listenPort int, key, block string) (string, error) {
+	name = strings.TrimSpace(name)
+	if !fileExists(app.ConfigPath(name)) {
+		return "", fmt.Errorf("no tunnel named %q to edit", name)
+	}
+	if listenPort < 1 || listenPort > 65535 {
+		return "", fmt.Errorf("invalid listen port %d", listenPort)
+	}
+	if listenPort == 80 || listenPort == 443 {
+		return "", fmt.Errorf("port %d is a standard port; pick a high, non-standard port", listenPort)
+	}
+	key = strings.TrimSpace(key)
+	if key == "" {
+		if cfg, err := LoadTunnelConfig(name); err == nil {
+			key = cfg.Packet.Key
+		}
+		if key == "" {
+			return "", fmt.Errorf("the shared key is required")
+		}
+	}
+	toml := packetRenderServer(name, listenPort, key, strings.TrimSpace(block))
+	if _, err := saveGeneratedTunnel(name, toml); err != nil {
+		return "", err
+	}
+	return key, nil
+}
+
+// UpdatePacketClient overwrites an existing packet client and restarts it.
+func UpdatePacketClient(name, serverAddr, key, block string, ports []string, socks string) error {
+	name = strings.TrimSpace(name)
+	if !fileExists(app.ConfigPath(name)) {
+		return fmt.Errorf("no tunnel named %q to edit", name)
+	}
+	serverAddr = strings.TrimSpace(serverAddr)
+	if serverAddr == "" {
+		return fmt.Errorf("the server address (abroad host:port) is required")
+	}
+	if _, _, err := splitHostPortStrict(serverAddr); err != nil {
+		return fmt.Errorf("invalid server address %q: %w", serverAddr, err)
+	}
+	if strings.TrimSpace(key) == "" {
+		return fmt.Errorf("the shared key is required")
 	}
 	ports = cleanPorts(ports)
 	socks = strings.TrimSpace(socks)
