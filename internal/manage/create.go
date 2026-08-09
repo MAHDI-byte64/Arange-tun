@@ -42,7 +42,8 @@ type TunnelRequest struct {
 	FallbackAddrs []string `json:"fallbackAddrs"` // backup server addresses
 	LoadBalance   bool     `json:"loadBalance"`   // spread connections over all addresses at once
 	Obfs          string   `json:"obfs"`          // frp/rathole DPI obfuscation: "" / "noise" / "tls"
-	TLSSni        string   `json:"tlsSni"`        // frp/rathole tls obfs: SNI to present
+	TLSSni        string   `json:"tlsSni"`        // frp/rathole tls obfs: SNI / (for acme) the domain
+	TLSCertMode   string   `json:"tlsCertMode"`   // frp/rathole tls obfs: "self" or "acme" (Let's Encrypt)
 
 	// TLS, for a wss/wssmux server. Ignored for other transports and for a
 	// client (which never verifies the certificate).
@@ -170,6 +171,16 @@ func buildSpec(req TunnelRequest) (TunnelSpec, error) {
 			s.Obfs = strings.TrimSpace(req.Obfs)
 		}
 		s.TLSSni = strings.TrimSpace(req.TLSSni)
+		// A real Let's Encrypt certificate is a server-side choice for the tls
+		// mode; the domain doubles as the SNI the client presents.
+		if s.Obfs == "tls" && req.Role == "server" && strings.EqualFold(strings.TrimSpace(req.TLSCertMode), "acme") {
+			domain := strings.TrimSpace(req.TLSSni)
+			if domain == "" {
+				return TunnelSpec{}, fmt.Errorf("a domain is required for a real Let's Encrypt certificate")
+			}
+			s.ACMEDomain = domain
+			s.ACMEEmail = strings.TrimSpace(req.ACMEEmail)
+		}
 	}
 
 	switch req.Role {

@@ -64,17 +64,24 @@ func selfSigned() (tls.Certificate, error) {
 	return selfSignedCert, selfSignedErr
 }
 
-// TLSServerConn wraps raw in a TLS server session with a self-signed certificate,
-// so the tunnel presents as ordinary HTTPS. It returns the encrypted connection.
-func TLSServerConn(raw net.Conn, timeout time.Duration) (net.Conn, error) {
+// SelfSignedTLSConfig returns a server tls.Config backed by the process-wide
+// self-signed certificate — the default when no real certificate is configured.
+func SelfSignedTLSConfig() (*tls.Config, error) {
 	cert, err := selfSigned()
 	if err != nil {
 		return nil, err
 	}
-	cfg := &tls.Config{
+	return &tls.Config{
 		Certificates: []tls.Certificate{cert},
 		MinVersion:   tls.VersionTLS12,
-	}
+	}, nil
+}
+
+// TLSServerConn wraps raw in a TLS server session using cfg, so the tunnel
+// presents as ordinary HTTPS. cfg is built once by the caller — a self-signed
+// config, or a Let's Encrypt one (ServerTLSConfig) so the certificate is real
+// and the self-signed tell is gone.
+func TLSServerConn(raw net.Conn, cfg *tls.Config, timeout time.Duration) (net.Conn, error) {
 	tconn := tls.Server(raw, cfg)
 	ctx := context.Background()
 	if timeout > 0 {

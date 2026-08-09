@@ -1470,9 +1470,18 @@
       <option value="tls" data-i18n>TLS (uTLS) — looks like HTTPS, blends with web traffic</option>
       <option value="none" data-i18n>None — fastest, but detectable</option>
     </select>
-    <div id="nt-tlssni-row" style="display:none">
-      <label for="nt-tlssni" data-i18n>TLS SNI (optional — a domain to present)</label>
+    <div id="nt-tls-opts" style="display:none">
+      <label for="nt-tls-cert" data-i18n>TLS certificate</label>
+      <select id="nt-tls-cert" class="sel" onchange="ntObfsChange()">
+        <option value="self" data-i18n>Self-signed — no domain needed</option>
+        <option value="acme" data-i18n>Let's Encrypt — real certificate (server needs a domain on port 443)</option>
+      </select>
+      <label for="nt-tlssni" id="nt-tlssni-label" data-i18n>TLS SNI (optional — a domain to present)</label>
       <input id="nt-tlssni" type="text" autocomplete="off" spellcheck="false" placeholder="www.cloudflare.com">
+      <div id="nt-tls-email-row" style="display:none">
+        <label for="nt-tls-email" data-i18n>Email for Let's Encrypt (optional)</label>
+        <input id="nt-tls-email" type="text" autocomplete="off" spellcheck="false" placeholder="you@example.com">
+      </div>
     </div>
     <p class="hint" style="margin:-4px 0 14px;font-size:11.5px;color:var(--muted2)" data-i18n>Hides the tunnel from DPI. Must be the same on both sides.</p>
     </div>
@@ -1892,6 +1901,11 @@ const FA={
   "TLS (uTLS) — looks like HTTPS, blends with web traffic":"TLS (uTLS) — شبیه HTTPS، هم‌رنگ ترافیک وب",
   "None — fastest, but detectable":"هیچ — سریع‌ترین، ولی قابل‌تشخیص",
   "TLS SNI (optional — a domain to present)":"SNI برای TLS (اختیاری — دامنه‌ای که نمایش داده می‌شود)",
+  "TLS certificate":"گواهی TLS",
+  "Self-signed — no domain needed":"خودامضا — نیازی به دامنه نیست",
+  "Let's Encrypt — real certificate (server needs a domain on port 443)":"Let's Encrypt — گواهی واقعی (سرور به یک دامنه روی پورت ۴۴۳ نیاز دارد)",
+  "Domain (required — must resolve to this server, port 443)":"دامنه (الزامی — باید به همین سرور روی پورت ۴۴۳ اشاره کند)",
+  "Email for Let's Encrypt (optional)":"ایمیل برای Let's Encrypt (اختیاری)",
   "Hides the tunnel from DPI. Must be the same on both sides.":"تونل را از DPI پنهان می‌کند. باید روی هر دو سمت یکسان باشد.",
   "New WireGuard tunnel":"تونل وایرگارد جدید",
   "WireGuard as an outbound: a server is an exit node that generates a config; a client brings WireGuard up and exposes a SOCKS5 proxy through it — point your panel's outbound at that SOCKS5.":"وایرگارد به‌عنوان اوت‌باند: سرور یک اکسیت‌نود است که کانفیگ می‌سازد؛ کلاینت وایرگارد را بالا می‌آورد و یک پراکسی SOCKS5 از داخل تونل باز می‌کند — اوت‌باند پنلت را به آن SOCKS5 وصل کن.",
@@ -2978,8 +2992,9 @@ function openNewTunnel(){
   $('nt-transport-row').style.display='';
   $('nt-frp-proto-row').style.display='none';
   $('nt-obfs-row').style.display='none';
-  $('nt-tlssni-row').style.display='none';
+  $('nt-tls-opts').style.display='none';
   $('nt-obfs').value='noise'; $('nt-tlssni').value='';
+  $('nt-tls-cert').value='self'; $('nt-tls-email').value='';
   ntSync(); ntSuggestName();
   $('newtun').classList.add('on');
 }
@@ -3002,14 +3017,26 @@ function openProto(base,title){
   $('nt-frp-proto-row').style.display='';
   $('nt-obfs-row').style.display='';
   $('nt-obfs').value='noise';
+  $('nt-tls-cert').value='self'; $('nt-tls-email').value='';
   ntObfsChange();
   $('nt-transport').value=base;
   ntSync();
 }
 function openFrp(){ openProto('frp','New frp tunnel'); }
 function openRathole(){ openProto('rathole','New rathole tunnel'); }
-// ntObfsChange shows the SNI field only for the TLS obfuscation mode.
-function ntObfsChange(){ $('nt-tlssni-row').style.display=$('nt-obfs').value==='tls'?'':'none'; }
+// ntObfsChange shows the TLS options only for the TLS obfuscation mode, the
+// e-mail field only when a real Let's Encrypt certificate is chosen, and swaps
+// the SNI label between "optional SNI to present" (self-signed) and "domain
+// that must resolve here" (Let's Encrypt).
+function ntObfsChange(){
+  var tls=$('nt-obfs').value==='tls';
+  $('nt-tls-opts').style.display=tls?'':'none';
+  var acme=$('nt-tls-cert').value==='acme';
+  $('nt-tls-email-row').style.display=(tls&&acme)?'':'none';
+  $('nt-tlssni-label').textContent=T(acme
+    ?'Domain (required — must resolve to this server, port 443)'
+    :'TLS SNI (optional — a domain to present)');
+}
 
 // ntFrpProtoChange maps the TCP/UDP choice onto the real transport value: the
 // base carries TCP on the exposed ports, base+"u" carries UDP.
@@ -3136,6 +3163,10 @@ async function submitNewTunnel(){
     obfs:ntProtoBase?$('nt-obfs').value:'',
     tlsSni:ntProtoBase&&$('nt-obfs').value==='tls'?$('nt-tlssni').value.trim():'',
   };
+  if(ntProtoBase&&$('nt-obfs').value==='tls'){
+    req.tlsCertMode=$('nt-tls-cert').value;
+    if($('nt-tls-cert').value==='acme') req.acmeEmail=$('nt-tls-email').value.trim();
+  }
   if(role==='server'){
     req.port=$('nt-port').value.trim();
     req.ports=ntList('nt-ports');
@@ -3269,6 +3300,8 @@ function ntFill(req){
     $('nt-frp-proto-row').style.display='';
     $('nt-obfs').value=(req.obfs==='noise'||req.obfs==='tls')?req.obfs:'none';
     $('nt-tlssni').value=req.tlsSni||'';
+    $('nt-tls-cert').value=req.tlsCertMode==='acme'?'acme':'self';
+    $('nt-tls-email').value=req.acmeEmail||'';
     $('nt-obfs-row').style.display='';
     ntObfsChange();
   }

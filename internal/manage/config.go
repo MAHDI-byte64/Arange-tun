@@ -236,8 +236,17 @@ func (s TunnelSpec) Render() string {
 		p("token = %q\n", s.Token)
 		if s.Obfs != "" {
 			p("obfs = %q\n", s.Obfs)
-			if s.Obfs == "tls" && s.TLSSni != "" {
-				p("tls_sni = %q\n", s.TLSSni)
+			if s.Obfs == "tls" {
+				if s.TLSSni != "" {
+					p("tls_sni = %q\n", s.TLSSni)
+				}
+				// A real Let's Encrypt certificate instead of the self-signed one.
+				if s.ACMEDomain != "" {
+					p("acme_domain = %q\n", s.ACMEDomain)
+					if s.ACMEEmail != "" {
+						p("acme_email = %q\n", s.ACMEEmail)
+					}
+				}
 			}
 		}
 		p("channel_size = %d\n", s.ChannelSize)

@@ -35,6 +35,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -46,12 +47,27 @@ import (
 	"time"
 
 	"github.com/mahdi-byte64/arange-tun/config"
+	"github.com/mahdi-byte64/arange-tun/internal/app"
 	"github.com/mahdi-byte64/arange-tun/internal/metrics"
 	"github.com/mahdi-byte64/arange-tun/internal/utils/network"
 
 	"github.com/sirupsen/logrus"
 	"github.com/xtaci/smux"
 )
+
+// serverTLSConfig builds the tls.Config for an frp/rathole tls-obfs server: a
+// real Let's Encrypt certificate when a domain is configured, otherwise the
+// self-signed default. Built once per run and reused for every connection.
+func serverTLSConfig(cfg *config.ServerConfig, logf func(string, ...any)) (*tls.Config, error) {
+	if cfg.ACMEDomain != "" {
+		return network.ServerTLSConfig(network.TLSSettings{
+			ACMEDomain:   cfg.ACMEDomain,
+			ACMEEmail:    cfg.ACMEEmail,
+			ACMECacheDir: app.ConfigDir + "/acme",
+		}, logf)
+	}
+	return network.SelfSignedTLSConfig()
+}
 
 const (
 	saltLen  = 16
@@ -151,7 +167,8 @@ type server struct {
 	cfg    *config.ServerConfig
 	logger *logrus.Logger
 	token  []byte
-	udp    bool // expose the ports as UDP instead of TCP
+	udp    bool        // expose the ports as UDP instead of TCP
+	tlsCfg *tls.Config // built once when the obfs mode is tls
 
 	mu      sync.Mutex
 	session *smux.Session // the current kharej client, or nil when none is up
@@ -162,6 +179,15 @@ type server struct {
 // When udp is set the exposed ports carry UDP; otherwise they carry TCP.
 func RunServer(ctx context.Context, cfg *config.ServerConfig, logger *logrus.Logger, udp bool) {
 	s := &server{cfg: cfg, logger: logger, token: []byte(cfg.Token), udp: udp}
+
+	if s.cfg.ObfsMode() == "tls" {
+		tc, err := serverTLSConfig(cfg, logger.Warnf)
+		if err != nil {
+			logger.Fatalf("frp: TLS setup failed: %v", err)
+			return
+		}
+		s.tlsCfg = tc
+	}
 
 	var lc net.ListenConfig
 	ln, err := lc.Listen(ctx, "tcp", cfg.BindAddr)
@@ -218,7 +244,7 @@ func (s *server) handleControl(ctx context.Context, conn net.Conn) {
 		}
 		conn = wrapped
 	case "tls":
-		wrapped, err := network.TLSServerConn(conn, handshakeTimeout)
+		wrapped, err := network.TLSServerConn(conn, s.tlsCfg, handshakeTimeout)
 		if err != nil {
 			conn.Close()
 			return

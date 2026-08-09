@@ -2,6 +2,25 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.13.0 — 2026-08-09
+
+**The TLS obfuscation mode can now use a real Let's Encrypt certificate.** When
+you pick **TLS (uTLS)** for a frp/rathole server, a new **TLS certificate**
+choice appears:
+
+- **Self-signed** — no domain needed (the previous behavior). The token still
+  authenticates inside the session; the certificate is only there to make the
+  handshake look like TLS.
+- **Let's Encrypt — real certificate** — the server obtains and renews a genuine
+  certificate for a domain you own via ACME (TLS-ALPN-01 on port 443, with an
+  HTTP-01 responder on port 80), so the tunnel presents the same trusted
+  certificate a real HTTPS site would. Point a domain's DNS at the server, run
+  the tunnel on port 443, and set that domain as the SNI. Certificates are
+  cached under `/etc/arange-tun/acme` and renewed automatically.
+
+The client stays on uTLS with a Chrome fingerprint and only needs the SNI. Old
+tls-mode tunnels keep working as self-signed.
+
 ## v1.12.0 — 2026-08-09
 
 **A TLS obfuscation mode for frp/rathole, chosen separately from Stealth.** The

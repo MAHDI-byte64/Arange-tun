@@ -40,6 +40,13 @@ func TunnelForEdit(name string) (TunnelRequest, error) {
 		req.ProxyProtocol = s.ProxyProtocol
 		req.Obfs = s.ObfsMode()
 		req.TLSSni = s.TLSSni
+		// A tls-obfs server with a Let's Encrypt certificate: the domain is the
+		// SNI, and the cert mode is acme.
+		if req.Obfs == "tls" && s.ACMEDomain != "" {
+			req.TLSCertMode = "acme"
+			req.TLSSni = s.ACMEDomain
+			req.ACMEEmail = s.ACMEEmail
+		}
 		req.SimpleAuth = s.SimpleAuth
 
 		// TLS mode: ACME wins; a certificate under the auto-generated cert

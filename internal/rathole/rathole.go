@@ -34,6 +34,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
+	"crypto/tls"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -44,6 +45,7 @@ import (
 	"time"
 
 	"github.com/mahdi-byte64/arange-tun/config"
+	"github.com/mahdi-byte64/arange-tun/internal/app"
 	"github.com/mahdi-byte64/arange-tun/internal/metrics"
 	"github.com/mahdi-byte64/arange-tun/internal/utils/network"
 
@@ -96,15 +98,29 @@ func sinkAndClose(conn net.Conn) {
 	conn.Close()
 }
 
+// serverTLSConfig builds the tls.Config for a tls-obfs server: a real Let's
+// Encrypt certificate when a domain is configured, otherwise the self-signed
+// default. Built once per run and reused for every connection.
+func serverTLSConfig(cfg *config.ServerConfig, logf func(string, ...any)) (*tls.Config, error) {
+	if cfg.ACMEDomain != "" {
+		return network.ServerTLSConfig(network.TLSSettings{
+			ACMEDomain:   cfg.ACMEDomain,
+			ACMEEmail:    cfg.ACMEEmail,
+			ACMECacheDir: app.ConfigDir + "/acme",
+		}, logf)
+	}
+	return network.SelfSignedTLSConfig()
+}
+
 // serverObfsWrap upgrades an accepted connection to the configured obfuscation
 // mode. On failure the raw connection is already closed. mode "" returns it
 // unchanged.
-func serverObfsWrap(conn net.Conn, mode, token string) (net.Conn, error) {
+func serverObfsWrap(conn net.Conn, mode, token string, tlsCfg *tls.Config) (net.Conn, error) {
 	switch mode {
 	case "noise":
 		return network.NoiseServerConn(conn, token, handshakeTimeout)
 	case "tls":
-		return network.TLSServerConn(conn, handshakeTimeout)
+		return network.TLSServerConn(conn, tlsCfg, handshakeTimeout)
 	}
 	return conn, nil
 }
@@ -239,6 +255,7 @@ type server struct {
 	logger *logrus.Logger
 	token  string
 	udp    bool
+	tlsCfg *tls.Config // built once when the obfs mode is tls
 
 	mu      sync.Mutex
 	current *controlChannel
@@ -248,6 +265,15 @@ type server struct {
 // carry UDP; otherwise TCP.
 func RunServer(ctx context.Context, cfg *config.ServerConfig, logger *logrus.Logger, udp bool) {
 	s := &server{cfg: cfg, logger: logger, token: cfg.Token, udp: udp}
+
+	if s.cfg.ObfsMode() == "tls" {
+		tc, err := serverTLSConfig(cfg, logger.Warnf)
+		if err != nil {
+			logger.Fatalf("rathole: TLS setup failed: %v", err)
+			return
+		}
+		s.tlsCfg = tc
+	}
 
 	var lc net.ListenConfig
 	ln, err := lc.Listen(ctx, "tcp", cfg.BindAddr)
@@ -292,7 +318,7 @@ func (s *server) handleIncoming(ctx context.Context, conn net.Conn) {
 	// Obfuscation: wrap every connection — control and data channels alike — in
 	// the configured mode first, so nothing after the TCP connect has a
 	// fingerprint and a peer that cannot complete the wrap is dropped.
-	wrapped, oerr := serverObfsWrap(conn, s.cfg.ObfsMode(), s.token)
+	wrapped, oerr := serverObfsWrap(conn, s.cfg.ObfsMode(), s.token, s.tlsCfg)
 	if oerr != nil {
 		return
 	}
