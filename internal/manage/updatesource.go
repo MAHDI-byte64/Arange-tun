@@ -115,6 +115,11 @@ func buildFromSource(logf func(string)) error {
 		return fmt.Errorf("could not unpack the source: %w", err)
 	}
 
+	// The Packet tunnel's pcap engine is built with cgo, so the machine needs a C
+	// compiler and the libpcap headers. Install them if they are missing, the same
+	// way the installer does, so a panel update is self-sufficient.
+	ensurePcapBuildDeps(logf)
+
 	tmpBin := app.BinPath + ".new"
 	_ = os.Remove(tmpBin)
 	logf("Compiling (go build) — this can take a minute...")
@@ -166,6 +171,54 @@ func buildFromSource(logf func(string)) error {
 		writeInstalledCommit(sha)
 	}
 	return nil
+}
+
+// ensurePcapBuildDeps installs a C compiler and the libpcap development headers
+// when they are missing, so the cgo build of the Packet engine succeeds. It is
+// best-effort: the panel runs as root, but on an unknown distro or with no
+// network it just logs and lets the build surface the real error.
+func ensurePcapBuildDeps(logf func(string)) {
+	haveCC := false
+	for _, cc := range []string{"cc", "gcc", "clang"} {
+		if _, err := exec.LookPath(cc); err == nil {
+			haveCC = true
+			break
+		}
+	}
+	if haveCC && pcapHeaderPresent() {
+		return
+	}
+	logf("Installing build prerequisites (gcc, libpcap headers)...")
+	type pm struct {
+		bin  string
+		args [][]string
+	}
+	candidates := []pm{
+		{"apt-get", [][]string{{"update", "-y"}, {"install", "-y", "gcc", "libpcap-dev"}}},
+		{"dnf", [][]string{{"install", "-y", "gcc", "libpcap-devel"}}},
+		{"yum", [][]string{{"install", "-y", "gcc", "libpcap-devel"}}},
+		{"apk", [][]string{{"add", "--no-cache", "gcc", "musl-dev", "libpcap-dev"}}},
+		{"pacman", [][]string{{"-Sy", "--noconfirm", "gcc", "libpcap"}}},
+	}
+	for _, c := range candidates {
+		if _, err := exec.LookPath(c.bin); err != nil {
+			continue
+		}
+		for _, a := range c.args {
+			cmd := exec.Command(c.bin, a...)
+			cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
+			_ = cmd.Run()
+		}
+		break
+	}
+	if !pcapHeaderPresent() {
+		logf("Warning: libpcap headers still missing — the Packet engine may fail to build. Install libpcap-dev/libpcap-devel manually.")
+	}
+}
+
+// pcapHeaderPresent reports whether the libpcap development header is installed.
+func pcapHeaderPresent() bool {
+	return fileExists("/usr/include/pcap/pcap.h") || fileExists("/usr/include/pcap.h")
 }
 
 // goBinary finds a usable Go toolchain: one on PATH, or the standard
