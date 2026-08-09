@@ -241,15 +241,20 @@ systemd units execute); `arange-tun --webui` runs the web panel;
 
 ## Build from source
 
-Requires **Go 1.24+**. From a clone of the repo:
+Requires **Go 1.24+**, a **C compiler**, and the **libpcap development headers**
+(`libpcap-dev` on Debian/Ubuntu, `libpcap-devel` on RHEL/Fedora). The binary is
+built with cgo because the **Packet** tunnel embeds a raw-packet (libpcap)
+engine; the rest of the tree is pure Go. The installer sets these up
+automatically. From a clone of the repo:
 
 ```bash
-go build -o arange-tun .          # build the binary
-make release                      # cross-build linux amd64 + arm64 into ./release
-go test ./...                     # run the test suite (the e2e tests move real traffic)
+CGO_ENABLED=1 go build -o arange-tun .   # build the binary
+make release                             # cross-build linux amd64 + arm64 into ./release
+go test ./...                            # run the test suite (the e2e tests move real traffic)
 ```
 
-**Requirements to run:** Linux (amd64 or arm64), root, and systemd.
+**Requirements to run:** Linux (amd64 or arm64), root, and systemd. The Packet
+tunnel additionally needs libpcap present at runtime (installed automatically).
 
 ---
 

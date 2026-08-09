@@ -203,6 +203,8 @@ func Serve() error {
 	// client is given one); delete/restart/logs are shared with every tunnel.
 	mux.HandleFunc("/api/wg/server", srv.requireAuth(srv.handleWGServerCreate))
 	mux.HandleFunc("/api/wg/client", srv.requireAuth(srv.handleWGClientCreate))
+	mux.HandleFunc("/api/packet/server", srv.requireAuth(srv.handlePacketServerCreate))
+	mux.HandleFunc("/api/packet/client", srv.requireAuth(srv.handlePacketClientCreate))
 	mux.HandleFunc("/metrics", srv.requireReadAuth(srv.handlePrometheus))
 	mux.HandleFunc("/api/logs", srv.requireAuth(srv.handleLogs))
 	mux.HandleFunc("/api/password", srv.requireAuth(srv.handlePassword))

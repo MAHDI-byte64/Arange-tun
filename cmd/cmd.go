@@ -11,6 +11,7 @@ import (
 	"github.com/mahdi-byte64/arange-tun/config"
 	"github.com/mahdi-byte64/arange-tun/internal/client"
 	"github.com/mahdi-byte64/arange-tun/internal/frp"
+	"github.com/mahdi-byte64/arange-tun/internal/packet"
 	"github.com/mahdi-byte64/arange-tun/internal/rathole"
 	"github.com/mahdi-byte64/arange-tun/internal/wireguard"
 
@@ -118,6 +119,25 @@ func runEngine(cfg *config.Config, ctx context.Context, configPath string, apply
 		}
 		<-ctx.Done()
 		logger.Println("shutting down wireguard...")
+		return
+	}
+
+	// Packet is a raw-packet (pcap) tunnel with an inverted topology — the
+	// server is the abroad exit, the client is the Iran entry — so like
+	// WireGuard it has its own config section and engine.
+	if role := cfg.Packet.Role; role != "" {
+		startMetrics(ctx, configPath, "packet", role)
+		log := utils.NewLoggerWithFormat(cfg.Packet.LogLevel, cfg.Server.LogFormat)
+		switch role {
+		case "client":
+			go packet.RunClient(ctx, &cfg.Packet, log)
+		case "server":
+			go packet.RunServer(ctx, &cfg.Packet, log)
+		default:
+			logger.Fatalf("packet: unknown role %q", role)
+		}
+		<-ctx.Done()
+		logger.Println("shutting down packet...")
 		return
 	}
 

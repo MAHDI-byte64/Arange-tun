@@ -2,6 +2,36 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.14.0 — 2026-08-09
+
+**The Packet tunnel — a raw-packet (pcap) transport that hides below the kernel
+stack.** Packet is now buildable from the panel. It ports the MIT-licensed
+[paqet](https://github.com/hanselime/paqet) engine into Arange-tun (vendored, not
+a downloaded binary): it captures and injects crafted raw TCP packets with
+libpcap, carrying an encrypted KCP transport *beneath* the OS TCP/IP stack, so
+DPI and stateful firewalls that track the kernel's own connections never see the
+tunnel — even a `ufw deny` on the port has no effect on it.
+
+- **Inverted topology.** Unlike the reverse-proxy tunnels, the **server is the
+  abroad exit node** (it listens and generates a shared key) and the **client is
+  the Iran entry** that exposes the forwarded ports and dials out. Each exposed
+  port is relayed 1:1 to `127.0.0.1:<port>` on the server; a SOCKS5 listener is
+  also supported.
+- **Zero manual network wiring.** The interface, local IP and gateway MAC the
+  raw engine needs are auto-detected from the default route, and the firewall
+  rules that keep the raw session alive (NOTRACK + kernel-RST drop, both
+  directions) are applied and removed automatically.
+- **Encryption** is KCP block cipher (AES by default; AES-128-GCM, Salsa20 and
+  others selectable), keyed by a shared secret generated on the server.
+- Full panel lifecycle like every other tunnel: create (server/client forms with
+  a setup guide), start/stop, logs, status, delete.
+
+**Build note:** the Packet engine links libpcap, so the binary is now built with
+cgo. The installer installs `gcc` + `libpcap-dev`/`libpcap-devel` automatically,
+and the panel's build-from-source updater compiles with cgo enabled. Packet
+tunnels require **root** and are **Linux-only**; the rest of Arange-tun is
+unaffected. Use a **high, non-standard port** for a Packet server (never 80/443).
+
 ## v1.13.0 — 2026-08-09
 
 **The TLS obfuscation mode can now use a real Let's Encrypt certificate.** When

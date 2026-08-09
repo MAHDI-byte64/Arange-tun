@@ -40,7 +40,7 @@ func CreateWireGuardServer(name string, listenPort int, endpointHost, dns, egres
 		return "", err
 	}
 	toml := wgRenderServer(name, gen.ServerPrivateKey, listenPort, gen.Address, strings.TrimSpace(egress), gen.Peers)
-	if _, err := saveWireGuard(name, toml); err != nil {
+	if _, err := saveGeneratedTunnel(name, toml); err != nil {
 		return "", err
 	}
 	return gen.ClientConfigText, nil
@@ -68,13 +68,13 @@ func CreateWireGuardClient(name, wgConfigText, socksBind string, socksPort int) 
 		socksBind = "127.0.0.1"
 	}
 	toml := wgRenderClient(name, pc, socksBind, socksPort)
-	_, err = saveWireGuard(name, toml)
+	_, err = saveGeneratedTunnel(name, toml)
 	return err
 }
 
-// saveWireGuard writes the config and unit and starts the service, the same way
+// saveGeneratedTunnel writes the config and unit and starts the service, the same way
 // TunnelSpec.Save does for the reverse tunnels.
-func saveWireGuard(name, tomlText string) (string, error) {
+func saveGeneratedTunnel(name, tomlText string) (string, error) {
 	if err := os.MkdirAll(app.ConfigDir, 0755); err != nil {
 		return "", err
 	}

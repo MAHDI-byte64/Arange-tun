@@ -311,9 +311,61 @@ type WireGuardConfig struct {
 	H4   uint32 `toml:"h4"`   // magic header — transport
 }
 
+// PacketForward is one explicit port mapping for a packet client: a local
+// listener relayed, over the raw-packet tunnel, to a target reached from the
+// server (abroad) side.
+type PacketForward struct {
+	Listen   string `toml:"listen"`   // local listen address, e.g. "0.0.0.0:8080"
+	Target   string `toml:"target"`   // target as seen by the server, e.g. "127.0.0.1:80"
+	Protocol string `toml:"protocol"` // "tcp" or "udp"
+}
+
+// PacketConfig is the Packet tunnel: a raw-packet (pcap) transport that carries
+// KCP over crafted TCP packets injected below the kernel stack, so DPI and
+// stateful firewalls that track the kernel's connections never see it. Its
+// topology is inverted from the reverse-proxy tunnels: the SERVER is the abroad
+// exit node and the CLIENT is the Iran entry that exposes the forwarded ports
+// and dials out to the server. It has its own section and engine, like
+// WireGuard, and ignores the [server]/[client] sections.
+type PacketConfig struct {
+	Role string `toml:"role"` // "server" (abroad exit) or "client" (Iran entry)
+
+	Key   string `toml:"key"`   // shared secret; must be identical on both ends
+	Block string `toml:"block"` // KCP encryption: aes (default), aes-128-gcm, …, none, null
+
+	// Server (abroad exit) fields.
+	ListenPort int `toml:"listen_port"` // TCP port to listen on (non-standard — avoid 80/443)
+
+	// Client (Iran entry) fields.
+	ServerAddr string          `toml:"server_addr"` // abroad public host:port
+	Ports      []string        `toml:"ports"`       // exposed TCP ports, forwarded 1:1 to 127.0.0.1:<port> on the server
+	Forward    []PacketForward `toml:"forward"`     // explicit forward mappings (advanced)
+	Socks      string          `toml:"socks"`       // optional SOCKS5 listen address, e.g. "127.0.0.1:1080"
+	Conn       int             `toml:"conn"`        // parallel tunnel connections (default 1)
+
+	// KCP tuning (optional; sensible defaults applied by the engine).
+	Mode string `toml:"mode"` // normal/fast/fast2/fast3 (default fast)
+	MTU  int    `toml:"mtu"`  // KCP MTU (default 1350; lower for restrictive networks)
+
+	// TCP flag cycling for traffic-shape obfuscation. Comma-separated flag
+	// combinations like "PA" or "PA,A". Empty means the engine default ("PA").
+	LocalFlags  string `toml:"local_flags"`
+	RemoteFlags string `toml:"remote_flags"`
+
+	// Network parameters. All optional — empty triggers auto-detection of the
+	// default-route interface, this host's IPv4 on it, and the gateway MAC.
+	Interface string `toml:"interface"`
+	LocalIP   string `toml:"local_ip"`
+	RouterMAC string `toml:"router_mac"`
+	Sockbuf   int    `toml:"sockbuf"` // pcap capture buffer bytes
+
+	LogLevel string `toml:"log_level"` // none/debug/info/warn/error/fatal (default none)
+}
+
 // Config represents the complete configuration, including both server and client settings.
 type Config struct {
 	Server    ServerConfig    `toml:"server"`
 	Client    ClientConfig    `toml:"client"`
 	WireGuard WireGuardConfig `toml:"wireguard"`
+	Packet    PacketConfig    `toml:"packet"`
 }

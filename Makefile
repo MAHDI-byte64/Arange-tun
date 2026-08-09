@@ -15,18 +15,23 @@ version:
 	@grep -oE 'Version = "[^"]+"' internal/app/app.go | grep -oE 'v[0-9.]+' > VERSION
 	@echo "VERSION -> $$(cat VERSION)"
 
+# cgo is on: the Packet tunnel's pcap engine links against libpcap. The build
+# needs a C compiler and the libpcap development headers (libpcap-dev /
+# libpcap-devel); the installer puts them on the machine.
 build: tidy
-	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o $(BIN) .
+	CGO_ENABLED=1 go build -trimpath -ldflags "$(LDFLAGS)" -o $(BIN) .
 
 vendor:
 	go mod tidy
 	go mod vendor
 
-# Cross-compile static Linux binaries (no libc / no Go needed to run).
+# Cross-compile Linux binaries. Because of cgo/libpcap these are dynamically
+# linked against libpcap and each target arch needs its own C cross-toolchain
+# and libpcap headers (e.g. gcc-aarch64-linux-gnu + libpcap-dev:arm64 for arm64).
 release-linux:
 	mkdir -p dist
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "$(LDFLAGS)" -o dist/arange-tun-linux-amd64 .
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "$(LDFLAGS)" -o dist/arange-tun-linux-arm64 .
+	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "$(LDFLAGS)" -o dist/arange-tun-linux-amd64 .
+	CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC=aarch64-linux-gnu-gcc go build -trimpath -ldflags "$(LDFLAGS)" -o dist/arange-tun-linux-arm64 .
 
 # GitHub release assets: arange-tun_linux_<arch>.tar.gz, each containing a single
 # `arange-tun` binary. These are what install.sh and the in-app updater download.

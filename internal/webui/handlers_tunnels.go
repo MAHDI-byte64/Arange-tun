@@ -108,6 +108,59 @@ func (s *server) handleWGClientCreate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"status": "ok", "name": strings.TrimSpace(req.Name)})
 }
 
+// handlePacketServerCreate starts a Packet exit node (abroad) and returns the
+// shared key the client must be given.
+func (s *server) handlePacketServerCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxTunnelBody)
+	var req struct {
+		Name       string `json:"name"`
+		ListenPort int    `json:"listenPort"`
+		Key        string `json:"key"`
+		Block      string `json:"block"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "could not read the request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	key, err := manage.CreatePacketServer(req.Name, req.ListenPort, req.Key, req.Block)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]any{"status": "ok", "name": strings.TrimSpace(req.Name), "key": key})
+}
+
+// handlePacketClientCreate starts a Packet entry node (Iran) that exposes ports
+// and dials the abroad server.
+func (s *server) handlePacketClientCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxTunnelBody)
+	var req struct {
+		Name       string   `json:"name"`
+		ServerAddr string   `json:"serverAddr"`
+		Key        string   `json:"key"`
+		Block      string   `json:"block"`
+		Ports      []string `json:"ports"`
+		Socks      string   `json:"socks"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "could not read the request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := manage.CreatePacketClient(req.Name, req.ServerAddr, req.Key, req.Block, req.Ports, req.Socks); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]any{"status": "ok", "name": strings.TrimSpace(req.Name)})
+}
+
 // handleTunnelGet returns an existing tunnel's config in the same shape the
 // create form uses, so the panel can prefill it for editing.
 func (s *server) handleTunnelGet(w http.ResponseWriter, r *http.Request) {

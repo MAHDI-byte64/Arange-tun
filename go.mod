@@ -8,12 +8,14 @@ require (
 	github.com/BurntSushi/toml v1.4.1-0.20240526193622-a339e1f7089c
 	github.com/amnezia-vpn/amneziawg-go v0.2.19
 	github.com/flynn/noise v1.1.0
+	github.com/goccy/go-yaml v1.19.2
+	github.com/gopacket/gopacket v1.6.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/refraction-networking/utls v1.8.2
 	github.com/shirou/gopsutil/v4 v4.24.8
 	github.com/sirupsen/logrus v1.9.3
 	github.com/xtaci/kcp-go/v5 v5.6.72
-	github.com/xtaci/smux v1.5.27
+	github.com/xtaci/smux v1.5.53
 	golang.org/x/crypto v0.45.0
 	golang.org/x/net v0.47.0
 	golang.org/x/sys v0.38.0

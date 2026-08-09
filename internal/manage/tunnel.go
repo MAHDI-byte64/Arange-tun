@@ -45,6 +45,17 @@ func List() []Tunnel {
 			} else {
 				t.Addr = fmt.Sprintf(":%d", cfg.WireGuard.ListenPort)
 			}
+		case cfg.Packet.Role != "":
+			// Packet is a raw-packet tunnel with an inverted topology: the client
+			// (Iran) exposes the forwarded ports and dials the server (abroad).
+			t.Role = cfg.Packet.Role
+			t.Transport = "packet"
+			if cfg.Packet.Role == "client" {
+				t.Addr = cfg.Packet.ServerAddr
+				t.Ports = cfg.Packet.Ports
+			} else {
+				t.Addr = fmt.Sprintf(":%d", cfg.Packet.ListenPort)
+			}
 		case cfg.Server.BindAddr != "":
 			t.Role = "server"
 			t.Transport = string(cfg.Server.Transport)

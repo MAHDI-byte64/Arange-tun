@@ -135,7 +135,9 @@ func buildFromSource(logf func(string)) error {
 	_ = os.MkdirAll(filepath.Join(goCache, "mod"), 0755)
 	_ = os.MkdirAll(filepath.Join(goCache, "build"), 0755)
 	cmd.Env = append(os.Environ(),
-		"CGO_ENABLED=0",
+		// cgo is on: the Packet tunnel's pcap engine links against libpcap, which
+		// the installer put on the machine. The rest of the tree is pure Go.
+		"CGO_ENABLED=1",
 		"GOPROXY=https://proxy.golang.org,https://mirror-go.runflare.com,https://goproxy.cn,direct",
 		"GOSUMDB=off",
 		"GOTOOLCHAIN=local",
