@@ -63,6 +63,16 @@ func applyDefaults(cfg *config.Config) {
 		cfg.Server.LogLevel = defaultLogLevel
 	}
 
+	// Packet has its own [packet] section and its own log level. Without a valid
+	// value the dispatch logger would be built at logrus's zero level (Panic),
+	// which silently swallows Error/Fatal messages while os.Exit still fires — so
+	// a real startup failure would look like an exit-1 with no explanation.
+	if cfg.Packet.Role != "" {
+		if _, err := logrus.ParseLevel(cfg.Packet.LogLevel); err != nil {
+			cfg.Packet.LogLevel = defaultLogLevel
+		}
+	}
+
 	// Retry interval
 	if cfg.Client.RetryInterval <= 0 {
 		cfg.Client.RetryInterval = defaultRetryInterval
