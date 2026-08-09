@@ -1463,9 +1463,18 @@
       <option value="udp" data-i18n>UDP — for WireGuard, Hysteria, QUIC and other datagram services</option>
     </select>
     </div>
-    <div id="nt-stealth-row" style="display:none">
-    <label class="tg" style="margin-bottom:8px"><input type="checkbox" id="nt-stealth" checked><span data-i18n>Stealth — Noise obfuscation (hides the tunnel from DPI; recommended)</span></label>
-    <p class="hint" style="margin:-4px 0 14px;font-size:11.5px;color:var(--muted2)" data-i18n>Wraps the tunnel in a random-looking encrypted layer with no fingerprint. Must be the same on both sides.</p>
+    <div id="nt-obfs-row" style="display:none">
+    <label for="nt-obfs" data-i18n>DPI obfuscation</label>
+    <select id="nt-obfs" class="sel" onchange="ntObfsChange()">
+      <option value="noise" data-i18n>Stealth (Noise) — random-looking, no fingerprint (recommended)</option>
+      <option value="tls" data-i18n>TLS (uTLS) — looks like HTTPS, blends with web traffic</option>
+      <option value="none" data-i18n>None — fastest, but detectable</option>
+    </select>
+    <div id="nt-tlssni-row" style="display:none">
+      <label for="nt-tlssni" data-i18n>TLS SNI (optional — a domain to present)</label>
+      <input id="nt-tlssni" type="text" autocomplete="off" spellcheck="false" placeholder="www.cloudflare.com">
+    </div>
+    <p class="hint" style="margin:-4px 0 14px;font-size:11.5px;color:var(--muted2)" data-i18n>Hides the tunnel from DPI. Must be the same on both sides.</p>
     </div>
 
     <label for="nt-preset" data-i18n>Performance preset</label>
@@ -1878,6 +1887,12 @@ const FA={
   "Direct — VPN outbound":"مستقیم — خروجی VPN",
   "Stealth — Noise obfuscation (hides the tunnel from DPI; recommended)":"مخفی‌کاری — obfuscation نویز (تونل را از DPI پنهان می‌کند؛ پیشنهادی)",
   "Wraps the tunnel in a random-looking encrypted layer with no fingerprint. Must be the same on both sides.":"تونل را در یک لایهٔ رمزنگاری‌شدهٔ شبه‌تصادفی و بدون فینگرپرینت می‌پیچد. باید روی هر دو سمت یکسان باشد.",
+  "DPI obfuscation":"پنهان‌سازی در برابر DPI",
+  "Stealth (Noise) — random-looking, no fingerprint (recommended)":"Stealth (نویز) — شبه‌تصادفی، بدون فینگرپرینت (پیشنهادی)",
+  "TLS (uTLS) — looks like HTTPS, blends with web traffic":"TLS (uTLS) — شبیه HTTPS، هم‌رنگ ترافیک وب",
+  "None — fastest, but detectable":"هیچ — سریع‌ترین، ولی قابل‌تشخیص",
+  "TLS SNI (optional — a domain to present)":"SNI برای TLS (اختیاری — دامنه‌ای که نمایش داده می‌شود)",
+  "Hides the tunnel from DPI. Must be the same on both sides.":"تونل را از DPI پنهان می‌کند. باید روی هر دو سمت یکسان باشد.",
   "New WireGuard tunnel":"تونل وایرگارد جدید",
   "WireGuard as an outbound: a server is an exit node that generates a config; a client brings WireGuard up and exposes a SOCKS5 proxy through it — point your panel's outbound at that SOCKS5.":"وایرگارد به‌عنوان اوت‌باند: سرور یک اکسیت‌نود است که کانفیگ می‌سازد؛ کلاینت وایرگارد را بالا می‌آورد و یک پراکسی SOCKS5 از داخل تونل باز می‌کند — اوت‌باند پنلت را به آن SOCKS5 وصل کن.",
   "🌍 Server — exit node (generates a WireGuard config)":"🌍 سرور — اکسیت‌نود (کانفیگ وایرگارد می‌سازد)",
@@ -2962,8 +2977,9 @@ function openNewTunnel(){
   ntProtoBase='';
   $('nt-transport-row').style.display='';
   $('nt-frp-proto-row').style.display='none';
-  $('nt-stealth-row').style.display='none';
-  $('nt-stealth').checked=true;
+  $('nt-obfs-row').style.display='none';
+  $('nt-tlssni-row').style.display='none';
+  $('nt-obfs').value='noise'; $('nt-tlssni').value='';
   ntSync(); ntSuggestName();
   $('newtun').classList.add('on');
 }
@@ -2984,13 +3000,16 @@ function openProto(base,title){
   $('nt-transport-row').style.display='none';
   $('nt-frp-proto').value='tcp';
   $('nt-frp-proto-row').style.display='';
-  $('nt-stealth-row').style.display='';
-  $('nt-stealth').checked=true;
+  $('nt-obfs-row').style.display='';
+  $('nt-obfs').value='noise';
+  ntObfsChange();
   $('nt-transport').value=base;
   ntSync();
 }
 function openFrp(){ openProto('frp','New frp tunnel'); }
 function openRathole(){ openProto('rathole','New rathole tunnel'); }
+// ntObfsChange shows the SNI field only for the TLS obfuscation mode.
+function ntObfsChange(){ $('nt-tlssni-row').style.display=$('nt-obfs').value==='tls'?'':'none'; }
 
 // ntFrpProtoChange maps the TCP/UDP choice onto the real transport value: the
 // base carries TCP on the exposed ports, base+"u" carries UDP.
@@ -3114,7 +3133,8 @@ async function submitNewTunnel(){
     proxyProtocol:role==='server'&&ntSupportsPP(tr)&&$('nt-pp').checked,
     loadBalance:$('nt-lb').checked,
     simpleAuth:ntNeedsTLS(tr)&&$('nt-simpleauth').checked,
-    stealth:!!ntProtoBase&&$('nt-stealth').checked,
+    obfs:ntProtoBase?$('nt-obfs').value:'',
+    tlsSni:ntProtoBase&&$('nt-obfs').value==='tls'?$('nt-tlssni').value.trim():'',
   };
   if(role==='server'){
     req.port=$('nt-port').value.trim();
@@ -3247,8 +3267,10 @@ function ntFill(req){
     $('nt-transport-row').style.display='none';
     $('nt-frp-proto').value=udp?'udp':'tcp';
     $('nt-frp-proto-row').style.display='';
-    $('nt-stealth').checked=!!req.stealth;
-    $('nt-stealth-row').style.display='';
+    $('nt-obfs').value=(req.obfs==='noise'||req.obfs==='tls')?req.obfs:'none';
+    $('nt-tlssni').value=req.tlsSni||'';
+    $('nt-obfs-row').style.display='';
+    ntObfsChange();
   }
   ntSync();
 }

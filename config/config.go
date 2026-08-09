@@ -129,11 +129,15 @@ type ServerConfig struct {
 	ZeroCopy bool `toml:"zero_copy"`
 
 	ProxyProtocol bool `toml:"proxy_protocol"`
-	// Stealth wraps the frp/rathole tunnel in the Noise record layer — a
-	// random-looking, PSK-authenticated stream with no handshake fingerprint,
-	// the same obfuscation the "stealth" transport uses. Off by default; the
-	// panel turns it on for new frp/rathole tunnels.
+	// Stealth is the legacy on/off form of Obfs ("noise"), kept so configs
+	// written before Obfs existed still work. New configs set Obfs.
 	Stealth bool `toml:"stealth"`
+	// Obfs is the DPI-obfuscation mode for an frp/rathole tunnel: "" / "none",
+	// "noise" (the Noise record layer), or "tls" (a uTLS session that looks like
+	// HTTPS). Both ends must match.
+	Obfs string `toml:"obfs"`
+	// TLSSni is the SNI the tls obfs presents; empty derives it from the address.
+	TLSSni string `toml:"tls_sni"`
 	// MaxConnections caps simultaneous forwarded connections (0 = unlimited).
 	MaxConnections int `toml:"max_connections"`
 	// BandwidthMbps caps total tunnel throughput in Mbit/s (0 = unlimited).
@@ -226,12 +230,36 @@ type ClientConfig struct {
 	// must reach the SAME server, since the control channel — and therefore
 	// the tunnel's identity — lives on one of them.
 	LoadBalance bool `toml:"load_balance"`
-	// Stealth wraps the frp/rathole tunnel in the Noise record layer. Must match
-	// the server. See ServerConfig.Stealth.
-	Stealth bool `toml:"stealth"`
+	// Stealth / Obfs / TLSSni configure DPI obfuscation for an frp/rathole
+	// tunnel; they must match the server. See ServerConfig.
+	Stealth bool   `toml:"stealth"`
+	Obfs    string `toml:"obfs"`
+	TLSSni  string `toml:"tls_sni"`
 	// Embedded so the kcp_* keys sit at the top level of the [client] table
 	// alongside every other tuning key.
 	KCPConfig
+}
+
+// ObfsMode resolves the effective obfuscation mode of a server config,
+// mapping the legacy stealth flag onto "noise".
+func (c *ServerConfig) ObfsMode() string { return resolveObfs(c.Obfs, c.Stealth) }
+
+// ObfsMode resolves the effective obfuscation mode of a client config.
+func (c *ClientConfig) ObfsMode() string { return resolveObfs(c.Obfs, c.Stealth) }
+
+// resolveObfs normalizes the obfuscation mode: an explicit Obfs wins, otherwise
+// the legacy Stealth bool means "noise", otherwise none.
+func resolveObfs(obfs string, stealth bool) string {
+	switch obfs {
+	case "noise", "tls":
+		return obfs
+	case "none":
+		return ""
+	}
+	if stealth {
+		return "noise"
+	}
+	return ""
 }
 
 // WGPeer is one allowed client on a WireGuard exit server: its public key and

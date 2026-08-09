@@ -41,7 +41,8 @@ type TunnelRequest struct {
 	LocalAddr     string   `json:"localAddr"`     // pin the tunnel to a source address
 	FallbackAddrs []string `json:"fallbackAddrs"` // backup server addresses
 	LoadBalance   bool     `json:"loadBalance"`   // spread connections over all addresses at once
-	Stealth       bool     `json:"stealth"`       // frp/rathole: wrap in the Noise record layer
+	Obfs          string   `json:"obfs"`          // frp/rathole DPI obfuscation: "" / "noise" / "tls"
+	TLSSni        string   `json:"tlsSni"`        // frp/rathole tls obfs: SNI to present
 
 	// TLS, for a wss/wssmux server. Ignored for other transports and for a
 	// client (which never verifies the certificate).
@@ -162,9 +163,13 @@ func buildSpec(req TunnelRequest) (TunnelSpec, error) {
 
 	s := TunnelSpec{Name: name, Role: req.Role, Transport: transport}
 
-	// Stealth is an frp/rathole-only obfuscation; ignore the flag elsewhere.
+	// Obfuscation is frp/rathole-only; ignore it elsewhere.
 	if isReverseProxy(transport) {
-		s.Stealth = req.Stealth
+		switch strings.TrimSpace(req.Obfs) {
+		case "noise", "tls":
+			s.Obfs = strings.TrimSpace(req.Obfs)
+		}
+		s.TLSSni = strings.TrimSpace(req.TLSSni)
 	}
 
 	switch req.Role {

@@ -96,6 +96,35 @@ func sinkAndClose(conn net.Conn) {
 	conn.Close()
 }
 
+// serverObfsWrap upgrades an accepted connection to the configured obfuscation
+// mode. On failure the raw connection is already closed. mode "" returns it
+// unchanged.
+func serverObfsWrap(conn net.Conn, mode, token string) (net.Conn, error) {
+	switch mode {
+	case "noise":
+		return network.NoiseServerConn(conn, token, handshakeTimeout)
+	case "tls":
+		return network.TLSServerConn(conn, handshakeTimeout)
+	}
+	return conn, nil
+}
+
+// clientObfsWrap upgrades a dialed connection to the configured obfuscation
+// mode. On failure the raw connection is already closed.
+func clientObfsWrap(conn net.Conn, cfg *config.ClientConfig) (net.Conn, error) {
+	switch cfg.ObfsMode() {
+	case "noise":
+		return network.NoiseClientConn(conn, cfg.Token, handshakeTimeout)
+	case "tls":
+		sni := cfg.TLSSni
+		if sni == "" {
+			sni = network.SNIFromAddr(cfg.RemoteAddr)
+		}
+		return network.TLSClientConn(conn, sni, handshakeTimeout)
+	}
+	return conn, nil
+}
+
 // sessionKey is sha256(token ‖ nonce) — the value that both authenticates the
 // control channel and, echoed back in a DataChannelHello, routes a data channel
 // to it.
@@ -260,17 +289,14 @@ func RunServer(ctx context.Context, cfg *config.ServerConfig, logger *logrus.Log
 // hello starts an authentication, a data hello joins an existing control
 // channel's pool.
 func (s *server) handleIncoming(ctx context.Context, conn net.Conn) {
-	// Stealth: wrap every connection — control and data channels alike — in the
-	// Noise record layer first, so nothing after the TCP connect has a
-	// fingerprint and a peer without the token is dropped without a reply.
-	if s.cfg.Stealth {
-		wrapped, err := network.NoiseServerConn(conn, s.token, handshakeTimeout)
-		if err != nil {
-			conn.Close()
-			return
-		}
-		conn = wrapped
+	// Obfuscation: wrap every connection — control and data channels alike — in
+	// the configured mode first, so nothing after the TCP connect has a
+	// fingerprint and a peer that cannot complete the wrap is dropped.
+	wrapped, oerr := serverObfsWrap(conn, s.cfg.ObfsMode(), s.token)
+	if oerr != nil {
+		return
 	}
+	conn = wrapped
 	_ = conn.SetDeadline(time.Now().Add(handshakeTimeout))
 	variant, d, err := readHello(conn)
 	if err != nil {
@@ -669,14 +695,11 @@ func runControlClient(ctx context.Context, cfg *config.ClientConfig, logger *log
 		return fmt.Errorf("cannot reach server %s: %w", cfg.RemoteAddr, err)
 	}
 
-	if cfg.Stealth {
-		wrapped, werr := network.NoiseClientConn(conn, cfg.Token, handshakeTimeout)
-		if werr != nil {
-			conn.Close()
-			return fmt.Errorf("stealth handshake failed: %w", werr)
-		}
-		conn = wrapped
+	wrapped, werr := clientObfsWrap(conn, cfg)
+	if werr != nil {
+		return fmt.Errorf("obfuscation handshake failed: %w", werr)
 	}
+	conn = wrapped
 
 	_ = conn.SetDeadline(time.Now().Add(handshakeTimeout))
 	// The Hello's digest field would normally be sha256(service name) — a
@@ -756,14 +779,11 @@ func openDataChannel(ctx context.Context, cfg *config.ClientConfig, key [32]byte
 		logger.Debugf("rathole client: data channel dial failed: %v", err)
 		return
 	}
-	if cfg.Stealth {
-		wrapped, werr := network.NoiseClientConn(conn, cfg.Token, handshakeTimeout)
-		if werr != nil {
-			conn.Close()
-			return
-		}
-		conn = wrapped
+	wrapped, werr := clientObfsWrap(conn, cfg)
+	if werr != nil {
+		return
 	}
+	conn = wrapped
 	defer conn.Close()
 
 	_ = conn.SetDeadline(time.Now().Add(handshakeTimeout))

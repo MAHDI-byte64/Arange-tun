@@ -2,6 +2,23 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.12.0 — 2026-08-09
+
+**A TLS obfuscation mode for frp/rathole, chosen separately from Stealth.** The
+single Stealth toggle is now a **DPI obfuscation** picker with three modes:
+
+- **Stealth (Noise)** — random-looking, no fingerprint (the previous behavior,
+  still the default).
+- **TLS (uTLS)** — carries the tunnel inside a TLS session whose ClientHello
+  wears a current Chrome fingerprint, so on the wire it looks like ordinary
+  HTTPS and blends with web traffic. An optional SNI can be set.
+- **None** — fastest, no obfuscation.
+
+The certificate is self-signed and the token still authenticates inside the
+session. A stronger **REALITY**-style mode (borrowing a real site's certificate,
+with a probe fallback) is planned as a further separate mode. Old configs with
+`stealth = true` keep working (read as Stealth/Noise).
+
 ## v1.11.0 — 2026-08-08
 
 **Stealth mode for frp and rathole.** New frp/rathole tunnels are now wrapped in

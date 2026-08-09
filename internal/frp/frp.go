@@ -206,12 +206,19 @@ func RunServer(ctx context.Context, cfg *config.ServerConfig, logger *logrus.Log
 // handleControl runs the handshake on an incoming connection and, if it checks
 // out, installs it as the live session — displacing any previous one.
 func (s *server) handleControl(ctx context.Context, conn net.Conn) {
-	// Stealth: wrap the whole connection in the Noise record layer first, so
-	// everything after the TCP connect — this handshake, the smux session, all
-	// forwarded traffic — is a random-looking, PSK-authenticated stream with no
-	// fingerprint. A peer without the token is dropped here without a reply.
-	if s.cfg.Stealth {
+	// Obfuscation: wrap the whole connection first — the Noise record layer
+	// (random-looking) or a uTLS session (looks like HTTPS) — so everything after
+	// the TCP connect is hidden. A peer that cannot complete the wrap is dropped.
+	switch s.cfg.ObfsMode() {
+	case "noise":
 		wrapped, err := network.NoiseServerConn(conn, string(s.token), handshakeTimeout)
+		if err != nil {
+			conn.Close()
+			return
+		}
+		conn = wrapped
+	case "tls":
+		wrapped, err := network.TLSServerConn(conn, handshakeTimeout)
 		if err != nil {
 			conn.Close()
 			return
@@ -513,13 +520,25 @@ func dialAndServe(ctx context.Context, cfg *config.ClientConfig, logger *logrus.
 		return fmt.Errorf("cannot reach server %s: %w", cfg.RemoteAddr, err)
 	}
 
-	// Stealth: upgrade to the Noise record layer before anything else, matching
-	// the server.
-	if cfg.Stealth {
+	// Obfuscation: upgrade the connection before anything else, matching the
+	// server's mode.
+	switch cfg.ObfsMode() {
+	case "noise":
 		wrapped, werr := network.NoiseClientConn(conn, cfg.Token, handshakeTimeout)
 		if werr != nil {
 			conn.Close()
-			return fmt.Errorf("stealth handshake failed: %w", werr)
+			return fmt.Errorf("obfuscation handshake failed: %w", werr)
+		}
+		conn = wrapped
+	case "tls":
+		sni := cfg.TLSSni
+		if sni == "" {
+			sni = network.SNIFromAddr(cfg.RemoteAddr)
+		}
+		wrapped, werr := network.TLSClientConn(conn, sni, handshakeTimeout)
+		if werr != nil {
+			conn.Close()
+			return fmt.Errorf("obfuscation handshake failed: %w", werr)
 		}
 		conn = wrapped
 	}

@@ -38,7 +38,8 @@ func TunnelForEdit(name string) (TunnelRequest, error) {
 		}
 		req.Ports = s.Ports
 		req.ProxyProtocol = s.ProxyProtocol
-		req.Stealth = s.Stealth
+		req.Obfs = s.ObfsMode()
+		req.TLSSni = s.TLSSni
 		req.SimpleAuth = s.SimpleAuth
 
 		// TLS mode: ACME wins; a certificate under the auto-generated cert
@@ -101,7 +102,8 @@ func TunnelForEdit(name string) (TunnelRequest, error) {
 		req.LocalAddr = c.LocalAddr
 		req.FallbackAddrs = c.FallbackAddrs
 		req.LoadBalance = c.LoadBalance
-		req.Stealth = c.Stealth
+		req.Obfs = c.ObfsMode()
+		req.TLSSni = c.TLSSni
 		req.SimpleAuth = c.SimpleAuth
 
 		if c.Preset == "" {

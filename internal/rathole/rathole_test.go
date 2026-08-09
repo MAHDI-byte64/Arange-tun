@@ -194,6 +194,81 @@ func TestRatholeRoundTripStealth(t *testing.T) {
 	}
 }
 
+// TestRatholeRoundTripTLS runs the TCP round trip with the uTLS obfuscation
+// mode on, wrapping the control channel and each data channel in TLS.
+func TestRatholeRoundTripTLS(t *testing.T) {
+	svc, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer svc.Close()
+	go func() {
+		for {
+			c, err := svc.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				defer c.Close()
+				buf := make([]byte, 4096)
+				for {
+					n, err := c.Read(buf)
+					if n > 0 {
+						c.Write(buf[:n])
+					}
+					if err != nil {
+						return
+					}
+				}
+			}()
+		}
+	}()
+	svcPort := svc.Addr().(*net.TCPAddr).Port
+
+	ctlPort := freeTCPPort(t)
+	expPort := freeTCPPort(t)
+	log := utils.NewLogger("error")
+
+	sc := config.ServerConfig{
+		BindAddr:  fmt.Sprintf("127.0.0.1:%d", ctlPort),
+		Transport: "rathole",
+		Token:     "tls-rh",
+		Obfs:      "tls",
+		Ports:     []string{fmt.Sprintf("%d=127.0.0.1:%d", expPort, svcPort)},
+	}
+	cc := config.ClientConfig{
+		RemoteAddr: fmt.Sprintf("127.0.0.1:%d", ctlPort),
+		Transport:  "rathole",
+		Token:      "tls-rh",
+		Obfs:       "tls",
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go RunServer(ctx, &sc, log, false)
+	go RunClient(ctx, &cc, log)
+
+	deadline := time.Now().Add(8 * time.Second)
+	for {
+		conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", expPort))
+		if err == nil {
+			conn.SetDeadline(time.Now().Add(800 * time.Millisecond))
+			if _, werr := conn.Write([]byte("hello-tls-xxxx")); werr == nil {
+				buf := make([]byte, 14)
+				if _, rerr := io.ReadFull(conn, buf); rerr == nil && string(buf) == "hello-tls-xxxx" {
+					conn.Close()
+					return
+				}
+			}
+			conn.Close()
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("tls tunnel did not carry traffic within the timeout")
+		}
+		time.Sleep(150 * time.Millisecond)
+	}
+}
+
 // TestRatholeRoundTripUDP is the same round trip over the UDP mode.
 func TestRatholeRoundTripUDP(t *testing.T) {
 	svc, err := net.ListenPacket("udp", "127.0.0.1:0")
