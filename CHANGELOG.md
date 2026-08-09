@@ -2,6 +2,17 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.16.1 — 2026-08-09
+
+**Ping and server country now show for WireGuard, Packet and SSH tunnels.** These
+egress/raw tunnels have no observable liveness socket, so the panel took their
+state from the health check but skipped the probe path entirely — leaving the
+country flag and ping blank. The client side now geo-locates and pings the remote
+server it dials (the host in the tunnel's address): a TCP probe for SSH (a real
+TCP service) and best-effort ICMP for WireGuard and Packet, with the country/ISP
+resolved from that address. State still comes from health, so a filtered ping
+never marks a working tunnel offline.
+
 ## v1.16.0 — 2026-08-09
 
 **New SSH tunnel; OpenVPN placeholder removed.** The Direct (VPN-outbound) family

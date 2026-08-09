@@ -442,10 +442,30 @@ func GatherTunnels() []TunnelInfo {
 			}
 			if t.Transport == "wireguard" || t.Transport == "packet" || t.Transport == "ssh" {
 				// WireGuard and SSH are VPN egresses and Packet injects raw packets
-				// below the kernel stack: none has a reverse-tunnel peer socket to
-				// probe or geo-locate. Their state comes from health, and their
-				// traffic from the metrics file below.
+				// below the kernel stack: none has an observable liveness socket, so
+				// their state comes from health and their traffic from the metrics
+				// file below. But the panel can still geo-locate and ping the remote
+				// server the client dials — the host in t.Addr (a server-role side
+				// is ":port" with no host, and is skipped).
 				info.State = health[t.Name].State
+				if h, port := splitHostPort(t.Addr); h != "" && h != "0.0.0.0" && h != "::" && h != "[::]" {
+					ip := resolveIP(h)
+					// SSH is a real TCP service, so a TCP probe measures it well;
+					// WireGuard (UDP) and Packet (a raw port the kernel drops probes
+					// on) can only be reached by best-effort ICMP.
+					if t.Transport == "ssh" {
+						info.Ping = tcpPing(h, port)
+					} else if ip != "" {
+						info.Ping = icmpPing(ip)
+					}
+					if ip != "" {
+						if g := geo.Lookup(ip); g != nil {
+							info.PeerLocation = strings.TrimSpace(g.City + ", " + g.Country)
+							info.PeerISP = g.ISP
+							info.PeerCountry = g.Code
+						}
+					}
+				}
 			} else if t.Role == "server" {
 				// Server (e.g. the Iran node): we can't ping our own bind_addr,
 				// but we can detect the connected client(s) — the kharej peers
