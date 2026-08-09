@@ -2,6 +2,16 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.16.2 — 2026-08-09
+
+**Renamed the "Amin Tunnel" to "Backhaul".** Arange-tun is a fork of Backhaul, so
+the built-in engine *is* the Backhaul engine (identical config, protocol and
+transports). Rather than ship a separate, redundant "Backhaul" tunnel that would
+just be the same engine under another name, the built-in engine is now labelled
+**Backhaul** — the honest name — everywhere in the panel, the setup guides and the
+READMEs. The unimplemented "Backhaul" placeholder in the chooser is gone. The
+internal engine, config format and behaviour are unchanged.
+
 ## v1.16.1 — 2026-08-09
 
 **Ping and server country now show for WireGuard, Packet and SSH tunnels.** These

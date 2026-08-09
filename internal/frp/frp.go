@@ -2,12 +2,12 @@
 // protocol written from scratch, with no external binary and nothing borrowed
 // from any other frp project but the three letters.
 //
-// It is a reverse tunnel in the same shape as the built-in Amin engine: the
+// It is a reverse tunnel in the same shape as the built-in Backhaul engine: the
 // abroad/kharej side always dials out, the Iran side accepts that one control
 // connection and then drives every forwarded stream over it. Because it is just
-// another transport value ("frp"), it reuses the whole Amin lifecycle — the same
+// another transport value ("frp"), it reuses the whole Backhaul lifecycle — the same
 // config file, systemd unit, status, logs and details — so from the panel it is
-// managed exactly like an Amin tunnel and lives in the same list.
+// managed exactly like a Backhaul tunnel and lives in the same list.
 //
 // The wire protocol, end to end:
 //

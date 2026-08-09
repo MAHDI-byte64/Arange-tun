@@ -173,7 +173,7 @@ func runEngine(cfg *config.Config, ctx context.Context, configPath string, apply
 		startMetrics(ctx, configPath, string(cfg.Server.Transport), "server")
 
 		// frp and rathole are Arange-tun's own reverse-proxy protocols, not part
-		// of the Amin engine's transport set, so they run their own server here.
+		// of the Backhaul engine's transport set, so they run their own server here.
 		// The "…u" variant is the same protocol carrying UDP on the exposed ports
 		// instead of TCP.
 		if t := cfg.Server.Transport; t == "frp" || t == "frpu" {
@@ -208,7 +208,7 @@ func runEngine(cfg *config.Config, ctx context.Context, configPath string, apply
 		startMetrics(ctx, configPath, string(cfg.Client.Transport), "client")
 
 		// frp and rathole are Arange-tun's own reverse-proxy protocols, not part
-		// of the Amin engine's transport set, so they run their own client here.
+		// of the Backhaul engine's transport set, so they run their own client here.
 		// The client is mode-agnostic — the server tells it per stream whether to
 		// dial TCP or UDP — so a protocol and its "…u" variant share one client.
 		if t := cfg.Client.Transport; t == "frp" || t == "frpu" {

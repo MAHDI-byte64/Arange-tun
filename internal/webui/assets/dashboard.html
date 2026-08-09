@@ -2908,16 +2908,15 @@ function closePageHelp(){ $('pagehelp').classList.remove('on'); }
 
 // ===== Tunnel types + Add-tunnel flow =====
 //
-// Only "Amin Tunnel" — the built-in Go engine — is buildable today. The rest
-// are shown as choices with their own guide and a "soon" badge, so the flow is
-// ready for them to be filled in one type at a time.
+// "Backhaul" is the built-in Go engine (Arange-tun is a Backhaul fork, so this
+// is the real Backhaul engine). The id stays "amin" internally for continuity;
+// only its display name is "Backhaul".
 // kind splits the chooser into two families: "reverse" tunnels forward ports
 // back to Iran; "direct" tunnels are VPN egress (connect out, no port forward).
 const TUN_TYPES=[
-  {id:'amin', name:'Amin Tunnel', ready:true, kind:'reverse', desc:{en:'The built-in engine — TCP/UDP/WS, KCP, Stealth.', fa:'موتور داخلی — TCP/UDP/WS، KCP، Stealth.'}},
+  {id:'amin', name:'Backhaul', ready:true, kind:'reverse', desc:{en:'The built-in engine — TCP/UDP/WS, KCP, Stealth.', fa:'موتور داخلی — TCP/UDP/WS، KCP، Stealth.'}},
   {id:'frp', name:'frp', ready:true, kind:'reverse', desc:{en:'Fast reverse proxy.', fa:'ریورس‌پراکسی سریع.'}},
   {id:'rathole', name:'Rathole v2', ready:true, kind:'reverse', desc:{en:'Pooled data-channel reverse proxy.', fa:'ریورس‌پراکسی با کانال دادهٔ مجزا.'}},
-  {id:'backhaul', name:'Backhaul', ready:false, kind:'reverse', desc:{en:'High-performance reverse tunnel.', fa:'تونل معکوس پرسرعت.'}},
   {id:'packet', name:'Packet', ready:true, kind:'reverse', desc:{en:'Raw-packet tunnel — bypasses the kernel stack.', fa:'تونل پکت خام — دور زدن لایهٔ کرنل.'}},
   {id:'wireguard', name:'WireGuard', ready:true, kind:'direct', desc:{en:'VPN egress + SOCKS5 outbound.', fa:'خروج VPN + اوت‌باند SOCKS5.'}},
   {id:'ssh', name:'SSH', ready:true, kind:'direct', desc:{en:'SOCKS5 over SSH — quick egress with a password.', fa:'SOCKS5 روی SSH — خروج سریع با پسورد.'}}
@@ -3181,8 +3180,8 @@ async function submitSSH(){
 // Tutorials shown before the create form. _soon builds a short placeholder for
 // the types that are not buildable yet.
 const TUTORIALS={
-  amin:{title:{en:'Amin Tunnel — setup guide', fa:'امین‌تانل — راهنمای راه‌اندازی'},body:{
-    en:'<p>Amin Tunnel is a <b>reverse tunnel</b>: the client always dials out, so the machine behind it needs no open inbound port.</p>'+
+  amin:{title:{en:'Backhaul — setup guide', fa:'Backhaul — راهنمای راه‌اندازی'},body:{
+    en:'<p>Backhaul is a <b>reverse tunnel</b>: the client always dials out, so the machine behind it needs no open inbound port.</p>'+
       '<h4>The two sides</h4><ul>'+
       '<li><b>🇮🇷 Iran server</b> — the entry point. It <b>exposes the ports</b>; your users connect to the Iran IP.</li>'+
       '<li><b>🌍 Abroad / kharej</b> — runs the real service (panel, app) and <b>dials out</b> to the Iran server.</li></ul>'+
@@ -3191,7 +3190,7 @@ const TUTORIALS={
       '<li>Create the <b>abroad / kharej</b> side: enter the Iran server IP, the tunnel port, and the <b>same token</b>.</li>'+
       '<li>Both ends must use the <b>same transport and token</b>. Turbo is the recommended preset.</li></ol>'+
       '<p>Close this guide to open the form and create the tunnel.</p>',
-    fa:'<p>امین‌تانل یک <b>تونل معکوس</b> است: کلاینت همیشه به بیرون dial می‌کند، پس ماشین پشت آن نیازی به پورت ورودی باز ندارد.</p>'+
+    fa:'<p>Backhaul یک <b>تونل معکوس</b> است: کلاینت همیشه به بیرون dial می‌کند، پس ماشین پشت آن نیازی به پورت ورودی باز ندارد.</p>'+
       '<h4>دو سمت</h4><ul>'+
       '<li><b>🇮🇷 سرور ایران</b> — نقطهٔ ورود. <b>پورت‌ها را نمایش می‌دهد</b>؛ کاربران به آی‌پی ایران وصل می‌شوند.</li>'+
       '<li><b>🌍 خارج / kharej</b> — سرویس واقعی (پنل، اپ) را اجرا می‌کند و به سرور ایران <b>dial بیرونی</b> می‌زند.</li></ul>'+
@@ -3201,7 +3200,7 @@ const TUTORIALS={
       '<li>هر دو سمت باید <b>ترنسپورت و توکن یکسان</b> داشته باشند. پیش‌تنظیم پیشنهادی Turbo است.</li></ol>'+
       '<p>برای باز شدن فرم و ساخت تانل، این راهنما را ببند.</p>'}},
   frp:{title:{en:'frp — setup guide', fa:'frp — راهنمای راه‌اندازی'},body:{
-    en:'<p><b>frp</b> is a reverse-proxy tunnel built into Arange-tun — its own protocol (a token handshake and multiplexed streams), no external binary. It works and is managed exactly like an Amin tunnel.</p>'+
+    en:'<p><b>frp</b> is a reverse-proxy tunnel built into Arange-tun — its own protocol (a token handshake and multiplexed streams), no external binary. It works and is managed exactly like a Backhaul tunnel.</p>'+
       '<h4>The two sides</h4><ul>'+
       '<li><b>🇮🇷 Iran server</b> — the entry point. Set the tunnel port and the <b>exposed ports</b>; users connect to the Iran IP.</li>'+
       '<li><b>🌍 Abroad / kharej</b> — dials out to the Iran server and forwards traffic to the real service.</li></ul>'+
@@ -3209,7 +3208,7 @@ const TUTORIALS={
       '<li>Create the <b>Iran server</b> first: set the tunnel port and exposed ports (e.g. <code>443</code>, <code>8080=127.0.0.1:8080</code>) and copy the generated token.</li>'+
       '<li>Create the <b>abroad / kharej</b> side: the Iran server IP, the tunnel port, and the <b>same token</b>.</li></ol>'+
       '<p>Close this guide to open the form.</p>',
-    fa:'<p><b>frp</b> یک تانل reverse-proxy داخلی آرنج‌تان است — پروتکل خودش (هندشیک توکن و استریم‌های مالتی‌پلکس)، بدون باینری خارجی. دقیقاً مثل تانل امین کار و مدیریت می‌شود.</p>'+
+    fa:'<p><b>frp</b> یک تانل reverse-proxy داخلی آرنج‌تان است — پروتکل خودش (هندشیک توکن و استریم‌های مالتی‌پلکس)، بدون باینری خارجی. دقیقاً مثل تانل Backhaul کار و مدیریت می‌شود.</p>'+
       '<h4>دو سمت</h4><ul>'+
       '<li><b>🇮🇷 سرور ایران</b> — نقطهٔ ورود. پورت تانل و <b>پورت‌های نمایش‌داده‌شده</b> را بگذار؛ کاربران به آی‌پی ایران وصل می‌شوند.</li>'+
       '<li><b>🌍 خارج / kharej</b> — به سرور ایران dial می‌کند و ترافیک را به سرویس واقعی می‌رساند.</li></ul>'+
@@ -3218,7 +3217,7 @@ const TUTORIALS={
       '<li>سپس سمت <b>خارج</b> را بساز: آی‌پی سرور ایران، پورت تانل، و <b>همان توکن</b>.</li></ol>'+
       '<p>برای باز شدن فرم، این راهنما را ببند.</p>'}},
   rathole:{title:{en:'Rathole v2 — setup guide', fa:'Rathole v2 — راهنمای راه‌اندازی'},body:{
-    en:'<p><b>Rathole v2</b> is a Go port of the rathole protocol, built into Arange-tun — no external binary. Unlike frp it does not multiplex: a control channel carries only commands and each forwarded connection gets its own data channel (rathole’s design), with a <code>sha256(token‖nonce)</code> handshake. It works and is managed exactly like an Amin tunnel.</p>'+
+    en:'<p><b>Rathole v2</b> is a Go port of the rathole protocol, built into Arange-tun — no external binary. Unlike frp it does not multiplex: a control channel carries only commands and each forwarded connection gets its own data channel (rathole’s design), with a <code>sha256(token‖nonce)</code> handshake. It works and is managed exactly like a Backhaul tunnel.</p>'+
       '<h4>The two sides</h4><ul>'+
       '<li><b>🇮🇷 Iran server</b> — the entry point. Set the tunnel port and the <b>exposed ports</b>; users connect to the Iran IP.</li>'+
       '<li><b>🌍 Abroad / kharej</b> — dials out to the Iran server and forwards traffic to the real service.</li></ul>'+
@@ -3227,7 +3226,7 @@ const TUTORIALS={
       '<li>Create the <b>abroad / kharej</b> side: the Iran server IP, the tunnel port, and the <b>same token</b>.</li>'+
       '<li>Pick the <b>protocol</b> — TCP for the usual inbounds, UDP for WireGuard/Hysteria/QUIC — the same on both sides.</li></ol>'+
       '<p>Close this guide to open the form.</p>',
-    fa:'<p><b>Rathole v2</b> یک پورت پروتکل rathole به زبان Go است که داخل آرنج‌تان پیاده شده — بدون باینری خارجی. برخلاف frp مالتی‌پلکس نمی‌کند: یک کانال کنترل فقط دستورها را می‌برد و هر اتصال یک <b>کانال دادهٔ مجزا</b> می‌گیرد (طراحی خود rathole)، با هندشیک <code>sha256(token‖nonce)</code>. دقیقاً مثل تانل امین کار و مدیریت می‌شود.</p>'+
+    fa:'<p><b>Rathole v2</b> یک پورت پروتکل rathole به زبان Go است که داخل آرنج‌تان پیاده شده — بدون باینری خارجی. برخلاف frp مالتی‌پلکس نمی‌کند: یک کانال کنترل فقط دستورها را می‌برد و هر اتصال یک <b>کانال دادهٔ مجزا</b> می‌گیرد (طراحی خود rathole)، با هندشیک <code>sha256(token‖nonce)</code>. دقیقاً مثل تانل Backhaul کار و مدیریت می‌شود.</p>'+
       '<h4>دو سمت</h4><ul>'+
       '<li><b>🇮🇷 سرور ایران</b> — نقطهٔ ورود. پورت تانل و <b>پورت‌های نمایش‌داده‌شده</b> را بگذار؛ کاربران به آی‌پی ایران وصل می‌شوند.</li>'+
       '<li><b>🌍 خارج / kharej</b> — به سرور ایران dial می‌کند و ترافیک را به سرویس واقعی می‌رساند.</li></ul>'+
@@ -3299,8 +3298,8 @@ const TUTORIALS={
       '<p>برای باز شدن فرم، این راهنما را ببند.</p>'}},
   _soon:function(name){ return {
     title:{en:name+' — coming soon', fa:name+' — به‌زودی'},body:{
-      en:'<p><b>'+esc(name)+'</b> cannot be created from the panel yet.</p><p>The chooser and this guide are in place for it; the create flow will be added in a later phase. For now, use <b>Amin Tunnel</b>.</p>',
-      fa:'<p>ساخت <b>'+esc(name)+'</b> از پنل هنوز در دسترس نیست.</p><p>منوی انتخاب و این راهنما برایش آماده است؛ روند ساخت در فازهای بعد اضافه می‌شود. فعلاً از <b>امین‌تانل</b> استفاده کن.</p>'}};
+      en:'<p><b>'+esc(name)+'</b> cannot be created from the panel yet.</p><p>The chooser and this guide are in place for it; the create flow will be added in a later phase. For now, use <b>Backhaul</b>.</p>',
+      fa:'<p>ساخت <b>'+esc(name)+'</b> از پنل هنوز در دسترس نیست.</p><p>منوی انتخاب و این راهنما برایش آماده است؛ روند ساخت در فازهای بعد اضافه می‌شود. فعلاً از <b>Backhaul</b> استفاده کن.</p>'}};
   }
 };
 
@@ -3324,7 +3323,7 @@ function openNewTunnel(){
   // The submit button may have been repurposed to "Create another" by a prior
   // success; put it back to a create action.
   $('nt-submit').onclick=submitNewTunnel;
-  // A plain Amin form always shows the transport picker and never the
+  // A plain Backhaul form always shows the transport picker and never the
   // reverse-proxy protocol picker; openProto flips both.
   ntProtoBase='';
   $('nt-transport-row').style.display='';
@@ -3338,11 +3337,11 @@ function openNewTunnel(){
 }
 
 // ntProtoBase is the base transport of the built-in reverse-proxy tunnels that
-// reuse the Amin create form — "frp" or "rathole" — while the TCP/UDP picker
-// chooses between it and its "…u" (UDP) variant. Empty for a plain Amin tunnel.
+// reuse the Backhaul create form — "frp" or "rathole" — while the TCP/UDP picker
+// chooses between it and its "…u" (UDP) variant. Empty for a plain Backhaul tunnel.
 let ntProtoBase='';
 
-// openProto reuses the Amin create form for a built-in reverse-proxy tunnel:
+// openProto reuses the Backhaul create form for a built-in reverse-proxy tunnel:
 // frp or rathole. The whole create/edit/list/logs lifecycle is shared; the
 // differences are that the transport is fixed (its picker hidden) and a small
 // TCP/UDP protocol picker takes its place.

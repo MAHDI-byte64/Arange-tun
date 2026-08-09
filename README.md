@@ -20,8 +20,8 @@ Go · AGPL-3.0 · Linux amd64/arm64 · one self-contained binary · CLI **and** 
 - [Install](#-install)
 - [How reverse tunneling works](#-how-reverse-tunneling-works)
 - [Tunnel types — pick the right one](#-tunnel-types--pick-the-right-one)
-  - [Amin Tunnel](#amin-tunnel--the-built-in-engine) · [frp](#frp--built-in-reverse-proxy) · [Rathole v2](#rathole-v2--pooled-reverse-proxy) · [Packet](#packet--raw-packets-below-the-kernel) · [WireGuard](#wireguard--vpn-egress) · [SSH](#ssh--socks5-over-ssh)
-- [Transports (Amin engine)](#-transports-amin-engine)
+  - [Backhaul](#backhaul--the-built-in-engine) · [frp](#frp--built-in-reverse-proxy) · [Rathole v2](#rathole-v2--pooled-reverse-proxy) · [Packet](#packet--raw-packets-below-the-kernel) · [WireGuard](#wireguard--vpn-egress) · [SSH](#ssh--socks5-over-ssh)
+- [Transports (Backhaul engine)](#-transports-backhaul-engine)
 - [The web dashboard](#-the-web-dashboard)
 - [Using the CLI](#-using-the-cli)
 - [Features](#-features)
@@ -101,7 +101,7 @@ which groups them into **Reverse** (port forwarding) and **Direct** (VPN outboun
 
 | Tunnel | Family | Where each side runs | Reach for it when… |
 |--------|--------|----------------------|--------------------|
-| **Amin** | Reverse | 🇮🇷 Iran = server · 🌍 abroad = client | You want the flexible default — many transports and DPI options. |
+| **Backhaul** | Reverse | 🇮🇷 Iran = server · 🌍 abroad = client | You want the flexible default — many transports and DPI options. |
 | **frp** | Reverse | 🇮🇷 Iran = server · 🌍 abroad = client | You want a simple, fast reverse proxy with obfuscation. |
 | **Rathole v2** | Reverse | 🇮🇷 Iran = server · 🌍 abroad = client | You want pooled data channels for low, steady latency. |
 | **Packet** | Reverse *(inverted)* | 🌍 abroad = server · 🇮🇷 Iran = client | DPI/firewalls are aggressive — this hides *below* the kernel stack. |
@@ -111,9 +111,9 @@ which groups them into **Reverse** (port forwarding) and **Direct** (VPN outboun
 Each type opens with a **built-in setup guide** in the panel before its form. Here's
 the short version of each.
 
-### Amin Tunnel — the built-in engine
+### Backhaul — the built-in engine
 
-The default reverse tunnel and the most flexible one: nine [transports](#-transports-amin-engine)
+The default reverse tunnel and the most flexible one: nine [transports](#-transports-backhaul-engine)
 across TCP/UDP/WebSocket, connection pooling, presets, and DPI options.
 
 - **🇮🇷 Iran (server):** *Setup Server* → pick a transport + preset, set the tunnel
@@ -124,7 +124,7 @@ across TCP/UDP/WebSocket, connection pooling, presets, and DPI options.
 ### frp — built-in reverse proxy
 
 frp's own protocol (a token handshake with multiplexed streams), compiled in — no
-external binary. It works and is managed exactly like an Amin tunnel, in **TCP** or
+external binary. It works and is managed exactly like a Backhaul tunnel, in **TCP** or
 **UDP** variants, with a **DPI obfuscation** choice: *Stealth (Noise)* — random-looking
 with no fingerprint — or *TLS (uTLS)* — looks like ordinary HTTPS, with a self-signed
 or a real **Let's Encrypt** certificate.
@@ -179,9 +179,9 @@ whose traffic leaves through it, reconnecting automatically if the link drops.
 
 ---
 
-## 🔌 Transports (Amin engine)
+## 🔌 Transports (Backhaul engine)
 
-The Amin tunnel offers nine transports across TCP, UDP and WebSocket, plus an
+The Backhaul tunnel offers nine transports across TCP, UDP and WebSocket, plus an
 experimental ICMP option, all with connection pooling:
 
 | Family | Variants | Notes |
