@@ -207,6 +207,8 @@ func Serve() error {
 	mux.HandleFunc("/api/packet/server", srv.requireAuth(srv.handlePacketServerCreate))
 	mux.HandleFunc("/api/packet/client", srv.requireAuth(srv.handlePacketClientCreate))
 	mux.HandleFunc("/api/packet/get", srv.requireAuth(srv.handlePacketGet))
+	mux.HandleFunc("/api/ssh/client", srv.requireAuth(srv.handleSSHClientCreate))
+	mux.HandleFunc("/api/ssh/get", srv.requireAuth(srv.handleSSHGet))
 	mux.HandleFunc("/metrics", srv.requireReadAuth(srv.handlePrometheus))
 	mux.HandleFunc("/api/logs", srv.requireAuth(srv.handleLogs))
 	mux.HandleFunc("/api/password", srv.requireAuth(srv.handlePassword))

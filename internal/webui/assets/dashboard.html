@@ -1478,6 +1478,38 @@
   </div>
 </div>
 
+<div class="modal" id="sshtun" onclick="if(event.target===this)closeSSH()">
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="sshtitle" style="width:min(94vw,520px)">
+    <h3 id="sshtitle" data-i18n>New SSH tunnel</h3>
+    <p data-i18n>SSH egress: Arange-tun logs in to a server abroad and opens a local SOCKS5 proxy whose traffic leaves through that server. Point your panel's outbound at the SOCKS5. Client only — no setup on the server beyond an SSH login.</p>
+
+    <label for="ssh-name" data-i18n>Tunnel name</label>
+    <input id="ssh-name" type="text" autocomplete="off" spellcheck="false" placeholder="ssh-out" maxlength="40">
+
+    <label for="ssh-host" data-i18n>Server IP or domain</label>
+    <input id="ssh-host" type="text" autocomplete="off" spellcheck="false" placeholder="1.2.3.4">
+
+    <label for="ssh-port" data-i18n>SSH port</label>
+    <input id="ssh-port" type="number" min="1" max="65535" step="1" placeholder="22">
+
+    <label for="ssh-user" data-i18n>Username</label>
+    <input id="ssh-user" type="text" autocomplete="off" spellcheck="false" placeholder="root">
+
+    <label for="ssh-pass" data-i18n>Password</label>
+    <input id="ssh-pass" type="password" autocomplete="new-password" spellcheck="false" placeholder="">
+
+    <label for="ssh-socksport" data-i18n>Local SOCKS5 port</label>
+    <input id="ssh-socksport" type="number" min="1" max="65535" step="1" placeholder="1080">
+    <p class="hint" style="margin:-8px 0 14px;font-size:11.5px;color:var(--muted2)" data-i18n>The SOCKS5 proxy binds to 127.0.0.1 — set it as an outbound in your panel (x-ui / 3x-ui) on this same server.</p>
+
+    <div id="ssh-msg" class="msg"></div>
+    <div class="actions" style="margin-top:6px">
+      <button class="btn-ghost" onclick="closeSSH()" data-i18n>Close</button>
+      <button class="btn-primary" id="ssh-submit" onclick="submitSSH()" data-i18n>Create tunnel</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="newtun" onclick="if(event.target===this)closeNewTunnel()">
   <div class="box" role="dialog" aria-modal="true" aria-labelledby="nttitle" style="width:min(94vw,460px)">
     <h3 id="nttitle" data-i18n>New tunnel</h3>
@@ -1983,6 +2015,15 @@ const FA={
   "Copy this client config to the machine that will use the tunnel — there, create a WireGuard “client” tunnel and paste it.":"این کانفیگ کلاینت را روی ماشینی که از تونل استفاده می‌کند کپی کن — آنجا یک تانل وایرگارد «کلاینت» بساز و paste کن.",
   "New Packet tunnel":"تونل پکت جدید",
   "Edit Packet tunnel":"ویرایش تونل پکت",
+  "New SSH tunnel":"تونل SSH جدید",
+  "Edit SSH tunnel":"ویرایش تونل SSH",
+  "SSH egress: Arange-tun logs in to a server abroad and opens a local SOCKS5 proxy whose traffic leaves through that server. Point your panel's outbound at the SOCKS5. Client only — no setup on the server beyond an SSH login.":"خروج SSH: آرنج‌تان به یک سرور خارج لاگین می‌کند و یک پراکسی SOCKS5 محلی باز می‌کند که ترافیکش از آن سرور بیرون می‌رود. اوت‌باند پنلت را به آن SOCKS5 وصل کن. فقط کلاینت — روی سرور جز یک لاگین SSH چیزی لازم نیست.",
+  "Server IP or domain":"آی‌پی یا دامنهٔ سرور",
+  "SSH port":"پورت SSH",
+  "Username":"نام کاربری",
+  "Password":"پسورد",
+  "Local SOCKS5 port":"پورت SOCKS5 محلی",
+  "leave blank to keep the current password":"برای نگه‌داشتن پسورد فعلی خالی بگذار",
   "Edit WireGuard tunnel":"ویرایش تونل وایرگارد",
   "saved.":"ذخیره شد.",
   "The server keys are kept, so existing clients keep working. If you change the port, update the Endpoint port in the client configs you already handed out.":"کلیدهای سرور حفظ می‌شوند، پس کلاینت‌های فعلی کار می‌کنند. اگر پورت را عوض کنی، پورت Endpoint را در کانفیگ‌های کلاینتی که قبلاً داده‌ای به‌روزرسانی کن.",
@@ -2480,6 +2521,7 @@ function trLabel(t){
   if(t==='ratholeu') return 'Rathole v2 (UDP)';
   if(t==='wireguard') return 'WireGuard';
   if(t==='packet') return 'Packet';
+  if(t==='ssh') return 'SSH';
   return t.toUpperCase();
 }
 
@@ -2878,7 +2920,7 @@ const TUN_TYPES=[
   {id:'backhaul', name:'Backhaul', ready:false, kind:'reverse', desc:{en:'High-performance reverse tunnel.', fa:'تونل معکوس پرسرعت.'}},
   {id:'packet', name:'Packet', ready:true, kind:'reverse', desc:{en:'Raw-packet tunnel — bypasses the kernel stack.', fa:'تونل پکت خام — دور زدن لایهٔ کرنل.'}},
   {id:'wireguard', name:'WireGuard', ready:true, kind:'direct', desc:{en:'VPN egress + SOCKS5 outbound.', fa:'خروج VPN + اوت‌باند SOCKS5.'}},
-  {id:'openvpn', name:'OpenVPN Tunnel', ready:false, kind:'direct', desc:{en:'OpenVPN-based tunnel.', fa:'تونل مبتنی بر OpenVPN.'}}
+  {id:'ssh', name:'SSH', ready:true, kind:'direct', desc:{en:'SOCKS5 over SSH — quick egress with a password.', fa:'SOCKS5 روی SSH — خروج سریع با پسورد.'}}
 ];
 function openChooser(){
   const g=$('typegrid'); g.innerHTML='';
@@ -2926,6 +2968,7 @@ function tutProceed(){
   else if(tutType==='rathole') openRathole();
   else if(tutType==='wireguard') openWireGuard();
   else if(tutType==='packet') openPacket();
+  else if(tutType==='ssh') openSSH();
 }
 
 // WireGuard is not a reverse tunnel, so it has its own form: a server generates
@@ -3084,6 +3127,57 @@ async function submitPacket(){
   }catch(e){ pktMsg(T('Network error.'),true); btn.disabled=false; }
 }
 
+// SSH is a client-only VPN egress: log in to a server abroad and open a local
+// SOCKS5 through it. There is no server side to configure.
+let sshEditMode='';
+function openSSH(){
+  $('sshtitle').textContent=T('New SSH tunnel');
+  sshMsg('');
+  sshEditMode='';
+  $('ssh-submit').disabled=false; $('ssh-submit').textContent=T('Create tunnel');
+  ['ssh-name','ssh-host','ssh-port','ssh-user','ssh-pass','ssh-socksport'].forEach(id=>{ if($(id)) $(id).value=''; });
+  $('ssh-name').readOnly=false;
+  $('ssh-pass').placeholder='';
+  $('sshtun').classList.add('on');
+}
+async function openSSHEdit(name){
+  let d;
+  try{
+    const r=await fetch('/api/ssh/get?name='+encodeURIComponent(name));
+    if(!r.ok){ toast((await r.text())||T('Could not load the tunnel.'),true); return; }
+    d=await r.json();
+  }catch(e){ toast(T('Network error.'),true); return; }
+  closeDetails();
+  openSSH();
+  sshEditMode=name;
+  $('sshtitle').textContent=T('Edit SSH tunnel');
+  $('ssh-submit').textContent=T('Save changes');
+  const nm=$('ssh-name'); nm.value=name; nm.readOnly=true;
+  $('ssh-host').value=d.host||'';
+  $('ssh-port').value=d.port||'';
+  $('ssh-user').value=d.user||'';
+  $('ssh-socksport').value=d.socksPort||'';
+  $('ssh-pass').placeholder=T('leave blank to keep the current password');
+  $('sshtun').classList.add('on');
+}
+function closeSSH(){ $('sshtun').classList.remove('on'); }
+function sshMsg(text,isErr){ const m=$('ssh-msg'); m.textContent=text||''; m.className='msg'+(text?(isErr?' err':' ok'):''); }
+async function submitSSH(){
+  const name=$('ssh-name').value.trim();
+  if(!name){ sshMsg(T('A tunnel name is required.'),true); return; }
+  const editing=!!sshEditMode;
+  const btn=$('ssh-submit'); btn.disabled=true; sshMsg(editing?T('Saving…'):T('Creating…'));
+  try{
+    const req={name, host:$('ssh-host').value.trim(), port:parseInt($('ssh-port').value,10)||0,
+      user:$('ssh-user').value.trim(), password:$('ssh-pass').value,
+      socksPort:parseInt($('ssh-socksport').value,10)||0, edit:editing};
+    const r=await fetch('/api/ssh/client',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(req)});
+    if(!r.ok){ sshMsg((await r.text())||('HTTP '+r.status),true); btn.disabled=false; return; }
+    closeSSH(); loadTunnels(); go('control');
+    toast('“'+name+'” '+(editing?T('saved.'):T('created.')));
+  }catch(e){ sshMsg(T('Network error.'),true); btn.disabled=false; }
+}
+
 // Tutorials shown before the create form. _soon builds a short placeholder for
 // the types that are not buildable yet.
 const TUTORIALS={
@@ -3183,6 +3277,25 @@ const TUTORIALS={
       '<h4>مراحل</h4><ol>'+
       '<li>اول <b>سرور</b> (خارج) را بساز: یک پورت گوش‌دادن بگذار و کلید ساخته‌شده را کپی کن.</li>'+
       '<li>سپس <b>کلاینت</b> (ایران) را بساز: <code>host:port</code> سرور را وارد کن، کلید را paste کن و پورت‌هایی که می‌خواهی نمایش داده شوند را فهرست کن.</li></ol>'+
+      '<p>برای باز شدن فرم، این راهنما را ببند.</p>'}},
+  ssh:{title:{en:'SSH — setup guide', fa:'SSH — راهنمای راه‌اندازی'},body:{
+    en:'<p><b>SSH</b> is the simplest egress: Arange-tun logs in to a server abroad over SSH and opens a local <b>SOCKS5 proxy</b> whose traffic leaves through that server. There is <b>no server side to set up</b> — any machine you can SSH into works.</p>'+
+      '<h4>What you need</h4><ul>'+
+      '<li>A server abroad with SSH (its <b>IP/domain</b>, <b>port</b> — usually 22, <b>username</b> and <b>password</b>).</li>'+
+      '<li>Run this <b>client</b> on the same machine as your panel (x-ui / 3x-ui).</li></ul>'+
+      '<h4>Steps</h4><ol>'+
+      '<li>Fill in the server login and a <b>local SOCKS5 port</b> (e.g. 1080).</li>'+
+      '<li>In your panel, add a <b>SOCKS outbound</b> pointing at <code>127.0.0.1:&lt;that port&gt;</code>. Traffic you route through it leaves by the SSH server\'s IP.</li></ol>'+
+      '<p>It reconnects automatically if the SSH link drops. Security is light (password login, host key trusted on first use), so use it for convenience rather than as a hardened channel.</p>'+
+      '<p>Close this guide to open the form.</p>',
+    fa:'<p><b>SSH</b> ساده‌ترین راه خروج است: آرنج‌تان با SSH به یک سرور خارج لاگین می‌کند و یک <b>پراکسی SOCKS5</b> محلی باز می‌کند که ترافیکش از آن سرور بیرون می‌رود. <b>هیچ سمت سروری لازم نیست</b> — هر ماشینی که بتوانی به آن SSH بزنی کار می‌کند.</p>'+
+      '<h4>چه چیزی لازم داری</h4><ul>'+
+      '<li>یک سرور خارج با SSH (آی‌پی/دامنه، پورت — معمولاً ۲۲، یوزرنیم و پسورد آن).</li>'+
+      '<li>این <b>کلاینت</b> را روی همان ماشینی که پنل داری (x-ui / 3x-ui) اجرا کن.</li></ul>'+
+      '<h4>مراحل</h4><ol>'+
+      '<li>مشخصات لاگین سرور و یک <b>پورت SOCKS5 محلی</b> (مثلاً ۱۰۸۰) را وارد کن.</li>'+
+      '<li>در پنل، یک <b>اوت‌باند SOCKS</b> به <code>127.0.0.1:&lt;همان پورت&gt;</code> اضافه کن. هر ترافیکی که از آن رد کنی با آی‌پی سرور SSH خارج می‌شود.</li></ol>'+
+      '<p>اگر ارتباط SSH قطع شود، خودکار وصل می‌شود. امنیتش سبک است (لاگین با پسورد، کلید میزبان در اولین اتصال مورد اعتماد)، پس بیشتر برای راحتی از آن استفاده کن تا یک کانال سخت‌گیرانه.</p>'+
       '<p>برای باز شدن فرم، این راهنما را ببند.</p>'}},
   _soon:function(name){ return {
     title:{en:name+' — coming soon', fa:name+' — به‌زودی'},body:{
@@ -3455,6 +3568,7 @@ async function editTunnel(name){
   const tt=(lastTunnels.find(x=>x.name===name)||{}).transport;
   if(tt==='wireguard'){ openWireGuardEdit(name); return; }
   if(tt==='packet'){ openPacketEdit(name); return; }
+  if(tt==='ssh'){ openSSHEdit(name); return; }
   let req;
   try{
     const r=await fetch('/api/tunnels/get?name='+encodeURIComponent(name));

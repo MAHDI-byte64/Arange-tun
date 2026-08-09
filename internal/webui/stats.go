@@ -440,9 +440,9 @@ func GatherTunnels() []TunnelInfo {
 				Country:    manage.TunnelCountry(t.Name),
 				Ping:       -1,
 			}
-			if t.Transport == "wireguard" || t.Transport == "packet" {
-				// WireGuard is a VPN egress and Packet injects raw packets below
-				// the kernel stack: neither has a reverse-tunnel peer socket to
+			if t.Transport == "wireguard" || t.Transport == "packet" || t.Transport == "ssh" {
+				// WireGuard and SSH are VPN egresses and Packet injects raw packets
+				// below the kernel stack: none has a reverse-tunnel peer socket to
 				// probe or geo-locate. Their state comes from health, and their
 				// traffic from the metrics file below.
 				info.State = health[t.Name].State

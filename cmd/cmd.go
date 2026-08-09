@@ -13,6 +13,7 @@ import (
 	"github.com/mahdi-byte64/arange-tun/internal/frp"
 	"github.com/mahdi-byte64/arange-tun/internal/packet"
 	"github.com/mahdi-byte64/arange-tun/internal/rathole"
+	sshtunnel "github.com/mahdi-byte64/arange-tun/internal/ssh"
 	"github.com/mahdi-byte64/arange-tun/internal/wireguard"
 
 	"github.com/mahdi-byte64/arange-tun/internal/server"
@@ -138,6 +139,17 @@ func runEngine(cfg *config.Config, ctx context.Context, configPath string, apply
 		}
 		<-ctx.Done()
 		logger.Println("shutting down packet...")
+		return
+	}
+
+	// SSH is a client-only VPN egress: it dials an SSH server abroad and serves a
+	// local SOCKS5 through it. Like WireGuard it has its own section and engine.
+	if role := cfg.SSH.Role; role != "" {
+		startMetrics(ctx, configPath, "ssh", role)
+		log := utils.NewLoggerWithFormat(cfg.SSH.LogLevel, cfg.Server.LogFormat)
+		go sshtunnel.RunClient(ctx, &cfg.SSH, log)
+		<-ctx.Done()
+		logger.Println("shutting down ssh...")
 		return
 	}
 

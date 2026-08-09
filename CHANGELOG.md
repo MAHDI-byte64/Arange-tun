@@ -2,6 +2,29 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.16.0 — 2026-08-09
+
+**New SSH tunnel; OpenVPN placeholder removed.** The Direct (VPN-outbound) family
+now offers an **SSH** tunnel in place of the never-implemented OpenVPN entry.
+
+- **SSH** is a **client-only** egress: Arange-tun logs in to a server abroad
+  (host, port, username, password) over SSH and opens a local **SOCKS5 proxy**
+  whose traffic leaves through that server (SSH dynamic forwarding). Point a panel
+  outbound at `127.0.0.1:<port>`. There is nothing to set up on the server beyond
+  an SSH login; the connection reconnects automatically if it drops. Security is
+  intentionally light (password auth, host key trusted on first use). Full panel
+  lifecycle: create, edit, start/stop, logs, status, delete — and it shows online
+  and counts traffic like the other egress tunnels.
+
+Internally, WireGuard's SOCKS5 proxy was factored into a shared `socksproxy`
+package that both WireGuard and SSH use.
+
+**Rewrote the README (English + Persian)** with a full **Tunnel types** guide —
+what each of the six tunnels is, which side runs where, and how to use it — plus a
+table of contents and a clearer structure throughout.
+
+Also removed the Telegram contact from the READMEs' remaining spots.
+
 ## v1.15.0 — 2026-08-09
 
 **WireGuard and Packet tunnels can now be edited from the panel.** They have

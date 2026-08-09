@@ -74,11 +74,11 @@ func RunWatchdog(ctx context.Context) {
 // tunnelHealthy reports whether a running tunnel currently has its connection up,
 // based on the established TCP sockets in `pairs` ([local, peer] address pairs).
 func tunnelHealthy(t Tunnel, pairs [][2]string) bool {
-	// Packet injects raw packets below the kernel stack, so there is no kernel
-	// socket to observe. A running service is treated as healthy — as with
-	// WireGuard — rather than being restarted forever on a check that can never
-	// succeed.
-	if t.Transport == "packet" {
+	// Packet injects raw packets below the kernel stack, and SSH is a VPN egress
+	// whose liveness is the SSH connection the engine holds — neither has a
+	// kernel socket to observe, so a running service is treated as healthy (as
+	// with WireGuard) rather than restarted on a check that can never succeed.
+	if t.Transport == "packet" || t.Transport == "ssh" {
 		return true
 	}
 

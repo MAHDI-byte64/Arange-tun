@@ -1,4 +1,10 @@
-package wireguard
+// Package socksproxy is a minimal SOCKS5 proxy whose outbound connections are
+// made through a caller-supplied dialer. It is shared by the tunnels that expose
+// a local SOCKS5 for a panel outbound — WireGuard (dialing through the userspace
+// netstack) and SSH (dialing through the SSH connection). The bind is always
+// loopback, so offering no authentication is not an exposure, and the relay
+// counts the bytes that cross the tunnel into the per-tunnel metrics.
+package socksproxy
 
 import (
 	"context"
@@ -15,13 +21,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// dialFunc dials a target through some network — here, the WireGuard netstack.
-type dialFunc func(ctx context.Context, network, address string) (net.Conn, error)
+// DialFunc dials a target through some network — a tunnel's own transport.
+type DialFunc func(ctx context.Context, network, address string) (net.Conn, error)
 
-// serveSOCKS5 runs a minimal SOCKS5 proxy: no authentication, CONNECT only,
-// every target dialed through dial. That is all a panel outbound needs — the
-// bind is loopback, so "no auth" is not an exposure.
-func serveSOCKS5(ctx context.Context, ln net.Listener, dial dialFunc, logger *logrus.Logger) {
+// Serve runs the SOCKS5 proxy on ln until ctx ends: no authentication, CONNECT
+// only, every target dialed through dial.
+func Serve(ctx context.Context, ln net.Listener, dial DialFunc, logger *logrus.Logger) {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -32,11 +37,11 @@ func serveSOCKS5(ctx context.Context, ln net.Listener, dial dialFunc, logger *lo
 				continue
 			}
 		}
-		go handleSOCKS5(ctx, conn, dial, logger)
+		go handle(ctx, conn, dial, logger)
 	}
 }
 
-func handleSOCKS5(ctx context.Context, client net.Conn, dial dialFunc, logger *logrus.Logger) {
+func handle(ctx context.Context, client net.Conn, dial DialFunc, logger *logrus.Logger) {
 	defer client.Close()
 	_ = client.SetDeadline(time.Now().Add(30 * time.Second))
 
@@ -59,13 +64,13 @@ func handleSOCKS5(ctx context.Context, client net.Conn, dial dialFunc, logger *l
 		return
 	}
 	if req[1] != 0x01 { // only CONNECT
-		_ = writeSOCKSReply(client, 0x07)
+		_ = writeReply(client, 0x07)
 		return
 	}
 
-	host, err := readSOCKSAddr(client, req[3])
+	host, err := readAddr(client, req[3])
 	if err != nil {
-		_ = writeSOCKSReply(client, 0x08) // address type not supported
+		_ = writeReply(client, 0x08) // address type not supported
 		return
 	}
 	var portBuf [2]byte
@@ -78,13 +83,15 @@ func handleSOCKS5(ctx context.Context, client net.Conn, dial dialFunc, logger *l
 	remote, err := dial(dctx, "tcp", target)
 	cancel()
 	if err != nil {
-		logger.Debugf("wireguard socks5: cannot reach %s: %v", target, err)
-		_ = writeSOCKSReply(client, 0x05) // connection refused
+		if logger != nil {
+			logger.Debugf("socks5: cannot reach %s: %v", target, err)
+		}
+		_ = writeReply(client, 0x05) // connection refused
 		return
 	}
 	defer remote.Close()
 
-	if err := writeSOCKSReply(client, 0x00); err != nil { // success
+	if err := writeReply(client, 0x00); err != nil { // success
 		return
 	}
 	_ = client.SetDeadline(time.Time{})
@@ -92,8 +99,8 @@ func handleSOCKS5(ctx context.Context, client net.Conn, dial dialFunc, logger *l
 	relay(client, remote)
 }
 
-// readSOCKSAddr reads the destination host for the given address type.
-func readSOCKSAddr(r io.Reader, atyp byte) (string, error) {
+// readAddr reads the destination host for the given address type.
+func readAddr(r io.Reader, atyp byte) (string, error) {
 	switch atyp {
 	case 0x01: // IPv4
 		b := make([]byte, 4)
@@ -122,8 +129,8 @@ func readSOCKSAddr(r io.Reader, atyp byte) (string, error) {
 	}
 }
 
-// writeSOCKSReply sends a reply with the given status and a zero bound address.
-func writeSOCKSReply(w io.Writer, status byte) error {
+// writeReply sends a reply with the given status and a zero bound address.
+func writeReply(w io.Writer, status byte) error {
 	_, err := w.Write([]byte{0x05, status, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
 	return err
 }

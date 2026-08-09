@@ -144,6 +144,57 @@ func (s *server) handleWGClientCreate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"status": "ok", "name": strings.TrimSpace(req.Name)})
 }
 
+// handleSSHClientCreate starts an SSH egress client (or edits one) that dials an
+// SSH server and exposes a local SOCKS5.
+func (s *server) handleSSHClientCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxTunnelBody)
+	var req struct {
+		Name      string `json:"name"`
+		Host      string `json:"host"`
+		Port      int    `json:"port"`
+		User      string `json:"user"`
+		Password  string `json:"password"`
+		SocksPort int    `json:"socksPort"`
+		Edit      bool   `json:"edit"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "could not read the request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	var err error
+	if req.Edit {
+		err = manage.UpdateSSHClient(req.Name, req.Host, req.Port, req.User, req.Password, "127.0.0.1", req.SocksPort)
+	} else {
+		err = manage.CreateSSHClient(req.Name, req.Host, req.Port, req.User, req.Password, "127.0.0.1", req.SocksPort)
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]any{"status": "ok", "name": strings.TrimSpace(req.Name)})
+}
+
+// handleSSHGet returns an SSH tunnel's config so the panel can prefill its edit
+// form. The password is not returned — an empty password on save keeps it.
+func (s *server) handleSSHGet(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimSpace(r.URL.Query().Get("name"))
+	if name == "" {
+		http.Error(w, "missing tunnel name", http.StatusBadRequest)
+		return
+	}
+	view, err := manage.SSHForEdit(name)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	view.Password = "" // never send the password back to the browser
+	writeJSON(w, view)
+}
+
 // handlePacketServerCreate starts a Packet exit node (abroad) and returns the
 // shared key the client must be given.
 func (s *server) handlePacketServerCreate(w http.ResponseWriter, r *http.Request) {

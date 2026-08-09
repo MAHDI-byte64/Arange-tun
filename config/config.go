@@ -362,10 +362,29 @@ type PacketConfig struct {
 	LogLevel string `toml:"log_level"` // none/debug/info/warn/error/fatal (default none)
 }
 
+// SSHConfig is the SSH tunnel: a client-only VPN egress. It opens an SSH
+// connection to a server abroad and exposes a local SOCKS5 proxy whose traffic
+// leaves through that server (SSH dynamic forwarding). Point a panel outbound at
+// the SOCKS5. Like WireGuard and Packet it has its own section and engine.
+type SSHConfig struct {
+	Role string `toml:"role"` // only "client"
+
+	Host     string `toml:"host"`     // server IP or domain
+	Port     int    `toml:"port"`     // SSH port (default 22)
+	User     string `toml:"user"`     // SSH username
+	Password string `toml:"password"` // SSH password
+
+	SocksBind string `toml:"socks_bind"` // e.g. "127.0.0.1"
+	SocksPort int    `toml:"socks_port"` // local SOCKS5 port
+
+	LogLevel string `toml:"log_level"`
+}
+
 // Config represents the complete configuration, including both server and client settings.
 type Config struct {
 	Server    ServerConfig    `toml:"server"`
 	Client    ClientConfig    `toml:"client"`
 	WireGuard WireGuardConfig `toml:"wireguard"`
 	Packet    PacketConfig    `toml:"packet"`
+	SSH       SSHConfig       `toml:"ssh"`
 }

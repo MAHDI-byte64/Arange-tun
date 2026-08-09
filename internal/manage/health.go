@@ -72,6 +72,12 @@ func tunnelHealthWith(t Tunnel, pairs [][2]string) Health {
 		// a running service is the only signal available here.
 		h.Connected = true
 		h.State, h.Detail = "online", "running"
+	case t.Transport == "ssh":
+		// SSH is a VPN egress; its liveness is the SSH connection the engine
+		// holds, not an observable reverse-tunnel socket, so a running service
+		// reports online.
+		h.Connected = true
+		h.State, h.Detail = "online", "running"
 	default:
 		h.Connected = tunnelHealthy(t, pairs)
 		// tunnelHealthy answers the watchdog's question — "is this worth

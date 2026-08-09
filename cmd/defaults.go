@@ -72,6 +72,11 @@ func applyDefaults(cfg *config.Config) {
 			cfg.Packet.LogLevel = defaultLogLevel
 		}
 	}
+	if cfg.SSH.Role != "" {
+		if _, err := logrus.ParseLevel(cfg.SSH.LogLevel); err != nil {
+			cfg.SSH.LogLevel = defaultLogLevel
+		}
+	}
 
 	// Retry interval
 	if cfg.Client.RetryInterval <= 0 {

@@ -25,6 +25,7 @@ import (
 
 	"github.com/mahdi-byte64/arange-tun/config"
 	"github.com/mahdi-byte64/arange-tun/internal/metrics"
+	"github.com/mahdi-byte64/arange-tun/internal/socksproxy"
 
 	"github.com/sirupsen/logrus"
 	// The userspace client runs on AmneziaWG-go, a drop-in fork of wireguard-go:
@@ -269,7 +270,7 @@ func RunClient(ctx context.Context, wc *config.WireGuardConfig, logger *logrus.L
 	}()
 
 	// The SOCKS5 server dials every target through the WireGuard netstack.
-	serveSOCKS5(ctx, ln, tnet.DialContext, logger)
+	socksproxy.Serve(ctx, ln, tnet.DialContext, logger)
 }
 
 // clientUAPI renders wireguard-go's configuration string for the client device.

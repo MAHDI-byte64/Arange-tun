@@ -56,6 +56,12 @@ func List() []Tunnel {
 			} else {
 				t.Addr = fmt.Sprintf(":%d", cfg.Packet.ListenPort)
 			}
+		case cfg.SSH.Role != "":
+			// SSH is a client-only VPN egress: it dials an SSH server and exposes
+			// a local SOCKS5. Its address is the server it dials.
+			t.Role = "client"
+			t.Transport = "ssh"
+			t.Addr = fmt.Sprintf("%s:%d", cfg.SSH.Host, cfg.SSH.Port)
 		case cfg.Server.BindAddr != "":
 			t.Role = "server"
 			t.Transport = string(cfg.Server.Transport)
