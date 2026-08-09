@@ -136,7 +136,7 @@ func buildServerConf(pc *config.PacketConfig) (*conf.Conf, int, error) {
 			PCAP:       conf.PCAP{Sockbuf: pc.Sockbuf},
 			TCP:        conf.TCP{LF_: parseFlags(pc.LocalFlags), RF_: parseFlags(pc.RemoteFlags)},
 		},
-		Transport: kcpTransport(pc, 1),
+		Transport: kcpTransport(pc, 1, packetMTU(iface, pc.MTU)),
 	}
 	if err := conf.Prepare(cfg); err != nil {
 		return nil, 0, err
@@ -183,7 +183,7 @@ func buildClientConf(pc *config.PacketConfig) (*conf.Conf, string, int, error) {
 			TCP:  conf.TCP{LF_: parseFlags(pc.LocalFlags), RF_: parseFlags(pc.RemoteFlags)},
 		},
 		Server:    conf.Server{Addr_: net.JoinHostPort(serverIP, strconv.Itoa(port))},
-		Transport: kcpTransport(pc, conn),
+		Transport: kcpTransport(pc, conn, packetMTU(iface, pc.MTU)),
 	}
 	if err := conf.Prepare(cfg); err != nil {
 		return nil, "", 0, err
@@ -216,7 +216,7 @@ func forwardsFor(pc *config.PacketConfig) []conf.Forward {
 	return out
 }
 
-func kcpTransport(pc *config.PacketConfig, conn int) conf.Transport {
+func kcpTransport(pc *config.PacketConfig, conn, mtu int) conf.Transport {
 	return conf.Transport{
 		Protocol: "kcp",
 		Conn:     conn,
@@ -224,9 +224,40 @@ func kcpTransport(pc *config.PacketConfig, conn int) conf.Transport {
 			Block_: strings.TrimSpace(pc.Block),
 			Key:    pc.Key,
 			Mode:   strings.TrimSpace(pc.Mode),
-			MTU:    pc.MTU,
+			MTU:    mtu,
 		},
 	}
+}
+
+// packetFrameOverhead is the worst-case link+IP+TCP header size the raw engine
+// prepends to a KCP segment: Ethernet(14) + IPv4(20) + TCP with options(<=40),
+// plus a little margin.
+const packetFrameOverhead = 80
+
+// packetMTU chooses the KCP MTU. The raw engine turns each KCP segment into one
+// crafted Ethernet frame and injects it with the DF bit set, so the frame must
+// fit the interface MTU or the driver rejects it with EMSGSIZE ("message too
+// long"), and it must also survive the path to the peer. The default (1280, the
+// IPv6 minimum MTU) is deliverable across virtually any Iran<->abroad path; a
+// user-set value is honoured but still capped to what the local link can carry.
+func packetMTU(iface string, requested int) int {
+	m := requested
+	if m <= 0 {
+		m = 1280
+	}
+	if ifi, err := net.InterfaceByName(iface); err == nil && ifi.MTU > 0 {
+		if limit := ifi.MTU - packetFrameOverhead; limit > 0 && m > limit {
+			m = limit
+		}
+	}
+	// The KCP engine accepts 50..1500; keep well inside that.
+	if m > 1500 {
+		m = 1500
+	}
+	if m < 576 {
+		m = 576
+	}
+	return m
 }
 
 // resolveServerAddr splits and resolves the abroad host:port to an IPv4 and

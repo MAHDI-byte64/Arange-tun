@@ -2,6 +2,24 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.14.1 — 2026-08-09
+
+**Packet tunnel fixes.**
+
+- **MTU auto-capping.** The raw engine turns each KCP segment into one crafted
+  Ethernet frame injected with the DF bit set, so an oversized frame was rejected
+  by the driver with `EMSGSIZE` ("message too long") and the tunnel passed no
+  traffic on links with an MTU below ~1450 (common on some VPS providers). The
+  KCP MTU now defaults to a path-safe 1280 and is additionally capped to the
+  interface MTU minus header overhead, so packets always fit both the local link
+  and the Iran↔abroad path. No manual tuning needed.
+- **Visible startup errors.** A Packet config carries no `log_level`, so the
+  dispatch logger was built at logrus's zero value (Panic level), which silently
+  swallowed `Error`/`Fatal` messages while `os.Exit(1)` still fired — a real
+  startup failure (e.g. an exposed port already in use) looked like an
+  unexplained exit-code-1 crash. The `[packet]` log level is now defaulted like
+  the other sections, so failures are actually logged.
+
 ## v1.14.0 — 2026-08-09
 
 **The Packet tunnel — a raw-packet (pcap) transport that hides below the kernel

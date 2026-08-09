@@ -109,6 +109,25 @@ func TestResolveServerAddr(t *testing.T) {
 	}
 }
 
+func TestPacketMTU(t *testing.T) {
+	// Default when unset stays at the safe 1280 (lo has a huge MTU, no cap).
+	if got := packetMTU("lo", 0); got != 1280 {
+		t.Fatalf("default MTU = %d, want 1280", got)
+	}
+	// A user value is honoured on a large-MTU interface...
+	if got := packetMTU("lo", 1400); got != 1400 {
+		t.Fatalf("MTU = %d, want 1400", got)
+	}
+	// ...but never above the engine's ceiling.
+	if got := packetMTU("lo", 9000); got != 1500 {
+		t.Fatalf("MTU = %d, want 1500 (capped)", got)
+	}
+	// An unknown interface just returns the requested/default value.
+	if got := packetMTU("definitely-not-an-iface", 0); got != 1280 {
+		t.Fatalf("MTU for unknown iface = %d, want 1280", got)
+	}
+}
+
 func TestFirewallRuleShape(t *testing.T) {
 	// A server rule must NOTRACK the listen port and drop kernel RSTs on it.
 	rules := serverRules(8888)
