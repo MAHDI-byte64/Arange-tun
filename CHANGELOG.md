@@ -2,6 +2,13 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.16.3 — 2026-08-09
+
+**Tidied the New-tunnel chooser.** The two groups are now split by *who dials
+out*: **Reverse — the Iran side is the server** (Backhaul, frp, Rathole) and
+**Direct — the Iran side dials out** (Packet, WireGuard, SSH). Packet moved into
+the second group so it sits with WireGuard and SSH.
+
 ## v1.16.2 — 2026-08-09
 
 **Renamed the "Amin Tunnel" to "Backhaul".** Arange-tun is a fork of Backhaul, so

@@ -1985,8 +1985,8 @@ const FA={
   "Edit frp tunnel":"ویرایش تونل frp",
   "New rathole tunnel":"تونل rathole جدید",
   "Edit rathole tunnel":"ویرایش تونل rathole",
-  "Reverse tunnels — port forwarding":"تانل‌های معکوس — فوروارد پورت",
-  "Direct — VPN outbound":"مستقیم — خروجی VPN",
+  "Reverse — the Iran side is the server":"معکوس — سمت ایران سرور است",
+  "Direct — the Iran side dials out":"مستقیم — سمت ایران به بیرون dial می‌کند",
   "Stealth — Noise obfuscation (hides the tunnel from DPI; recommended)":"مخفی‌کاری — obfuscation نویز (تونل را از DPI پنهان می‌کند؛ پیشنهادی)",
   "Wraps the tunnel in a random-looking encrypted layer with no fingerprint. Must be the same on both sides.":"تونل را در یک لایهٔ رمزنگاری‌شدهٔ شبه‌تصادفی و بدون فینگرپرینت می‌پیچد. باید روی هر دو سمت یکسان باشد.",
   "DPI obfuscation":"پنهان‌سازی در برابر DPI",
@@ -2917,14 +2917,14 @@ const TUN_TYPES=[
   {id:'amin', name:'Backhaul', ready:true, kind:'reverse', desc:{en:'The built-in engine — TCP/UDP/WS, KCP, Stealth.', fa:'موتور داخلی — TCP/UDP/WS، KCP، Stealth.'}},
   {id:'frp', name:'frp', ready:true, kind:'reverse', desc:{en:'Fast reverse proxy.', fa:'ریورس‌پراکسی سریع.'}},
   {id:'rathole', name:'Rathole v2', ready:true, kind:'reverse', desc:{en:'Pooled data-channel reverse proxy.', fa:'ریورس‌پراکسی با کانال دادهٔ مجزا.'}},
-  {id:'packet', name:'Packet', ready:true, kind:'reverse', desc:{en:'Raw-packet tunnel — bypasses the kernel stack.', fa:'تونل پکت خام — دور زدن لایهٔ کرنل.'}},
+  {id:'packet', name:'Packet', ready:true, kind:'direct', desc:{en:'Raw-packet tunnel — bypasses the kernel stack.', fa:'تونل پکت خام — دور زدن لایهٔ کرنل.'}},
   {id:'wireguard', name:'WireGuard', ready:true, kind:'direct', desc:{en:'VPN egress + SOCKS5 outbound.', fa:'خروج VPN + اوت‌باند SOCKS5.'}},
   {id:'ssh', name:'SSH', ready:true, kind:'direct', desc:{en:'SOCKS5 over SSH — quick egress with a password.', fa:'SOCKS5 روی SSH — خروج سریع با پسورد.'}}
 ];
 function openChooser(){
   const g=$('typegrid'); g.innerHTML='';
-  [{kind:'reverse', label:T('Reverse tunnels — port forwarding')},
-   {kind:'direct',  label:T('Direct — VPN outbound')}].forEach(function(grp){
+  [{kind:'reverse', label:T('Reverse — the Iran side is the server')},
+   {kind:'direct',  label:T('Direct — the Iran side dials out')}].forEach(function(grp){
     const types=TUN_TYPES.filter(function(t){ return (t.kind||'reverse')===grp.kind; });
     if(!types.length) return;
     const head=document.createElement('div');
