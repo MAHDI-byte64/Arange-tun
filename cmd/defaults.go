@@ -224,7 +224,7 @@ func checkOutbound(cfg *config.Config) {
 	// tunnel would come up and quietly leave by the wrong link — or, with a
 	// proxy, come up and carry nothing at all.
 	switch cfg.Client.Transport {
-	case config.UDP, config.KCP, config.XDI:
+	case config.UDP, config.KCP, config.XDI, config.QUIC:
 		logger.Fatalf("proxy, local_addr, interface and so_mark are not supported on the %s transport: its data is not carried over the TCP dialer these settings apply to. Use tcp, tcpmux, ws, wss or wsmux, or remove them.", cfg.Client.Transport)
 	}
 

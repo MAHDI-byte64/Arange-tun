@@ -1641,6 +1641,7 @@
       <optgroup label="UDP">
         <option value="udp">UDP</option>
         <option value="kcp">UDP + KCP</option>
+        <option value="quic">QUIC</option>
       </optgroup>
       <optgroup label="WebSocket">
         <option value="ws">WS</option>
@@ -3010,8 +3011,8 @@ const ntNeedsTLS=t=>t==='wss'||t==='wssmux';
 const ntIsWS=t=>t==='ws'||t==='wss'||t==='wsmux'||t==='wssmux';
 const ntIsMux=t=>['tcpmux','wsmux','wssmux','kcp','xdi'].includes(t);
 const ntIsKCP=t=>t==='kcp'||t==='xdi';
-const ntIsDatagram=t=>t==='udp'||t==='kcp'||t==='xdi';
-const ntSupportsPP=t=>['tcp','tcpmux','kcp','wsmux','wssmux','stealth'].includes(t);
+const ntIsDatagram=t=>t==='udp'||t==='kcp'||t==='xdi'||t==='quic';
+const ntSupportsPP=t=>['tcp','tcpmux','kcp','wsmux','wssmux','stealth','quic'].includes(t);
 
 let toastTimer=null;
 function toast(msg,isErr){
@@ -3068,7 +3069,7 @@ function closePageHelp(){ $('pagehelp').classList.remove('on'); }
 // kind splits the chooser into two families: "reverse" tunnels forward ports
 // back to Iran; "direct" tunnels are VPN egress (connect out, no port forward).
 const TUN_TYPES=[
-  {id:'amin', name:'Backhaul', ready:true, kind:'reverse', desc:{en:'The built-in engine — TCP/UDP/WS, KCP, Stealth.', fa:'موتور داخلی — TCP/UDP/WS، KCP، Stealth.'}},
+  {id:'amin', name:'Backhaul', ready:true, kind:'reverse', desc:{en:'The built-in engine — TCP/UDP/WS, KCP, QUIC, Stealth.', fa:'موتور داخلی — TCP/UDP/WS، KCP، QUIC، Stealth.'}},
   {id:'frp', name:'frp', ready:true, kind:'reverse', desc:{en:'Fast reverse proxy.', fa:'ریورس‌پراکسی سریع.'}},
   {id:'rathole', name:'Rathole v2', ready:true, kind:'reverse', desc:{en:'Pooled data-channel reverse proxy.', fa:'ریورس‌پراکسی با کانال دادهٔ مجزا.'}},
   {id:'packet', name:'Packet', ready:true, kind:'direct', desc:{en:'Raw-packet tunnel — bypasses the kernel stack.', fa:'تونل پکت خام — دور زدن لایهٔ کرنل.'}},
@@ -4017,7 +4018,7 @@ async function deleteTunnel(name){
 function renderLinkTestBox(t){
   const box=$('ltwrap');
   // Measured from the side that dials out; a TCP probe can't see a UDP port.
-  if(t.role!=='client'||['udp','kcp'].includes(t.transport)){ box.innerHTML=''; return; }
+  if(t.role!=='client'||['udp','kcp','quic'].includes(t.transport)){ box.innerHTML=''; return; }
   box.innerHTML=dSec('Link Test')+
     '<div class="upd"><span class="umsg" id="ltmsg">Latency, jitter and loss to '+esc(t.addr)+
     ', with a transport recommendation.</span>'+

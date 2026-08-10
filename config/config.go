@@ -12,6 +12,10 @@ const (
 	WSSMUX TransportType = "wssmux"
 	UDP    TransportType = "udp"
 	KCP    TransportType = "kcp"
+	// QUIC carries the tunnel inside QUIC streams over UDP. Like KCP it survives
+	// packet loss and reordering well, but with a modern, TLS-1.3-based handshake
+	// and built-in stream multiplexing. Ported from the upstream Backhaul engine.
+	QUIC TransportType = "quic"
 	// STEALTH is a TCP tunnel wrapped in a Noise (NNpsk0) record layer. It has
 	// no TLS fingerprint and no recognisable handshake — on the wire it is
 	// indistinguishable from random — so deep packet inspection has nothing to

@@ -16,6 +16,7 @@ measures your route and recommends one. See
 | **TCP + Stealth** | TCP | ✅ (Noise) | ✅ | — |
 | UDP | UDP | — | — | UDP open |
 | **UDP + KCP** | UDP | ✅ (token key) | ✅ | UDP open |
+| **QUIC** | UDP | ✅ (TLS 1.3) | ✅ | UDP open |
 | WS | WebSocket | — | — | — |
 | WS Mux | WebSocket | — | ✅ | — |
 | WSS | WebSocket | ✅ (TLS) | — | certificate |
@@ -75,6 +76,15 @@ tunnel token.
 [Tunnel Metrics](tunnel-metrics.md) shows KCP's retransmits, lost/duplicated
 segments and how many packets FEC repaired — the numbers that tell you whether
 KCP is earning its overhead on your route.
+
+### QUIC
+QUIC multiplexes many **reliable, ordered streams over a single UDP flow**, so it
+gives mux-like concurrency without a separate SMUX layer, with its own loss
+recovery and congestion control — and a **TLS 1.3** handshake underneath, so the
+tunnel's token is never sent in the clear. The certificate is self-signed (the
+token is still what authenticates the tunnel), so no certificate has to be
+provisioned. Like KCP it rides on UDP, so **it needs UDP to be open**; if your
+provider filters or throttles UDP, use a TCP-based transport instead.
 
 ---
 

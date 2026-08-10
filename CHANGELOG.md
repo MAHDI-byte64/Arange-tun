@@ -2,6 +2,26 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.18.0 — 2026-08-10
+
+**New QUIC transport, ported from upstream BackPack.** QUIC carries the tunnel
+in reliable streams multiplexed over a single UDP flow, giving mux-like
+concurrency without a separate SMUX layer and with QUIC's own loss recovery and
+congestion control. It picks up where the other UDP-based transports leave off:
+one connection, many streams, and a TLS 1.3 handshake underneath (self-signed —
+the token is still what authenticates the tunnel).
+
+- Pick **QUIC** under the *UDP* group in the New-tunnel form. Like UDP and KCP it
+  carries datagrams, so it never appears in the TCP listen table and skips the
+  TCP-based link test; the PROXY-protocol header is supported.
+- Brings in a shared framed-datagram UDP-forward helper (`udpforward`) used by the
+  QUIC server and client to carry UDP port-forwards alongside the TCP ones.
+- Built on `quic-go` v0.54.0, pinned to keep the from-source build on Go 1.24 —
+  no new system dependency.
+
+Upstream BackPack's own native spoof transport was intentionally **not** ported:
+Arange-tun already ships its own Spoof tunnel (see v1.17.0).
+
 ## v1.17.0 — 2026-08-10
 
 **New Spoof tunnel — a forged source-IP UDP pipe, with its own management panel.**

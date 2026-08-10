@@ -114,7 +114,7 @@ the short version of each.
 
 ### Backhaul — the built-in engine
 
-The default reverse tunnel and the most flexible one: nine [transports](#-transports-backhaul-engine)
+The default reverse tunnel and the most flexible one: ten [transports](#-transports-backhaul-engine)
 across TCP/UDP/WebSocket, connection pooling, presets, and DPI options.
 
 - **🇮🇷 Iran (server):** *Setup Server* → pick a transport + preset, set the tunnel
@@ -201,13 +201,13 @@ WireGuard over it for a full VPN. It is a pure-Go take on
 
 ## 🔌 Transports (Backhaul engine)
 
-The Backhaul tunnel offers nine transports across TCP, UDP and WebSocket, plus an
+The Backhaul tunnel offers ten transports across TCP, UDP and WebSocket, plus an
 experimental ICMP option, all with connection pooling:
 
 | Family | Variants | Notes |
 |--------|----------|-------|
 | **TCP** | TCP · TCP Mux · TCP + Stealth | *Stealth* wraps TCP in a Noise layer with **no fingerprint** — random-looking bytes with nothing for DPI to match. Best under heavy filtering. |
-| **UDP** | UDP · UDP + KCP | *KCP* adds reliable delivery with **forward error correction**, repairing loss without waiting for a retransmit. |
+| **UDP** | UDP · UDP + KCP · QUIC | *KCP* adds reliable delivery with **forward error correction**, repairing loss without waiting for a retransmit. *QUIC* multiplexes many reliable streams over one UDP flow, with its own loss recovery and a TLS 1.3 handshake underneath. |
 | **WebSocket** | WS · WS Mux · WSS · WSS Mux | *WSS* uses TLS with a real Chrome fingerprint and a Let's Encrypt (or self-signed) certificate; a **decoy site** answers non-tunnel probes so the server looks like a normal HTTPS website. |
 | **Experimental** | xDi (ICMP) | Tunnels inside ping packets, for networks that filter TCP/UDP but not ICMP. |
 
