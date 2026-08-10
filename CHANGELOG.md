@@ -2,6 +2,29 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.17.0 — 2026-08-10
+
+**New Spoof tunnel — a forged source-IP UDP pipe, with its own management panel.**
+Spoof carries a UDP flow (meant to wrap WireGuard) inside packets whose **source
+IP is forged** (mutual bidirectional spoofing), so a Layer-3 firewall that filters
+on source/destination IP sees a whitelisted-looking flow. It is a pure-Go take on
+ParsaKSH/spoof-tunnel's technique — raw `IP_HDRINCL` injection + libpcap capture,
+ChaCha20-Poly1305 sealed frames, UDP/TCP/ICMP carriers — not wire-compatible with
+the upstream (two Arange-tun ends talk to each other).
+
+Clicking **Spoof** in the chooser opens a **dedicated panel** (same Arange-tun
+look), not the normal create form:
+
+- **Instances** — create/edit/start-stop/delete spoof clients and servers.
+- **Tester** — the check that matters: forge probes from one box and count how many
+  arrive at the other, per source IP. Most networks block source-IP spoofing; the
+  tester tells you whether yours does before you rely on the tunnel.
+- **IP scanner** — expand a single IP, a range (`a-b`) or a CIDR into a candidate
+  list to feed the tester.
+
+Needs **root** and **libpcap**, Linux only. It only works where the network permits
+forged source IPs.
+
 ## v1.16.3 — 2026-08-09
 
 **Tidied the New-tunnel chooser.** The two groups are now split by *who dials

@@ -62,6 +62,16 @@ func List() []Tunnel {
 			t.Role = "client"
 			t.Transport = "ssh"
 			t.Addr = fmt.Sprintf("%s:%d", cfg.SSH.Host, cfg.SSH.Port)
+		case cfg.Spoof.Role != "":
+			// Spoof is a forged-source-IP UDP pipe. For a client the address is
+			// the server it dials; for a server it is the port it listens on.
+			t.Role = cfg.Spoof.Role
+			t.Transport = "spoof"
+			if cfg.Spoof.Role == "client" {
+				t.Addr = fmt.Sprintf("%s:%d", cfg.Spoof.ServerIP, cfg.Spoof.ServerPort)
+			} else {
+				t.Addr = fmt.Sprintf(":%d", cfg.Spoof.ListenPort)
+			}
 		case cfg.Server.BindAddr != "":
 			t.Role = "server"
 			t.Transport = string(cfg.Server.Transport)

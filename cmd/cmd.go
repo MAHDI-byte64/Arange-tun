@@ -13,6 +13,7 @@ import (
 	"github.com/mahdi-byte64/arange-tun/internal/frp"
 	"github.com/mahdi-byte64/arange-tun/internal/packet"
 	"github.com/mahdi-byte64/arange-tun/internal/rathole"
+	"github.com/mahdi-byte64/arange-tun/internal/spoof"
 	sshtunnel "github.com/mahdi-byte64/arange-tun/internal/ssh"
 	"github.com/mahdi-byte64/arange-tun/internal/wireguard"
 
@@ -150,6 +151,24 @@ func runEngine(cfg *config.Config, ctx context.Context, configPath string, apply
 		go sshtunnel.RunClient(ctx, &cfg.SSH, log)
 		<-ctx.Done()
 		logger.Println("shutting down ssh...")
+		return
+	}
+
+	// Spoof is a UDP pipe over forged-source-IP packets, with its own section and
+	// engine.
+	if role := cfg.Spoof.Role; role != "" {
+		startMetrics(ctx, configPath, "spoof", role)
+		log := utils.NewLoggerWithFormat(cfg.Spoof.LogLevel, cfg.Server.LogFormat)
+		switch role {
+		case "client":
+			go spoof.RunClient(ctx, &cfg.Spoof, log)
+		case "server":
+			go spoof.RunServer(ctx, &cfg.Spoof, log)
+		default:
+			logger.Fatalf("spoof: unknown role %q", role)
+		}
+		<-ctx.Done()
+		logger.Println("shutting down spoof...")
 		return
 	}
 
