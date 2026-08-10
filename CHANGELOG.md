@@ -2,6 +2,25 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.18.1 — 2026-08-10
+
+**Fixed the from-source install and update failing behind Iran's blocks.** On a
+fresh Iran server the build died at `proxy.golang.org … 403 Forbidden`. Two
+causes, both fixed in `install.sh` and the panel's in-app updater:
+
+- **GOPROXY fall-through.** With comma-separated proxies Go only tries the next
+  one on a 404/410 — a **403** (what `proxy.golang.org` returns from a sanctioned
+  region) is a hard stop that never reached the mirrors. The list is now
+  **pipe-separated** (`|`), which falls through on *any* error, and puts
+  Iran-reachable mirrors (`goproxy.cn`, `mirror-go.runflare.com`) first.
+- **Toolchain auto-download.** A pre-existing `go1.24.0–1.24.3` would try to fetch
+  a newer toolchain from `proxy.golang.org` (also 403). `GOTOOLCHAIN=local` is now
+  exported for the whole install, and the Go-version check requires the full
+  go.mod minimum (1.24.4) so an in-between patch release is replaced rather than
+  used. Go tarball mirrors were reordered to try Iran-reachable ones first.
+
+No functional change to the tunnels — install/update reliability only.
+
 ## v1.18.0 — 2026-08-10
 
 **New QUIC transport, ported from upstream BackPack.** QUIC carries the tunnel

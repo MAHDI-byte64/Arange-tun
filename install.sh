@@ -26,7 +26,23 @@ BIN_PATH="/usr/local/bin/arange-tun"
 INSTALL_DIR="/root/Arange-tun"
 GO_VERSION="1.24.5"
 GO_MIN_MINOR=24
+GO_MIN_PATCH=4   # go.mod requires go >= 1.24.4
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-/tmp}")" 2>/dev/null && pwd || echo /tmp)"
+
+# Module and toolchain fetching, set once for every go invocation in this run.
+#
+# GOTOOLCHAIN=local pins the build to whatever go is on PATH and forbids Go from
+# downloading a newer toolchain — that download goes to proxy.golang.org, which
+# returns 403 from a sanctioned region and would abort the whole build. We
+# install a toolchain that satisfies go.mod, so local is always enough.
+#
+# GOPROXY lists Iran-reachable mirrors first and is pipe-separated ("|") on
+# purpose: with commas Go only advances to the next proxy on a 404/410, so a
+# 403 (what proxy.golang.org returns from Iran) is a hard stop that never
+# reaches the mirrors. "|" makes it fall through on ANY error.
+export GOTOOLCHAIN=local
+export GOPROXY="https://goproxy.cn|https://mirror-go.runflare.com|https://proxy.golang.org|direct"
+export GOSUMDB=off
 
 if [[ $EUID -ne 0 ]]; then err "Please run as root (sudo)."; exit 1; fi
 
@@ -48,18 +64,29 @@ fetch() {
 # ---------------------------------------------------------------------------
 download_go() {
   local file="go${GO_VERSION}.linux-${ARCH}.tar.gz" out="$1"
-  for u in "https://go.dev/dl/${file}" \
+  # Iran-reachable mirrors first (go.dev/dl often 404s or geoblocks from Iran).
+  for u in "https://mirrors.aliyun.com/golang/${file}" \
+           "https://mirrors.ustc.edu.cn/golang/${file}" \
            "https://golang.google.cn/dl/${file}" \
-           "https://mirrors.aliyun.com/golang/${file}"; do
+           "https://go.dev/dl/${file}"; do
     info "Trying ${u}"
     curl -fsSL --connect-timeout 15 "$u" -o "$out" && return 0
     warn "source failed, trying next..."
   done
   return 1
 }
+# go_new_enough accepts a go only if it satisfies the go.mod minimum (1.24.4).
+# Checking the minor alone is not enough: with GOTOOLCHAIN=local a go1.24.0..3
+# cannot build a module that requires 1.24.4 and would fail with no fallback, so
+# the patch level has to clear GO_MIN_PATCH too.
 go_new_enough() {
-  local v; v="$("$1" version 2>/dev/null | grep -oE 'go1\.[0-9]+' | head -1)"; v="${v#go1.}"
-  [[ -n "$v" ]] && (( v >= GO_MIN_MINOR ))
+  local v minor patch
+  v="$("$1" version 2>/dev/null | grep -oE 'go1\.[0-9]+(\.[0-9]+)?' | head -1)"; v="${v#go1.}"
+  [[ -z "$v" ]] && return 1
+  minor="${v%%.*}"
+  patch="${v#*.}"; [[ "$patch" == "$v" ]] && patch=0
+  (( minor > GO_MIN_MINOR )) && return 0
+  (( minor == GO_MIN_MINOR && patch >= GO_MIN_PATCH ))
 }
 ensure_go() {
   command -v go >/dev/null 2>&1 && go_new_enough "$(command -v go)" && { info "Go: $(go version)"; return; }
@@ -110,10 +137,8 @@ build_from_source() {
   cd "$SCRIPT_DIR"
   ensure_go; export PATH="/usr/local/go/bin:$PATH"
   ensure_build_deps
-  # Direct module fetching first, Iran-friendly mirrors as fallback.
-  export GOPROXY="https://proxy.golang.org,https://mirror-go.runflare.com,https://goproxy.cn,direct"
-  export GOSUMDB=off GOTOOLCHAIN=local
-  info "Building from source (proxy order: direct first, then mirrors)."
+  # GOPROXY / GOSUMDB / GOTOOLCHAIN are exported once near the top of the script.
+  info "Building from source (Iran-reachable module mirrors first)."
   # cgo is on: the Packet tunnel's pcap engine links against libpcap.
   CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o "$BIN_PATH" .
   echo "$INSTALL_DIR" > /etc/arange-tun/install_path

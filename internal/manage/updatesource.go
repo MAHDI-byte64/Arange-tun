@@ -143,7 +143,12 @@ func buildFromSource(logf func(string)) error {
 		// cgo is on: the Packet tunnel's pcap engine links against libpcap, which
 		// the installer put on the machine. The rest of the tree is pure Go.
 		"CGO_ENABLED=1",
-		"GOPROXY=https://proxy.golang.org,https://mirror-go.runflare.com,https://goproxy.cn,direct",
+		// Iran-reachable mirrors first, and pipe-separated ("|") on purpose: with
+		// commas Go only advances to the next proxy on a 404/410, so a 403 — which
+		// is exactly what proxy.golang.org returns from a sanctioned region — is a
+		// hard stop that never reaches the mirrors. "|" makes it fall through on
+		// ANY error, so a blocked proxy is skipped instead of failing the build.
+		"GOPROXY=https://goproxy.cn|https://mirror-go.runflare.com|https://proxy.golang.org|direct",
 		"GOSUMDB=off",
 		"GOTOOLCHAIN=local",
 		"HOME="+app.InstallDir,
