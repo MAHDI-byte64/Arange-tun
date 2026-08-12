@@ -50,8 +50,8 @@ func validPortSpec(spec string) bool {
 	if local == "" {
 		return false
 	}
-	if len(parts) == 2 && strings.TrimSpace(parts[1]) == "" {
-		return false // "443=" — empty destination
+	if len(parts) == 2 && !validBackendList(parts[1]) {
+		return false // "443=", "443=|", "443=a||b" — a destination with a hole in it
 	}
 	// "ip:port=addr" — a full local address is only valid in mapping form.
 	if h, p, err := net.SplitHostPort(local); err == nil && h != "" {
@@ -73,6 +73,26 @@ func validPortSpec(spec string) bool {
 	}
 	// Plain single port.
 	return validPort(local)
+}
+
+// validBackendList reports whether a mapping's destination is a usable backend
+// or list of them. A pipe separates several ("a:1|b:2"), and every entry has to
+// be there: "|", "a|" and "a||b" all describe a backend that does not exist.
+//
+// This is not pedantry about a typo. The engine's pool splits the same string,
+// and an entry it cannot find is a backend it will never dial — at best a
+// connection sent nowhere, and for the empty list it used to be a panic that
+// took the tunnel down. Saying so at the point the mapping is typed costs the
+// user one correction; letting it through costs them a tunnel that dies on its
+// first connection with nothing in the log to explain why.
+func validBackendList(dest string) bool {
+	parts := strings.Split(dest, "|")
+	for _, p := range parts {
+		if strings.TrimSpace(p) == "" {
+			return false
+		}
+	}
+	return len(parts) > 0
 }
 
 // validatePortSpecs checks every forwarded-port entry, returning a descriptive

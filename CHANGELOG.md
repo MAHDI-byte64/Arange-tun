@@ -2,6 +2,35 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.21.1 — 2026-08-12
+
+**A crash in the backend pool, and a second look at the toolchain check.**
+
+- **A typo in a port mapping could kill a tunnel.** A forwarded port may name
+  several backends separated by a pipe (`443=127.0.0.1:8443|127.0.0.1:8444`).
+  The pool decided it had a list to balance by looking for a pipe in the string,
+  then divided by however many backends it parsed out — so a destination that is
+  only separators (`443=|`) parsed to none, and the first connection on that
+  port divided by zero. That panic happens in a goroutine handling a forwarded
+  connection, which ends the whole tunnel process, not just the connection. The
+  pool now decides on what the list actually parses to, and a mapping with a
+  hole in it is rejected where it is typed — the panel and the CLI accepted
+  `443=|` without complaint, since only the port half was ever checked. A stray
+  trailing pipe (`443=127.0.0.1:8443|`) is now what it always looked like: one
+  backend, passed straight through, with no health checker started for it.
+
+- **The Go toolchain check asks one independent source, not two agreeing
+  ones.** The check added in v1.21.0 required two mirrors to publish the same
+  checksum. That is sound but needlessly fragile: it makes an install fail on a
+  network that reaches only one mirror besides the one that served the archive,
+  which is a plausible situation for the servers this runs on. The property that
+  matters is not agreement, it is independence — a hostile mirror serving a
+  modified archive would serve a matching checksum next to it, and cannot change
+  what a different host publishes. So the checksum is now required to come from
+  a host other than the one the archive came from, and one is enough. Google's
+  download CDN is listed as a source alongside the mirrors, and if several
+  independent sources do answer they must still agree.
+
 ## v1.21.0 — 2026-08-12
 
 **A security and housekeeping pass.** Nothing here changes what a tunnel does;

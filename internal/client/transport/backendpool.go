@@ -46,9 +46,23 @@ type backendPool struct {
 
 // pick returns a backend to dial for this target. For a single backend it is a
 // no-op passthrough; for several it hands out the next healthy one.
+//
+// The decision is made on what the list actually parses to, not on whether a
+// pipe appears in the string. Those are not the same: "127.0.0.1:8443|" holds
+// one backend and a stray separator, and a target of "|" holds none at all. The
+// second used to reach group(), which built a group over an empty list, and the
+// first connection on that port divided by its length — a panic, in a goroutine
+// handling a forwarded connection, which takes the whole tunnel process down.
+// A typo in a port mapping should not be able to do that.
 func (p *backendPool) pick(target string) string {
 	if !strings.Contains(target, backendSep) {
 		return target
+	}
+	if len(splitBackends(target)) < 2 {
+		// Nothing to balance: one backend, or a separator and no backend. Hand
+		// the target back and let the dial report whatever is wrong with it,
+		// which is a far better error than a crash.
+		return firstBackend(target)
 	}
 	return p.group(target).pick()
 }
@@ -90,6 +104,11 @@ func (g *backendGroup) pick() string {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	n := len(g.list)
+	// Belt and braces. The caller already refuses to build a group over an
+	// empty list, and every line below divides by n.
+	if n == 0 {
+		return ""
+	}
 	for i := 0; i < n; i++ {
 		idx := g.next % n
 		g.next++

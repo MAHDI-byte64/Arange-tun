@@ -78,62 +78,99 @@ GO_MIRRORS=(
   "https://go.dev/dl"
 )
 
+# Where a checksum may come from. The mirrors above all publish a .sha256 beside
+# each archive, and Google's download CDN is listed as well: it is a different
+# host from go.dev, so it counts as an independent source even when go.dev
+# itself served the archive.
+GO_SUM_SOURCES=(
+  "${GO_MIRRORS[@]}"
+  "https://dl.google.com/go"
+)
+
+# Set by download_go to the base URL the archive actually came from, so the
+# checksum can be required to come from somewhere else.
+GO_SOURCE_BASE=""
+
 download_go() {
   local file="go${GO_VERSION}.linux-${ARCH}.tar.gz" out="$1" base
   for base in "${GO_MIRRORS[@]}"; do
     info "Trying ${base}/${file}"
-    curl -fsSL --connect-timeout 15 "${base}/${file}" -o "$out" && return 0
+    if curl -fsSL --connect-timeout 15 "${base}/${file}" -o "$out"; then
+      GO_SOURCE_BASE="$base"
+      return 0
+    fi
     warn "source failed, trying next..."
   done
   return 1
 }
 
-# go_agreed_sha256 <file> — the SHA256 that at least two of the mirrors publish
-# for <file>, or nothing when they cannot agree.
+# go_independent_sha256 <file> — the SHA256 published for <file> by a host other
+# than the one that served the archive, or nothing when no such host answers.
 #
-# The compiler that builds the binary this server will run as root is the last
-# thing that should arrive on trust. It used to: whichever mirror answered first
+# The compiler that builds the binary this server runs as root is the last thing
+# that should arrive on trust, and it used to: whichever mirror answered first
 # handed over eighty megabytes of toolchain and nothing checked what was in it.
-# TLS proves only that the bytes came from that mirror unaltered — it says
-# nothing about the mirror itself, and these are third-party mirrors chosen
-# because they are reachable from a censored network, not because they are
-# trusted.
+# TLS proves the bytes left that mirror unaltered. It says nothing about the
+# mirror, and these are third-party mirrors picked for being reachable from a
+# censored network, not for being trusted.
 #
-# So the checksum is taken from a different source than the tarball. Each mirror
-# publishes a .sha256 beside the archive; two of them agreeing on a value is
-# enough, because a single hostile mirror can only cast one vote and cannot make
-# an honest mirror agree with it. It is a few hundred bytes of extra traffic.
-go_agreed_sha256() {
-  local file="$1" base sum
-  # Note the `if` rather than a `[[ ]] && echo`: the loop feeds a pipeline, and
-  # under `set -o pipefail` a trailing failed test would make the whole pipeline
-  # — and with `set -e`, the script — exit silently whenever the last mirror in
-  # the list happened not to answer.
-  for base in "${GO_MIRRORS[@]}"; do
+# The fix is not "check a hash" — a mirror serving a modified archive would
+# happily serve a matching hash next to it. It is that the hash must come from
+# somewhere the archive did not. One other host is enough for that: a hostile
+# mirror cannot change what an independent one publishes.
+#
+# If several independent hosts answer they must all say the same thing.
+# Disagreement means one of them is lying, and there is no way from here to tell
+# which — so it stops rather than guess.
+go_independent_sha256() {
+  local file="$1" base sum seen=""
+  for base in "${GO_SUM_SOURCES[@]}"; do
+    [[ "$base" == "$GO_SOURCE_BASE" ]] && continue
     sum="$(curl -fsSL --connect-timeout 10 --max-time 30 "${base}/${file}.sha256" 2>/dev/null \
       | tr -d '[:space:]' | tr 'A-F' 'a-f')" || true
-    if [[ "$sum" =~ ^[0-9a-f]{64}$ ]]; then echo "$sum"; fi
-  done | sort | uniq -c | sort -rn | awk '$1 >= 2 { print $2; exit }'
+    [[ "$sum" =~ ^[0-9a-f]{64}$ ]] || continue
+    if [[ -z "$seen" ]]; then
+      seen="$sum"
+    elif [[ "$seen" != "$sum" ]]; then
+      err "Sources disagree about the checksum of ${file}:"
+      err "  ${seen}"
+      err "  ${sum}"
+      err "One of them is serving something it should not be. Stopping."
+      # Status 2, not `exit`: this function is called inside a command
+      # substitution, where an exit would end only the subshell and let the
+      # caller carry on to print a second, wrong explanation.
+      return 2
+    fi
+  done
+  [[ -n "$seen" ]] && echo "$seen"
+  return 0
 }
 
-# verify_go_tarball <path> — abort unless the archive hashes to what the
-# mirrors agree it should. GO_SHA256 in the environment pins the value instead,
-# for an operator who has the official checksum and does not want to rely on
-# mirrors agreeing.
+# verify_go_tarball <path> — abort unless the archive hashes to what an
+# independent source says it should. GO_SHA256 in the environment pins the value
+# by hand instead, for an operator who has the official checksum or whose
+# network reaches only the one mirror.
 verify_go_tarball() {
-  local out="$1" file="go${GO_VERSION}.linux-${ARCH}.tar.gz" want got
+  local out="$1" file="go${GO_VERSION}.linux-${ARCH}.tar.gz" want got rc=0
   if [[ -n "${GO_SHA256:-}" ]]; then
     want="$(echo "$GO_SHA256" | tr -d '[:space:]' | tr 'A-F' 'a-f')"
   else
-    info "Checking the toolchain against the mirrors' published checksums..."
-    want="$(go_agreed_sha256 "$file")" || want=""
+    info "Checking the toolchain against an independent checksum..."
+    # The status has to be captured on the assignment itself; reading $? inside
+    # an `if ! ...` would read the negation, not what the function returned.
+    want="$(go_independent_sha256 "$file")" && rc=0 || rc=$?
+    # 2 means the sources contradicted each other, and it has said so already.
+    [[ $rc -eq 2 ]] && exit 1
+    [[ $rc -eq 0 ]] || want=""
   fi
   if [[ ! "$want" =~ ^[0-9a-f]{64}$ ]]; then
-    err "Could not establish a trusted checksum for ${file}: fewer than two"
-    err "mirrors published one, or they disagreed. Refusing to build with an"
-    err "unverified Go toolchain. Either install Go ${GO_VERSION} or newer"
-    err "yourself and re-run this script, or re-run it with the official"
-    err "checksum: GO_SHA256=<sha256> bash install.sh"
+    err "No independent checksum for ${file} could be fetched — every source"
+    err "other than the one that served the archive was unreachable."
+    err "Refusing to build with an unverified Go toolchain. Either:"
+    err "  - install Go ${GO_VERSION} or newer yourself and re-run this script"
+    err "    (an existing toolchain on PATH is used as-is), or"
+    err "  - re-run with the official checksum from https://go.dev/dl/:"
+    err "      GO_SHA256=<sha256> bash install.sh"
     exit 1
   fi
   got="$(sha256sum "$out" | awk '{print $1}')"

@@ -88,3 +88,36 @@ func TestBackendHealthCheckDropsAndRestores(t *testing.T) {
 	}
 	_ = time.Now
 }
+
+// A port mapping is typed by a person, so it can be typed wrong. A destination
+// that is nothing but separators parses to an empty backend list, and the pool
+// used to divide by its length — a panic inside a goroutine handling a
+// forwarded connection, which ends the tunnel process, not just the connection.
+func TestPickSurvivesAMappingWithNoBackends(t *testing.T) {
+	for _, target := range []string{"|", "||", "| ", " | | "} {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("pick(%q) panicked: %v", target, r)
+				}
+			}()
+			backends.pick(target)
+		}()
+	}
+}
+
+// A stray trailing separator leaves exactly one backend. There is nothing to
+// balance, so it is handed straight back — and, as the file's own contract
+// says, no health checker is started for it.
+func TestASingleBackendWithAStraySeparatorIsPassedThrough(t *testing.T) {
+	const target = "127.0.0.1:8443|"
+	if got := backends.pick(target); got != "127.0.0.1:8443" {
+		t.Errorf("pick(%q) = %q, want the one backend it names", target, got)
+	}
+	backends.mu.Lock()
+	_, grouped := backends.groups[target]
+	backends.mu.Unlock()
+	if grouped {
+		t.Error("a health-checking group was started for a single backend")
+	}
+}
