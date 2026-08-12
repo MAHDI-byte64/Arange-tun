@@ -99,6 +99,10 @@ type AdvancedTuning struct {
 	KCPDataShards   int `json:"kcpDataShards"`
 	KCPParityShards int `json:"kcpParityShards"`
 
+	// MSS clamps the largest TCP segment the tunnel sends (0 = off). Only the
+	// transports that carry TCP segments honour it; see supportsMSS.
+	MSS int `json:"mss"`
+
 	// Limits.
 	MaxConnections int `json:"maxConnections"`
 	BandwidthMbps  int `json:"bandwidthMbps"`
@@ -447,6 +451,9 @@ func applyAdvanced(s *TunnelSpec, a *AdvancedTuning) {
 		}
 	}
 
+	if a.MSS > 0 && supportsMSS(s.Transport) {
+		s.MSS = a.MSS
+	}
 	if a.MaxConnections > 0 {
 		s.MaxConnections = a.MaxConnections
 	}

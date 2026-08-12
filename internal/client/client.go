@@ -209,6 +209,7 @@ func (c *Client) Start() {
 			AggressivePool: c.config.AggressivePool,
 			EdgeIP:         c.config.EdgeIP,
 			Outbound:       outbound,
+			MSS:            c.config.MSS,
 		}
 		WsClient := transport.NewWSClient(c.ctx, WsConfig, c.logger)
 		go WsClient.Start()
@@ -235,6 +236,7 @@ func (c *Client) Start() {
 			AggressivePool:   c.config.AggressivePool,
 			EdgeIP:           c.config.EdgeIP,
 			Outbound:         outbound,
+			MSS:              c.config.MSS,
 		}
 		wsMuxClient := transport.NewWSMuxClient(c.ctx, wsMuxConfig, c.logger)
 		go wsMuxClient.Start()

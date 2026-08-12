@@ -62,7 +62,13 @@ const (
 // to get past — of exactly which foreign servers this machine talks to. The
 // query is not secret to the provider, but it must not be readable by everyone
 // carrying the packet.
-var geoProviders = []func(string) *Info{geoFromIpwho, geoFromIpSb, geoFromIpApiCo}
+// geojs.io and ipinfo.io lead the list because they are CDN-fronted and answer
+// from more networks than the others — including, in practice, from Iran, which
+// is the case that matters: after the plaintext ip-api.com was dropped the peer
+// row went blank on exactly the servers this runs on, because the remaining
+// providers were not reachable from there. More reachable HTTPS providers is
+// the fix that keeps the query off plain HTTP without giving up the answer.
+var geoProviders = []func(string) *Info{geoFromGeoJS, geoFromIPInfo, geoFromIpwho, geoFromIpSb, geoFromIpApiCo}
 
 // Lookup resolves an IP, caching the answer. It returns nil when nothing is
 // known, which callers must treat as "unavailable" rather than an error.
@@ -192,6 +198,37 @@ func geoFromIpApiCo(ip string) *Info {
 	}
 	if geoGetter("https://ipapi.co/"+url.PathEscape(ip)+"/json/", &r) && !r.Error && r.Country != "" {
 		return &Info{Country: r.Country, Code: r.CountryCode, City: r.City, ISP: r.Org}
+	}
+	return nil
+}
+
+// geoFromGeoJS — get.geojs.io (HTTPS, no key). It returns no city, only the
+// country and the organisation, which is enough for the flag and the ISP line.
+func geoFromGeoJS(ip string) *Info {
+	var r struct {
+		Country     string `json:"country"`
+		CountryCode string `json:"country_code"`
+		Org         string `json:"organization_name"`
+	}
+	if geoGetter("https://get.geojs.io/v1/ip/geo/"+url.PathEscape(ip)+".json", &r) && r.CountryCode != "" {
+		return &Info{Country: r.Country, Code: r.CountryCode, ISP: r.Org}
+	}
+	return nil
+}
+
+// geoFromIPInfo — ipinfo.io (HTTPS, no key on the free path). Its "country" is
+// the ISO code, not the name, and it has no country name at all — so the region
+// (the state or province) stands in for the second half of the location line,
+// which reads well enough: "Mountain View, California".
+func geoFromIPInfo(ip string) *Info {
+	var r struct {
+		City    string `json:"city"`
+		Region  string `json:"region"`
+		Country string `json:"country"` // ISO code, e.g. "US"
+		Org     string `json:"org"`
+	}
+	if geoGetter("https://ipinfo.io/"+url.PathEscape(ip)+"/json", &r) && r.Country != "" {
+		return &Info{Country: r.Region, Code: r.Country, City: r.City, ISP: r.Org}
 	}
 	return nil
 }

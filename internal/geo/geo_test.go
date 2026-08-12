@@ -1,11 +1,50 @@
 package geo
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 )
+
+// cannedGetter makes geoGetter decode a fixed JSON body into the provider's
+// struct, so a provider's parsing can be checked without the network.
+func cannedGetter(t *testing.T, body string) {
+	t.Helper()
+	restore := geoGetter
+	t.Cleanup(func() { geoGetter = restore })
+	geoGetter = func(_ string, out any) bool {
+		return json.Unmarshal([]byte(body), out) == nil
+	}
+}
+
+// Each provider maps a different JSON shape onto Info; a wrong field name is
+// silent (the zero value), so the real response shapes are pinned here.
+func TestProviderParsing(t *testing.T) {
+	t.Run("geojs", func(t *testing.T) {
+		cannedGetter(t, `{"country":"Sweden","country_code":"SE","organization_name":"AS12345 Acme"}`)
+		g := geoFromGeoJS("192.0.2.1")
+		if g == nil || g.Code != "SE" || g.Country != "Sweden" || g.ISP != "AS12345 Acme" {
+			t.Fatalf("geojs parsed to %+v", g)
+		}
+	})
+	t.Run("ipinfo", func(t *testing.T) {
+		cannedGetter(t, `{"city":"Mountain View","region":"California","country":"US","org":"AS15169 Google"}`)
+		g := geoFromIPInfo("192.0.2.2")
+		if g == nil || g.Code != "US" || g.City != "Mountain View" || g.ISP != "AS15169 Google" {
+			t.Fatalf("ipinfo parsed to %+v", g)
+		}
+	})
+	// A provider that cannot identify the address returns nil, so Lookup moves on
+	// to the next rather than caching an empty answer as a hit.
+	t.Run("geojs blank is nil", func(t *testing.T) {
+		cannedGetter(t, `{"country":"","country_code":"","organization_name":""}`)
+		if g := geoFromGeoJS("192.0.2.3"); g != nil {
+			t.Errorf("a blank response parsed to %+v, want nil", g)
+		}
+	})
+}
 
 // resetCache empties the shared cache so one test cannot see another's answers.
 func resetCache(t *testing.T) {

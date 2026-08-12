@@ -188,6 +188,17 @@ func supportsProxyProtocol(t string) bool {
 	return false
 }
 
+// supportsMSS reports whether a transport carries its data as TCP segments, and
+// so can have their size clamped. The datagram transports (udp, kcp, xdi, quic)
+// size their packets with the KCP MTU instead and are not offered a clamp.
+func supportsMSS(t string) bool {
+	switch t {
+	case "tcp", "tcpmux", "stealth", "ws", "wss", "wsmux", "wssmux":
+		return true
+	}
+	return false
+}
+
 // isWS reports whether a transport rides over websocket.
 func isWS(t string) bool {
 	return t == "ws" || t == "wss" || t == "wsmux" || t == "wssmux"

@@ -66,7 +66,7 @@ func TunnelForEdit(name string) (TunnelRequest, error) {
 			}
 		}
 
-		if s.Preset == "" || s.MaxConnections > 0 || s.BandwidthMbps > 0 {
+		if s.Preset == "" || s.MaxConnections > 0 || s.BandwidthMbps > 0 || s.MSS > 0 {
 			nd, au, zc := s.Nodelay, s.AcceptUDP, s.ZeroCopy
 			req.Advanced = &AdvancedTuning{
 				Nodelay:         &nd,
@@ -87,6 +87,7 @@ func TunnelForEdit(name string) (TunnelRequest, error) {
 				KCPRcvWnd:       s.RcvWnd,
 				KCPDataShards:   s.DataShards,
 				KCPParityShards: s.ParityShards,
+				MSS:             s.MSS,
 				MaxConnections:  s.MaxConnections,
 				BandwidthMbps:   s.BandwidthMbps,
 				ZeroCopy:        &zc,
@@ -113,7 +114,7 @@ func TunnelForEdit(name string) (TunnelRequest, error) {
 		req.TLSSni = c.TLSSni
 		req.SimpleAuth = c.SimpleAuth
 
-		if c.Preset == "" {
+		if c.Preset == "" || c.MSS > 0 {
 			nd, ap, zc := c.Nodelay, c.AggressivePool, c.ZeroCopy
 			req.Advanced = &AdvancedTuning{
 				Nodelay:         &nd,
@@ -133,6 +134,7 @@ func TunnelForEdit(name string) (TunnelRequest, error) {
 				KCPRcvWnd:       c.RcvWnd,
 				KCPDataShards:   c.DataShards,
 				KCPParityShards: c.ParityShards,
+				MSS:             c.MSS,
 				ZeroCopy:        &zc,
 			}
 		}

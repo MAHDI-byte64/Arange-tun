@@ -429,6 +429,42 @@ func SetLimits(name string, maxConns, bandwidthMbps int) error {
 	return applySpec(s)
 }
 
+// SetMSS sets the TCP MSS clamp (0 = off) on a tunnel that carries TCP segments.
+//
+// Unlike the connection and bandwidth limits this is not server-only: each end
+// clamps only what it sends, so a path that drops full-sized packets in one
+// direction is fixed by clamping the end that sends them — which is why the
+// diagnostics tell the operator to set the same value on both.
+func SetMSS(name string, mss int) error {
+	s, err := LoadSpec(name)
+	if err != nil {
+		return err
+	}
+	if !supportsMSS(s.Transport) {
+		return fmt.Errorf("the %s transport does not carry TCP segments, so an MSS clamp does not apply to it", s.Transport)
+	}
+	if err := setMSSFloorCheck(mss); err != nil {
+		return err
+	}
+	s.MSS = mss
+	return applySpec(s)
+}
+
+// setMSSFloorCheck rejects a nonsensical MSS before it is written. 0 is off; a
+// positive value below the floor every IPv4 path must carry (a 576-byte
+// datagram less 40 bytes of headers) is almost certainly a typo the kernel
+// would reject or ignore, so it is caught here with an explanation rather than
+// left to fail silently on the socket.
+func setMSSFloorCheck(mss int) error {
+	if mss < 0 {
+		return fmt.Errorf("an MSS value cannot be negative")
+	}
+	if mss > 0 && mss < 536 {
+		return fmt.Errorf("an MSS of %d is below the 536-byte floor every path must carry — check the value the diagnostics reported", mss)
+	}
+	return nil
+}
+
 // ChangePreset re-applies a whole performance profile to an existing tunnel.
 // Every tuning field is rewritten from the preset; the identity of the tunnel
 // (name, token, ports, addresses, certificates) is untouched.

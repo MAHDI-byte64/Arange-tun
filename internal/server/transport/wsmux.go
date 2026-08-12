@@ -79,6 +79,10 @@ type WsMuxConfig struct {
 	WebPort          int
 	Mode             config.TransportType // ws or wss
 	ProxyProtocol    bool
+	// MSS caps the largest TCP segment the accepted tunnel connections send
+	// (0 = kernel default). Set on the listening socket, inherited by the
+	// accepted connections — the same clamp the TCP transports carry.
+	MSS int
 	// MaxConnections caps simultaneous forwarded connections (0 = unlimited).
 	MaxConnections int
 	// BandwidthMbps caps total tunnel throughput (0 = unlimited).
@@ -354,13 +358,23 @@ func (s *WsMuxTransport) tunnelListener(g *wsMuxGen) {
 		}),
 	}
 
+	// Built here rather than via ListenAndServe so the tunnel's socket options —
+	// the MSS clamp in particular — actually land on the listening socket, which
+	// the accepted connections inherit. The websocket transports do not pin the
+	// socket buffers, so those stay 0.
+	ln, err := network.ListenWithBuffers("tcp", addr, 0, 0, s.config.MSS, s.config.KeepAlive, !s.config.Nodelay)
+	if err != nil {
+		s.logger.Fatalf("failed to listen on %s: %v", addr, err)
+		return
+	}
+
 	if s.config.Mode == config.WSMUX {
 		go func() {
 			s.logger.Infof("%s server starting, listening on %s", s.config.Mode, addr)
 			if !s.controlChannel.IsSet() {
 				s.logger.Infof("waiting for %s control channel connection", s.config.Mode)
 			}
-			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			if err := server.Serve(ln); err != nil && err != http.ErrServerClosed {
 				s.logger.Fatalf("failed to listen on %s: %v", addr, err)
 			}
 		}()
@@ -380,7 +394,7 @@ func (s *WsMuxTransport) tunnelListener(g *wsMuxGen) {
 			}
 			// Empty paths: the certificate comes from TLSConfig.GetCertificate,
 			// so renewal needs no restart.
-			if err := server.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
+			if err := server.ServeTLS(ln, "", ""); err != nil && err != http.ErrServerClosed {
 				s.logger.Fatalf("failed to listen on %s: %v", addr, err)
 			}
 		}()

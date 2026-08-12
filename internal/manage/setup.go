@@ -135,6 +135,11 @@ func applyManualTuning(s *TunnelSpec) {
 		s.KCPDataShards = tui.PromptInt("FEC data shards (0 disables error correction)", s.KCPDataShards)
 		s.KCPParityShards = tui.PromptInt("FEC parity shards (losses repaired per group)", s.KCPParityShards)
 	}
+	// Only where the data rides on TCP segments. 0 leaves it to the kernel; set
+	// it when Health Check reports a path that drops full-sized packets.
+	if supportsMSS(s.Transport) {
+		s.MSS = tui.PromptInt("TCP MSS clamp (0 = off; set the value Health Check reports, on both ends)", s.MSS)
+	}
 	// Zero-copy forwarding, offered only where it can actually engage: the
 	// kernel path needs two plain TCP sockets, so a mux, websocket or datagram
 	// transport would take the setting and quietly ignore it.

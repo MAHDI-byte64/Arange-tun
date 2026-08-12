@@ -469,9 +469,7 @@ func GatherTunnels() []TunnelInfo {
 					}
 					if ip != "" {
 						if g := geo.Lookup(ip); g != nil {
-							info.PeerLocation = strings.TrimSpace(g.City + ", " + g.Country)
-							info.PeerISP = g.ISP
-							info.PeerCountry = g.Code
+							fillPeer(&info, g)
 						}
 					}
 				}
@@ -499,9 +497,7 @@ func GatherTunnels() []TunnelInfo {
 						info.Ping = icmpPing(p.IP)
 					}
 					if g := geo.Lookup(p.IP); g != nil {
-						info.PeerLocation = strings.TrimSpace(g.City + ", " + g.Country)
-						info.PeerISP = g.ISP
-						info.PeerCountry = g.Code
+						fillPeer(&info, g)
 					}
 				}
 				info.State = health[t.Name].State
@@ -528,9 +524,7 @@ func GatherTunnels() []TunnelInfo {
 					}
 					if ip != "" {
 						if g := geo.Lookup(ip); g != nil {
-							info.PeerLocation = strings.TrimSpace(g.City + ", " + g.Country)
-							info.PeerISP = g.ISP
-							info.PeerCountry = g.Code
+							fillPeer(&info, g)
 						}
 					}
 				}
@@ -603,6 +597,26 @@ func measureTCP(host, port string) int {
 type peerConn struct {
 	IP  string
 	RTT int
+}
+
+// fillPeer copies a geo answer onto a tunnel's peer fields.
+//
+// The location line joins city and country/region with ", " skipping whichever
+// is missing, so a provider that returns only a country ("United States") does
+// not produce a stray leading comma, and one that returns only a city does not
+// produce a trailing one. The providers disagree about which halves they carry,
+// so the join has to tolerate either being empty rather than assume both.
+func fillPeer(info *TunnelInfo, g *geo.Info) {
+	parts := make([]string, 0, 2)
+	if c := strings.TrimSpace(g.City); c != "" {
+		parts = append(parts, c)
+	}
+	if c := strings.TrimSpace(g.Country); c != "" {
+		parts = append(parts, c)
+	}
+	info.PeerLocation = strings.Join(parts, ", ")
+	info.PeerISP = g.ISP
+	info.PeerCountry = g.Code
 }
 
 // peerTable maps a local (listening) port to the unique remote peers connected

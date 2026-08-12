@@ -128,6 +128,9 @@ func editPortsMenu(name string) {
 				tui.Info("Real client IP        : " + onOff(spec.ProxyProtocol))
 			}
 			tui.Info("Limits                : " + limitsSummary(spec))
+			if supportsMSS(spec.Transport) {
+				tui.Info("TCP MSS clamp         : " + mssSummary(spec.MSS))
+			}
 			if needsTLS(spec.Transport) {
 				tui.Info("Certificate           : " + certSummary(spec))
 			}
@@ -140,30 +143,41 @@ func editPortsMenu(name string) {
 				{Title: "Real client IP", Desc: "send the user's real IP so panels can limit devices"},
 				{Title: "Limits", Desc: "cap connections and bandwidth for this tunnel"},
 			}
+			// The optional rows are appended, so their menu positions depend on
+			// which of them apply to this transport — recorded here rather than
+			// hard-coded, so a back-out (idx -1) never collides with an absent one.
+			mssIdx, certIdx := -1, -1
+			if supportsMSS(spec.Transport) {
+				mssIdx = len(opts)
+				opts = append(opts, tui.Option{Title: "TCP MSS clamp", Desc: "cap segment size for a path that drops full-sized packets"})
+			}
 			if needsTLS(spec.Transport) {
+				certIdx = len(opts)
 				opts = append(opts, tui.Option{
 					Title: "Certificate",
 					Desc:  "self-signed, or a real one from Let's Encrypt (needs a domain)",
 				})
 			}
 			idx := tui.ChooseOpt("Choose:", opts)
-			switch idx {
-			case 0:
+			switch {
+			case idx < 0: // backed out — must come first, before the -1 sentinels
+				return
+			case idx == 0:
 				changeTunnelPort(name, spec)
-			case 1:
+			case idx == 1:
 				changeForwardedPorts(name, spec)
-			case 2:
+			case idx == 2:
 				changeTunnelTransport(name, spec)
-			case 3:
+			case idx == 3:
 				changeTunnelPreset(name, spec)
-			case 4:
+			case idx == 4:
 				toggleProxyProtocol(name, spec)
-			case 5:
+			case idx == 5:
 				editLimits(name, spec)
-			case 6:
-				if needsTLS(spec.Transport) {
-					editCertificate(name, spec)
-				}
+			case idx == mssIdx:
+				editMSS(name, spec)
+			case idx == certIdx:
+				editCertificate(name, spec)
 			default:
 				return
 			}
@@ -173,28 +187,41 @@ func editPortsMenu(name string) {
 			tui.Info("Backup servers : " + fallbackSummary(spec.FallbackAddrs))
 			tui.Info("Preset         : " + presetLabel(spec.Preset))
 			tui.Info("Load balancing : " + onOff(spec.LoadBalance))
+			if supportsMSS(spec.Transport) {
+				tui.Info("TCP MSS clamp  : " + mssSummary(spec.MSS))
+			}
 			fmt.Println()
-			idx := tui.ChooseOpt("Choose:", []tui.Option{
+			opts := []tui.Option{
 				{Title: "Change server tunnel port", Desc: "must match the server side"},
 				{Title: "Change server address", Desc: "IP or domain of the Iran server"},
 				{Title: "Change transport", Desc: "switch carrier — keeps the token"},
 				{Title: "Backup server addresses", Desc: "auto-failover when the main IP gets blocked"},
 				{Title: "Change performance preset", Desc: "Balance, Turbo or Aggressive"},
 				{Title: "Load balancing", Desc: "use all backup addresses at once, not just as spares"},
-			})
-			switch idx {
-			case 0:
+			}
+			mssIdx := -1
+			if supportsMSS(spec.Transport) {
+				mssIdx = len(opts)
+				opts = append(opts, tui.Option{Title: "TCP MSS clamp", Desc: "cap segment size for a path that drops full-sized packets"})
+			}
+			idx := tui.ChooseOpt("Choose:", opts)
+			switch {
+			case idx < 0:
+				return
+			case idx == 0:
 				changeTunnelPort(name, spec)
-			case 1:
+			case idx == 1:
 				changeClientHost(name, spec)
-			case 2:
+			case idx == 2:
 				changeTunnelTransport(name, spec)
-			case 3:
+			case idx == 3:
 				changeFallbackAddrs(name, spec)
-			case 4:
+			case idx == 4:
 				changeTunnelPreset(name, spec)
-			case 5:
+			case idx == 5:
 				toggleLoadBalance(name, spec)
+			case idx == mssIdx:
+				editMSS(name, spec)
 			default:
 				return
 			}
@@ -387,6 +414,50 @@ func editLimits(name string, spec TunnelSpec) {
 		return
 	}
 	tui.Success("Limits updated and the tunnel restarted.")
+	tui.PressEnter()
+}
+
+// mssSummary renders the MSS clamp for an Edit header.
+func mssSummary(mss int) string {
+	if mss <= 0 {
+		return "off"
+	}
+	return fmt.Sprintf("%d bytes", mss)
+}
+
+// editMSS sets the TCP MSS clamp on a tunnel that carries TCP segments.
+func editMSS(name string, spec TunnelSpec) {
+	fmt.Println()
+	tui.Title("TCP MSS clamp for " + name)
+	fmt.Println()
+	tui.Warn("Most tunnels never need this. Set it only when Health Check reports a")
+	tui.Warn("path that carries fewer bytes than the tunnel's segments — the case")
+	tui.Warn("where full-sized packets are dropped silently, so the tunnel connects")
+	tui.Warn("and then stalls on the first real transfer.")
+	fmt.Println()
+	tui.Error("Set the SAME value on both ends: each end clamps only what it sends,")
+	tui.Error("so clamping one side still leaves the other sending full-sized packets.")
+	fmt.Println()
+	tui.Info("Currently : " + mssSummary(spec.MSS))
+	fmt.Println()
+
+	mss := tui.PromptInt("TCP MSS clamp (0 = off)", spec.MSS)
+	if mss == spec.MSS {
+		tui.Info("Nothing changed.")
+		tui.PressEnter()
+		return
+	}
+	if err := SetMSS(name, mss); err != nil {
+		tui.Error("Failed: " + err.Error())
+		tui.PressEnter()
+		return
+	}
+	if mss == 0 {
+		tui.Success("MSS clamp turned off and the tunnel restarted.")
+	} else {
+		tui.Success(fmt.Sprintf("MSS clamp set to %d and the tunnel restarted.", mss))
+		tui.Warn("Set the same value on the OTHER end too, or its packets still get dropped.")
+	}
 	tui.PressEnter()
 }
 

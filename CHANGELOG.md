@@ -2,6 +2,32 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.22.0 — 2026-08-12
+
+**Fixed the peer country/ISP row going blank in the panel.** After the
+geolocation providers were moved to HTTPS-only, the two that remained were often
+unreachable from an Iran server, so the "peer" line under a tunnel — the far
+end's location and ISP, on both the client and the server side — stopped
+appearing. Two CDN-fronted HTTPS providers (geojs.io, ipinfo.io) now lead the
+list, which answer from more networks, and the location text is built so a
+provider that returns only a country (or only a city) no longer produces a stray
+comma. The queries stay HTTPS — no return to plaintext.
+
+**The TCP MSS clamp now works on the WebSocket transports, and is settable.**
+Health Check has long reported a too-small path MTU and told the operator to set
+an MSS clamp, but there were two gaps: nothing put the clamp on a socket for the
+`ws`/`wss`/`wsmux`/`wssmux` transports (only the TCP ones honoured it), and there
+was no way to set it at all.
+
+- The websocket server now builds its listener with the tunnel's socket options
+  — including the clamp — instead of a bare `ListenAndServe`, and the client
+  threads it into its dial. It applies to every transport that carries TCP
+  segments: `tcp`, `tcpmux`, `stealth`, `ws`, `wss`, `wsmux`, `wssmux`.
+- It can be set in the **panel** (Edit → Fine-tune → *TCP MSS clamp*), in the
+  **CLI** (Manage → Edit → *TCP MSS clamp*, and in the setup wizard's advanced
+  questions), and is rejected below the 536-byte floor every path must carry.
+  Set the same value on both ends — each end clamps only what it sends.
+
 ## v1.21.1 — 2026-08-12
 
 **A crash in the backend pool, and a second look at the toolchain check.**

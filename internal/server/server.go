@@ -194,6 +194,7 @@ func (s *Server) Start() {
 			ACMECacheDir: acmeCacheDir,
 			TLSKeyFile:   s.config.TLSKeyFile,
 
+			MSS:            s.config.MSS,
 			MaxConnections: s.config.MaxConnections,
 			BandwidthMbps:  s.config.BandwidthMbps,
 		}
@@ -226,6 +227,7 @@ func (s *Server) Start() {
 			ACMECacheDir:     acmeCacheDir,
 			TLSKeyFile:       s.config.TLSKeyFile,
 			ProxyProtocol:    s.config.ProxyProtocol,
+			MSS:              s.config.MSS,
 			MaxConnections:   s.config.MaxConnections,
 			BandwidthMbps:    s.config.BandwidthMbps,
 		}

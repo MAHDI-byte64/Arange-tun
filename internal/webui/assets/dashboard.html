@@ -1691,6 +1691,12 @@
         <label class="tg" style="margin-bottom:14px"><input type="checkbox" id="nt-aggpool"><span data-i18n>Aggressive pool</span></label>
       </div>
 
+      <div id="nt-adv-mss" style="display:none">
+        <label for="nt-mss" data-i18n>TCP MSS clamp</label>
+        <input id="nt-mss" type="number" min="0" step="1" placeholder="0 = off">
+        <p class="hint" style="margin:2px 0 12px;font-size:11.5px;color:var(--muted2)" data-i18n>Only for a path that silently drops full-sized packets — Health Check reports the value. Set the same number on both ends. Leave 0 unless told otherwise.</p>
+      </div>
+
       <div id="nt-adv-mux" style="display:none">
         <p class="acclabel" style="margin-bottom:8px">Mux</p>
         <div class="thresholds" style="grid-template-columns:1fr 1fr">
@@ -2111,6 +2117,8 @@ const FA={
   "Simple token auth (for a TLS-terminating proxy in front)":
     "احراز هویت سادهٔ توکن (برای پراکسی پایان‌دهندهٔ TLS در جلو)",
   "Fine-tune advanced settings (overrides the preset)":"تنظیمات پیشرفته (پیش‌تنظیم را بازنویسی می‌کند)",
+  "TCP MSS clamp":"کلمپ MSS تی‌سی‌پی",
+  "Only for a path that silently drops full-sized packets — Health Check reports the value. Set the same number on both ends. Leave 0 unless told otherwise.":"فقط برای مسیری که پکت‌های تمام‌اندازه را بی‌صدا دور می‌ریزد — مقدارش را «بررسی سلامت» گزارش می‌دهد. همان عدد را روی هر دو سمت بگذار. اگر گفته نشده، روی ۰ بماند.",
   "Max connections":"حداکثر اتصال‌ها",
   "Bandwidth (Mbps)":"پهنای باند (مگابیت)",
   "TCP_NODELAY":"TCP_NODELAY",
@@ -2876,6 +2884,8 @@ const ntIsMux=t=>['tcpmux','wsmux','wssmux','kcp','xdi'].includes(t);
 const ntIsKCP=t=>t==='kcp'||t==='xdi';
 const ntIsDatagram=t=>t==='udp'||t==='kcp'||t==='xdi'||t==='quic';
 const ntSupportsPP=t=>['tcp','tcpmux','kcp','wsmux','wssmux','stealth','quic'].includes(t);
+// The transports that carry TCP segments, and so can have their size clamped.
+const ntSupportsMSS=t=>['tcp','tcpmux','stealth','ws','wss','wsmux','wssmux'].includes(t);
 
 let toastTimer=null;
 function toast(msg,isErr){
@@ -3333,7 +3343,7 @@ function openNewTunnel(){
    'nt-localaddr','nt-fallback','nt-token','nt-tlshost','nt-acmedomain','nt-acmeemail',
    'nt-tlscert','nt-tlskey','nt-keepalive','nt-heartbeat','nt-maxconn','nt-bw','nt-channelsize',
    'nt-connpool','nt-muxcon','nt-muxver','nt-muxframe','nt-muxrecv','nt-muxstream',
-   'nt-kcpmtu','nt-kcpint','nt-kcpsnd','nt-kcprcv','nt-kcpdata','nt-kcpparity'].forEach(id=>{ if($(id)) $(id).value=''; });
+   'nt-kcpmtu','nt-kcpint','nt-kcpsnd','nt-kcprcv','nt-kcpdata','nt-kcpparity','nt-mss'].forEach(id=>{ if($(id)) $(id).value=''; });
   ['nt-ipv6','nt-pp','nt-lb','nt-simpleauth','nt-adv-on','nt-acceptudp','nt-aggpool','nt-zerocopy'].forEach(id=>{ if($(id)) $(id).checked=false; });
   $('nt-role').value='server'; $('nt-transport').value='tcp'; $('nt-preset').value='turbo';
   $('nt-tlsmode').value='self'; $('nt-nodelay').value=''; $('nt-loglevel').value=''; $('nt-logformat').value='';
@@ -3449,6 +3459,7 @@ function ntSync(){
   $('nt-au-row').style.display=(role==='server'&&tr==='tcp')?'':'none';
   $('nt-adv-mux').style.display=ntIsMux(tr)?'':'none';
   $('nt-adv-kcp').style.display=ntIsKCP(tr)?'':'none';
+  $('nt-adv-mss').style.display=ntSupportsMSS(tr)?'':'none';
   $('nt-zc-row').style.display=tr==='tcp'?'':'none';
 }
 
@@ -3483,6 +3494,7 @@ function ntAdvanced(){
   sel('logFormat','nt-logformat'); // '' omitted; 'text' clears; 'json' sets
   num('maxConnections','nt-maxconn');
   num('bandwidthMbps','nt-bw');
+  if(ntSupportsMSS($('nt-transport').value)) num('mss','nt-mss');
 
   if(role==='server'){
     num('channelSize','nt-channelsize');
@@ -3637,6 +3649,7 @@ function ntFill(req){
     if(a.logLevel) $('nt-loglevel').value=a.logLevel;
     if(a.logFormat) $('nt-logformat').value=a.logFormat;
     ntSetNum('nt-maxconn',a.maxConnections); ntSetNum('nt-bw',a.bandwidthMbps);
+    ntSetNum('nt-mss',a.mss);
     ntSetNum('nt-channelsize',a.channelSize);
     if(typeof a.acceptUDP==='boolean') $('nt-acceptudp').checked=a.acceptUDP;
     ntSetNum('nt-connpool',a.connectionPool);
