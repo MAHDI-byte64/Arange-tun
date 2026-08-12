@@ -1,26 +1,28 @@
 package manage
 
-// Release-based updater. Arange-tun updates itself from GitHub release assets
-// (arange-tun_linux_amd64.tar.gz / arange-tun_linux_arm64.tar.gz). Every network
-// step is tried in order:
+// Update discovery. What is newer, and how to find out from a machine that may
+// not be able to reach GitHub directly. The update itself downloads no binary:
+// it rebuilds from source, which lives in updatesource.go.
+//
+// Every network step here is tried in order:
 //
 //  1. direct GitHub
 //  2. the tunnel SOCKS relay (the peer/kharej side can reach GitHub)
 //
-// A machine that has neither installs offline instead; see the README.
+// Both terminate TLS at GitHub, which is the whole of the trust model.
+// Third-party GitHub proxies used to sit behind those two and were removed: on
+// a blocked network — the only time a proxy is reached for — everything the
+// update needed travelled the same proxy, so a hostile one could serve modified
+// content and whatever was needed to make it look right. A server with neither
+// direct access nor a live tunnel installs offline instead; see the README.
 
 import (
-	"archive/tar"
-	"compress/gzip"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -30,17 +32,6 @@ import (
 	"github.com/mahdi-byte64/arange-tun/internal/app"
 	"github.com/mahdi-byte64/arange-tun/internal/socks"
 )
-
-// Downloads go direct to GitHub, or through the tunnel relay when this machine
-// cannot reach it. Both terminate TLS at github.com, so the checksum published
-// with a release is worth checking against.
-//
-// Third-party GitHub proxies used to sit behind those two. They were removed:
-// the archive and its SHA256SUMS travelled the same proxy, so a proxy that
-// served a modified binary could serve a matching checksum with it, and the
-// verification proved nothing precisely when it mattered — a blocked network is
-// the only time a proxy gets used. A server with neither direct access nor a
-// live tunnel now installs offline instead; see the README.
 
 func repoURL() string {
 	return fmt.Sprintf("https://github.com/%s/%s", app.RepoOwner, app.RepoName)
@@ -269,157 +260,6 @@ func pickTag(body string, beta bool) string {
 		}
 	}
 	return best
-}
-
-// downloadAsset fetches the release tar.gz for this architecture into destDir
-// and returns its path. Sources are tried in order.
-func downloadAsset(tag, destDir string, logf func(string)) (string, error) {
-	asset := fmt.Sprintf("arange-tun_linux_%s.tar.gz", runtime.GOARCH)
-	url := fmt.Sprintf("%s/releases/download/%s/%s", repoURL(), tag, asset)
-
-	if err := os.MkdirAll(destDir, 0755); err != nil {
-		return "", err
-	}
-	dest := filepath.Join(destDir, asset)
-
-	var lastErr error = fmt.Errorf("no source reachable")
-	for _, s := range sources(3 * time.Minute) {
-		logf("Downloading " + asset + " via " + s.name + "...")
-		resp, err := s.client.Get(url)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		if resp.StatusCode != http.StatusOK {
-			resp.Body.Close()
-			lastErr = fmt.Errorf("%s returned status %d", s.name, resp.StatusCode)
-			continue
-		}
-		f, err := os.OpenFile(dest, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
-		if err != nil {
-			resp.Body.Close()
-			return "", err
-		}
-		_, err = io.Copy(f, resp.Body)
-		resp.Body.Close()
-		f.Close()
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		return dest, nil
-	}
-	return "", fmt.Errorf("could not download %s: %v", asset, lastErr)
-}
-
-// fetchChecksums downloads the SHA256SUMS published with a release and returns
-// the expected hash for one asset. An empty hash with no error means the
-// release simply does not publish checksums.
-func fetchChecksums(tag, asset string) (string, error) {
-	url := fmt.Sprintf("%s/releases/download/%s/SHA256SUMS", repoURL(), tag)
-
-	var lastErr error = fmt.Errorf("no source reachable")
-	for _, s := range sources(30 * time.Second) {
-		resp, err := s.client.Get(url)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		if resp.StatusCode == http.StatusNotFound {
-			resp.Body.Close()
-			return "", nil // this release predates published checksums
-		}
-		if resp.StatusCode != http.StatusOK {
-			resp.Body.Close()
-			lastErr = fmt.Errorf("%s returned status %d", s.name, resp.StatusCode)
-			continue
-		}
-		body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
-		resp.Body.Close()
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		return hashFor(string(body), asset), nil
-	}
-	return "", lastErr
-}
-
-// hashFor picks one asset's hash out of a SHA256SUMS file. The format is
-// "<hash>  <name>", with an optional "*" marking a binary-mode entry.
-func hashFor(sums, asset string) string {
-	for _, line := range strings.Split(sums, "\n") {
-		fields := strings.Fields(line)
-		if len(fields) != 2 {
-			continue
-		}
-		if strings.TrimPrefix(fields[1], "*") == asset {
-			return strings.ToLower(fields[0])
-		}
-	}
-	return ""
-}
-
-// verifyChecksum confirms a downloaded file hashes to want.
-func verifyChecksum(path, want string) error {
-	f, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return err
-	}
-	got := hex.EncodeToString(h.Sum(nil))
-	if !strings.EqualFold(got, want) {
-		return fmt.Errorf("checksum mismatch — expected %s, got %s", want, got)
-	}
-	return nil
-}
-
-// extractBinary pulls the `arange-tun` executable out of the release archive and
-// atomically replaces the installed binary.
-func extractBinary(archive string) error {
-	f, err := os.Open(archive)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	gz, err := gzip.NewReader(f)
-	if err != nil {
-		return fmt.Errorf("not a valid release archive: %w", err)
-	}
-	defer gz.Close()
-
-	tr := tar.NewReader(gz)
-	for {
-		hdr, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
-		if hdr.Typeflag != tar.TypeReg || filepath.Base(hdr.Name) != "arange-tun" {
-			continue
-		}
-		// Write next to the target so the final rename is atomic.
-		tmp := app.BinPath + ".new"
-		out, err := os.OpenFile(tmp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0755)
-		if err != nil {
-			return err
-		}
-		if _, err := io.Copy(out, tr); err != nil {
-			out.Close()
-			os.Remove(tmp)
-			return err
-		}
-		out.Close()
-		return os.Rename(tmp, app.BinPath)
-	}
-	return fmt.Errorf("no `arange-tun` binary found inside the archive")
 }
 
 // ApplyUpdate rebuilds arange-tun from the current source on main and installs

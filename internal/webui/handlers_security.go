@@ -22,15 +22,28 @@ import (
 const (
 	loginMaxFails    = 5
 	loginBlockPeriod = 10 * time.Minute
+	// loginFailTTL is how long an unpunished failure is remembered. Without it
+	// the count for an address that failed once and never came back is kept
+	// forever — and since the panel sits on a scanned public port, "addresses
+	// that tried once and never came back" is unbounded. It also makes the
+	// threshold mean what it reads like: five failures within a window, not
+	// five failures ever.
+	loginFailTTL = 30 * time.Minute
 )
+
+// failCount is one address's running tally and when it stops counting.
+type failCount struct {
+	n   int
+	exp time.Time
+}
 
 type loginLimiter struct {
 	mu    sync.Mutex
-	fails map[string]int
+	fails map[string]failCount
 	until map[string]time.Time
 }
 
-var limiter = &loginLimiter{fails: map[string]int{}, until: map[string]time.Time{}}
+var limiter = &loginLimiter{fails: map[string]failCount{}, until: map[string]time.Time{}}
 
 // blocked reports whether ip is currently locked out, and for how much longer.
 func (l *loginLimiter) blocked(ip string) (bool, time.Duration) {
@@ -49,9 +62,35 @@ func (l *loginLimiter) blocked(ip string) (bool, time.Duration) {
 func (l *loginLimiter) fail(ip string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.fails[ip]++
-	if l.fails[ip] >= loginMaxFails {
-		l.until[ip] = time.Now().Add(loginBlockPeriod)
+	l.sweepLocked()
+
+	now := time.Now()
+	f := l.fails[ip]
+	if now.After(f.exp) {
+		f.n = 0 // the previous window lapsed; this failure starts a new one
+	}
+	f.n++
+	f.exp = now.Add(loginFailTTL)
+	l.fails[ip] = f
+	if f.n >= loginMaxFails {
+		l.until[ip] = now.Add(loginBlockPeriod)
+	}
+}
+
+// sweepLocked drops the addresses whose counts and blocks have lapsed, so a
+// scan across many source addresses cannot grow these maps without bound. The
+// caller must hold l.mu.
+func (l *loginLimiter) sweepLocked() {
+	now := time.Now()
+	for ip, f := range l.fails {
+		if now.After(f.exp) {
+			delete(l.fails, ip)
+		}
+	}
+	for ip, t := range l.until {
+		if now.After(t) {
+			delete(l.until, ip)
+		}
 	}
 }
 
@@ -158,7 +197,7 @@ func (s *server) startTwoFA(w http.ResponseWriter) bool {
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name: pendingCookie, Value: token, Path: "/",
-		HttpOnly: true, SameSite: http.SameSiteLaxMode,
+		HttpOnly: true, Secure: Load().HTTPS, SameSite: http.SameSiteLaxMode,
 		MaxAge: int(twoFACodeTTL / time.Second),
 	})
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -183,10 +222,7 @@ func (s *server) handleLogin2FA(w http.ResponseWriter, r *http.Request) {
 		http.SetCookie(w, &http.Cookie{Name: pendingCookie, Value: "", Path: "/", MaxAge: -1})
 		tok := s.sessions.create(clientIP(r))
 		notifyLogin(r)
-		http.SetCookie(w, &http.Cookie{
-			Name: sessionCookie, Value: tok, Path: "/",
-			HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 12 * 3600,
-		})
+		http.SetCookie(w, sessionCookieFor(tok, Load().HTTPS))
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	case dead:
 		http.SetCookie(w, &http.Cookie{Name: pendingCookie, Value: "", Path: "/", MaxAge: -1})

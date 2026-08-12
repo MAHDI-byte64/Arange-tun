@@ -18,7 +18,13 @@ version:
 # cgo is on: the Packet tunnel's pcap engine links against libpcap. The build
 # needs a C compiler and the libpcap development headers (libpcap-dev /
 # libpcap-devel); the installer puts them on the machine.
-build: tidy
+#
+# Deliberately does NOT run `tidy` first. `go mod tidy` rewrites go.mod and
+# go.sum, so building used to be able to add a module checksum as a side effect
+# of compiling — the one file whose whole job is to say which modules are
+# expected, edited by the step that consumes it. Run `make tidy` when the
+# dependencies actually change, and commit the result.
+build:
 	CGO_ENABLED=1 go build -trimpath -ldflags "$(LDFLAGS)" -o $(BIN) .
 
 vendor:

@@ -1,13 +1,18 @@
 package webui
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
 
+func newTestLimiter() *loginLimiter {
+	return &loginLimiter{fails: map[string]failCount{}, until: map[string]time.Time{}}
+}
+
 // Five failures lock the address out; a success wipes the slate.
 func TestLoginLimiter(t *testing.T) {
-	l := &loginLimiter{fails: map[string]int{}, until: map[string]time.Time{}}
+	l := newTestLimiter()
 	ip := "203.0.113.9"
 
 	for i := 0; i < loginMaxFails-1; i++ {
@@ -24,6 +29,56 @@ func TestLoginLimiter(t *testing.T) {
 	l.reset(ip)
 	if b, _ := l.blocked(ip); b {
 		t.Fatal("still blocked after reset")
+	}
+}
+
+// The panel answers on a public port, so it is scanned: addresses that fail
+// once and never come back are the common case, not the exception. Their tallies
+// have to age out, or the two maps grow for as long as the panel runs.
+func TestLoginLimiterForgetsStaleAddresses(t *testing.T) {
+	l := newTestLimiter()
+
+	// A thousand addresses, each one failure, all already past their window.
+	for i := 0; i < 1000; i++ {
+		ip := fmt.Sprintf("198.51.100.%d", i)
+		l.fail(ip)
+		l.mu.Lock()
+		f := l.fails[ip]
+		f.exp = time.Now().Add(-time.Minute)
+		l.fails[ip] = f
+		l.mu.Unlock()
+	}
+
+	// The next failure from anywhere sweeps them.
+	l.fail("203.0.113.1")
+
+	l.mu.Lock()
+	n := len(l.fails)
+	l.mu.Unlock()
+	if n != 1 {
+		t.Fatalf("stale addresses kept: %d entries remain, want 1", n)
+	}
+}
+
+// A failure that has aged out must not count towards the lockout, or the
+// threshold quietly becomes "five failures ever" rather than five in a window.
+func TestLoginLimiterCountsOnlyWithinTheWindow(t *testing.T) {
+	l := newTestLimiter()
+	ip := "203.0.113.7"
+
+	for i := 0; i < loginMaxFails-1; i++ {
+		l.fail(ip)
+	}
+	// Age the tally out, as a quiet hour would.
+	l.mu.Lock()
+	f := l.fails[ip]
+	f.exp = time.Now().Add(-time.Minute)
+	l.fails[ip] = f
+	l.mu.Unlock()
+
+	l.fail(ip)
+	if b, _ := l.blocked(ip); b {
+		t.Fatal("a lapsed tally still counted towards the lockout")
 	}
 }
 

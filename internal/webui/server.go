@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"sort"
 	"strconv"
@@ -28,6 +29,32 @@ var loginHTML []byte
 var dashboardHTML []byte
 
 const sessionCookie = "arange-tun_session"
+
+// sessionLifetime is how long a signed-in browser stays signed in. One constant
+// for both the cookie and the server-side record, so they cannot expire at
+// different times.
+const sessionLifetime = 12 * time.Hour
+
+// sessionCookieFor builds the cookie that carries a session token.
+//
+// Secure is set whenever the panel is serving HTTPS. Without it a browser that
+// has been to the panel over TLS will still hand the token back over plain HTTP
+// — to a downgraded link, or to anything that can get the browser to make one
+// request to the panel's port without TLS — which throws away most of what
+// turning HTTPS on was for. It is deliberately conditional: a panel still on
+// http:// would never receive a Secure cookie back, so setting it
+// unconditionally would lock those installs out entirely.
+func sessionCookieFor(tok string, secure bool) *http.Cookie {
+	return &http.Cookie{
+		Name:     sessionCookie,
+		Value:    tok,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   int(sessionLifetime / time.Second),
+	}
+}
 
 // sessionInfo is what the panel remembers about one signed-in browser — the
 // address and age make the Settings session list meaningful, and the token
@@ -57,7 +84,7 @@ func (s *sessionStore) create(ip string) string {
 			delete(s.sessions, t)
 		}
 	}
-	s.sessions[tok] = &sessionInfo{expires: now.Add(12 * time.Hour), created: now, ip: ip}
+	s.sessions[tok] = &sessionInfo{expires: now.Add(sessionLifetime), created: now, ip: ip}
 	s.mu.Unlock()
 	return tok
 }
@@ -240,7 +267,7 @@ func Serve() error {
 	mux.HandleFunc("/icons/", handleIconPNG)
 	mux.HandleFunc("/sw.js", handleServiceWorker)
 
-	addr := fmt.Sprintf("0.0.0.0:%d", cfg.Port)
+	addr := net.JoinHostPort(cfg.Bind, strconv.Itoa(cfg.Port))
 	httpServer := &http.Server{
 		Addr: addr,
 		// Everything is gzipped on the way out; see compress.go. The panel is
@@ -348,14 +375,7 @@ func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			}
 			tok := s.sessions.create(ip)
 			notifyLogin(r)
-			http.SetCookie(w, &http.Cookie{
-				Name:     sessionCookie,
-				Value:    tok,
-				Path:     "/",
-				HttpOnly: true,
-				SameSite: http.SameSiteLaxMode,
-				MaxAge:   12 * 3600,
-			})
+			http.SetCookie(w, sessionCookieFor(tok, Load().HTTPS))
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
@@ -413,8 +433,8 @@ func (s *server) handlePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	r.ParseForm()
 	pw := strings.TrimSpace(r.FormValue("password"))
-	if len(pw) < 4 || len(pw) > 128 {
-		http.Error(w, "password must be 4–128 characters", http.StatusBadRequest)
+	if len(pw) < MinPasswordLen || len(pw) > 128 {
+		http.Error(w, fmt.Sprintf("password must be %d–128 characters", MinPasswordLen), http.StatusBadRequest)
 		return
 	}
 	if err := s.updatePassword(pw); err != nil {

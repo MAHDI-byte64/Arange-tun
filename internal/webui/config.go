@@ -18,6 +18,17 @@ type Config struct {
 	Password string `json:"password"` // 8-digit login password
 	Port     int    `json:"port"`
 
+	// Bind is the address the panel listens on. It defaults to 0.0.0.0 — every
+	// interface — which is what a panel reached from a laptop has to do, and is
+	// what every existing install already does.
+	//
+	// It is configurable because that default is not right for everybody. A
+	// panel that is only ever opened through an SSH tunnel does not need to
+	// answer the public internet at all, and setting this to 127.0.0.1 takes
+	// the login page off a port that is otherwise scanned continuously. There
+	// is no way to express that without a setting, so there is a setting.
+	Bind string `json:"bind,omitempty"`
+
 	// RemoteToken, when set, grants read-only API access (stats, tunnels,
 	// alerts, Prometheus metrics) with `Authorization: Bearer <token>` — for
 	// a peer panel or a metrics scraper. Empty means no remote access.
@@ -65,8 +76,24 @@ func Load() Config {
 	if c.Port == 0 {
 		c.Port = app.WebUIPort
 	}
+	if c.Bind == "" {
+		c.Bind = DefaultBind
+	}
 	return c
 }
+
+// DefaultBind is the listen address a panel uses when none is configured.
+const DefaultBind = "0.0.0.0"
+
+// MinPasswordLen is the shortest panel password that may be set.
+//
+// It matches the length of the one generated on first run, which is the point:
+// the old floor of four let somebody replace a generated eight-character
+// password with a weaker one and call it a change. Four characters on a login
+// page reachable from the internet is not a password, and the failure lockout
+// buys time rather than safety — it slows an attacker down, it does not make a
+// four-character secret worth guarding.
+const MinPasswordLen = 8
 
 // Save persists the config (0600, root only).
 func Save(c Config) error {

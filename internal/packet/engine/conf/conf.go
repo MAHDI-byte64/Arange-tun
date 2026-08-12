@@ -3,11 +3,11 @@ package conf
 import (
 	"fmt"
 	"os"
-	"github.com/mahdi-byte64/arange-tun/internal/packet/engine/flog"
 	"slices"
 	"strings"
 
 	"github.com/goccy/go-yaml"
+	"github.com/mahdi-byte64/arange-tun/internal/packet/engine/flog"
 )
 
 type Conf struct {

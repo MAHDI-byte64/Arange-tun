@@ -52,9 +52,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const protoVersion byte = 1 // rathole PROTO_V1
+
 const (
-	protoVersion byte = 1 // rathole PROTO_V1
-	hashWidth         = 32
+	hashWidth = 32
 
 	handshakeTimeout  = 10 * time.Second
 	heartbeatInterval = 30 * time.Second

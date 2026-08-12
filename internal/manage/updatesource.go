@@ -149,7 +149,14 @@ func buildFromSource(logf func(string)) error {
 		// hard stop that never reaches the mirrors. "|" makes it fall through on
 		// ANY error, so a blocked proxy is skipped instead of failing the build.
 		"GOPROXY=https://goproxy.cn|https://mirror-go.runflare.com|https://proxy.golang.org|direct",
-		"GOSUMDB=off",
+		// The checksum database stays on. It used to be switched off here,
+		// which meant every module arrived from a third-party mirror on trust
+		// alone — in a build whose output replaces the binary running every
+		// tunnel on this machine. Leaving it on costs nothing: go.sum in the
+		// downloaded source pins every module the build needs, and Go consults
+		// the database only for a module go.sum does not already cover, so a
+		// normal build never reaches for it. One that would have to now fails
+		// loudly instead of trusting whichever mirror answered.
 		"GOTOOLCHAIN=local",
 		"HOME="+app.InstallDir,
 		"GOPATH="+gopath,
@@ -235,7 +242,7 @@ func goBinary() (string, error) {
 	if p := "/usr/local/go/bin/go"; fileExists(p) {
 		return p, nil
 	}
-	return "", fmt.Errorf("Go toolchain not found — cannot rebuild from source; re-run the installer, which installs Go")
+	return "", fmt.Errorf("no Go toolchain found — cannot rebuild from source; re-run the installer, which installs Go")
 }
 
 // downloadSource fetches the main-branch source tarball into dest, trying the

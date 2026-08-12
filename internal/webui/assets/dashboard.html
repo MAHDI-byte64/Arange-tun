@@ -1141,7 +1141,7 @@
                 onclick="savePanelCert()" data-i18n>Apply certificate</button>
 
         <p class="acclabel" data-i18n>Password</p>
-        <label for="np" data-i18n>New password (4–128 characters)</label>
+        <label for="np" data-i18n>New password (8–128 characters)</label>
         <input id="np" type="password" autocomplete="new-password" placeholder="New password" maxlength="128">
         <label for="np2" data-i18n>Confirm password</label>
         <input id="np2" type="password" autocomplete="new-password" placeholder="Repeat password" maxlength="128">
@@ -1883,7 +1883,7 @@ const FA={
   "Port &amp; password":"پورت و رمز عبور",
   "Port, certificate &amp; password":"پورت، گواهی و رمز عبور",
   "The panel restarts on the new port.":"پنل روی پورت جدید دوباره راه‌اندازی می‌شود.",
-  "New password (4–128 characters)":"رمز عبور جدید (۴ تا ۱۲۸ نویسه)",
+  "New password (8–128 characters)":"رمز عبور جدید (۸ تا ۱۲۸ نویسه)",
   "Confirm password":"تکرار رمز عبور",
   "Bot token":"توکن ربات",
   "from @BotFather":"از @BotFather",
@@ -4251,7 +4251,7 @@ function openSettings(){
 function closeSettings(){ $('settings').classList.remove('on'); }
 async function savePassword(){
   const a=$('np').value, b=$('np2').value, msg=$('pwmsg');
-  if(a.length<4||a.length>128){ msg.className='msg err'; msg.textContent='Password must be 4–128 characters.'; return; }
+  if(a.length<8||a.length>128){ msg.className='msg err'; msg.textContent='Password must be 8–128 characters.'; return; }
   if(a!==b){ msg.className='msg err'; msg.textContent='Passwords do not match.'; return; }
   try{
     const body=new URLSearchParams({password:a});

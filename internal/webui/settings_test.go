@@ -72,3 +72,15 @@ func TestMaskTokenNeverLeaksTheSecret(t *testing.T) {
 		t.Error("an unset token should mask to nothing at all")
 	}
 }
+
+// The listen address is configurable, but every install that never set one has
+// to keep answering exactly where it did before.
+func TestBindDefaultsToEveryInterface(t *testing.T) {
+	var c Config // what an older config decodes to: no bind key at all
+	if c.Bind != "" {
+		t.Fatalf("the zero Config already carries a bind address (%q)", c.Bind)
+	}
+	if DefaultBind != "0.0.0.0" {
+		t.Errorf("DefaultBind = %q — an upgrade would move the panel off its address", DefaultBind)
+	}
+}

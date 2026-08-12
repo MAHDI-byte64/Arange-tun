@@ -598,9 +598,9 @@ func changePanelPort() {
 // setCustomPassword prompts for a custom web-panel password and applies it.
 func setCustomPassword() {
 	fmt.Println()
-	pw := tui.Prompt("New password (4–128 chars, letters/digits/symbols): ")
-	if len(pw) < 4 || len(pw) > 128 {
-		tui.Error("Password must be between 4 and 128 characters.")
+	pw := tui.Prompt(fmt.Sprintf("New password (%d–128 chars, letters/digits/symbols): ", webui.MinPasswordLen))
+	if len(pw) < webui.MinPasswordLen || len(pw) > 128 {
+		tui.Error(fmt.Sprintf("Password must be between %d and 128 characters.", webui.MinPasswordLen))
 		tui.PressEnter()
 		return
 	}

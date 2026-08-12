@@ -40,9 +40,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-/tmp}")" 2>/dev/null && pwd || ec
 # purpose: with commas Go only advances to the next proxy on a 404/410, so a
 # 403 (what proxy.golang.org returns from Iran) is a hard stop that never
 # reaches the mirrors. "|" makes it fall through on ANY error.
+#
+# The checksum database is deliberately NOT switched off. It used to be, which
+# meant every dependency arrived from a third-party mirror on trust alone. It
+# does not need to be off: go.sum in this repo pins every module the build uses,
+# and Go consults the checksum database only for a module that go.sum does not
+# already cover — so a normal build never contacts it, and a module that
+# somehow is not covered fails loudly instead of being taken from a mirror
+# unverified. That is the behaviour we want on exactly the networks this runs on.
 export GOTOOLCHAIN=local
 export GOPROXY="https://goproxy.cn|https://mirror-go.runflare.com|https://proxy.golang.org|direct"
-export GOSUMDB=off
 
 if [[ $EUID -ne 0 ]]; then err "Please run as root (sudo)."; exit 1; fi
 
@@ -62,18 +69,82 @@ fetch() {
 # ---------------------------------------------------------------------------
 # Go toolchain — installed automatically when the machine has none new enough.
 # ---------------------------------------------------------------------------
+# Where a Go toolchain may come from. Iran-reachable mirrors first, because
+# go.dev/dl often 404s or geoblocks from Iran.
+GO_MIRRORS=(
+  "https://mirrors.aliyun.com/golang"
+  "https://mirrors.ustc.edu.cn/golang"
+  "https://golang.google.cn/dl"
+  "https://go.dev/dl"
+)
+
 download_go() {
-  local file="go${GO_VERSION}.linux-${ARCH}.tar.gz" out="$1"
-  # Iran-reachable mirrors first (go.dev/dl often 404s or geoblocks from Iran).
-  for u in "https://mirrors.aliyun.com/golang/${file}" \
-           "https://mirrors.ustc.edu.cn/golang/${file}" \
-           "https://golang.google.cn/dl/${file}" \
-           "https://go.dev/dl/${file}"; do
-    info "Trying ${u}"
-    curl -fsSL --connect-timeout 15 "$u" -o "$out" && return 0
+  local file="go${GO_VERSION}.linux-${ARCH}.tar.gz" out="$1" base
+  for base in "${GO_MIRRORS[@]}"; do
+    info "Trying ${base}/${file}"
+    curl -fsSL --connect-timeout 15 "${base}/${file}" -o "$out" && return 0
     warn "source failed, trying next..."
   done
   return 1
+}
+
+# go_agreed_sha256 <file> — the SHA256 that at least two of the mirrors publish
+# for <file>, or nothing when they cannot agree.
+#
+# The compiler that builds the binary this server will run as root is the last
+# thing that should arrive on trust. It used to: whichever mirror answered first
+# handed over eighty megabytes of toolchain and nothing checked what was in it.
+# TLS proves only that the bytes came from that mirror unaltered — it says
+# nothing about the mirror itself, and these are third-party mirrors chosen
+# because they are reachable from a censored network, not because they are
+# trusted.
+#
+# So the checksum is taken from a different source than the tarball. Each mirror
+# publishes a .sha256 beside the archive; two of them agreeing on a value is
+# enough, because a single hostile mirror can only cast one vote and cannot make
+# an honest mirror agree with it. It is a few hundred bytes of extra traffic.
+go_agreed_sha256() {
+  local file="$1" base sum
+  # Note the `if` rather than a `[[ ]] && echo`: the loop feeds a pipeline, and
+  # under `set -o pipefail` a trailing failed test would make the whole pipeline
+  # — and with `set -e`, the script — exit silently whenever the last mirror in
+  # the list happened not to answer.
+  for base in "${GO_MIRRORS[@]}"; do
+    sum="$(curl -fsSL --connect-timeout 10 --max-time 30 "${base}/${file}.sha256" 2>/dev/null \
+      | tr -d '[:space:]' | tr 'A-F' 'a-f')" || true
+    if [[ "$sum" =~ ^[0-9a-f]{64}$ ]]; then echo "$sum"; fi
+  done | sort | uniq -c | sort -rn | awk '$1 >= 2 { print $2; exit }'
+}
+
+# verify_go_tarball <path> — abort unless the archive hashes to what the
+# mirrors agree it should. GO_SHA256 in the environment pins the value instead,
+# for an operator who has the official checksum and does not want to rely on
+# mirrors agreeing.
+verify_go_tarball() {
+  local out="$1" file="go${GO_VERSION}.linux-${ARCH}.tar.gz" want got
+  if [[ -n "${GO_SHA256:-}" ]]; then
+    want="$(echo "$GO_SHA256" | tr -d '[:space:]' | tr 'A-F' 'a-f')"
+  else
+    info "Checking the toolchain against the mirrors' published checksums..."
+    want="$(go_agreed_sha256 "$file")" || want=""
+  fi
+  if [[ ! "$want" =~ ^[0-9a-f]{64}$ ]]; then
+    err "Could not establish a trusted checksum for ${file}: fewer than two"
+    err "mirrors published one, or they disagreed. Refusing to build with an"
+    err "unverified Go toolchain. Either install Go ${GO_VERSION} or newer"
+    err "yourself and re-run this script, or re-run it with the official"
+    err "checksum: GO_SHA256=<sha256> bash install.sh"
+    exit 1
+  fi
+  got="$(sha256sum "$out" | awk '{print $1}')"
+  if [[ "$got" != "$want" ]]; then
+    err "Checksum mismatch for ${file}."
+    err "  expected ${want}"
+    err "  got      ${got}"
+    err "The download was corrupted or the mirror served something else."
+    exit 1
+  fi
+  info "Toolchain checksum verified."
 }
 # go_new_enough accepts a go only if it satisfies the go.mod minimum (1.24.4).
 # Checking the minor alone is not enough: with GOTOOLCHAIN=local a go1.24.0..3
@@ -92,6 +163,7 @@ ensure_go() {
   command -v go >/dev/null 2>&1 && go_new_enough "$(command -v go)" && { info "Go: $(go version)"; return; }
   [[ -x /usr/local/go/bin/go ]] && go_new_enough /usr/local/go/bin/go && { export PATH="/usr/local/go/bin:$PATH"; info "Go: $(go version)"; return; }
   warn "Installing Go ${GO_VERSION}..."; download_go /tmp/go-at.tgz || { err "Could not obtain Go."; exit 1; }
+  verify_go_tarball /tmp/go-at.tgz
   rm -rf /usr/local/go && tar -C /usr/local -xzf /tmp/go-at.tgz; export PATH="/usr/local/go/bin:$PATH"; info "$(go version)"
 }
 

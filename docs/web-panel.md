@@ -30,5 +30,41 @@ also cover update, panel port and password). Open the port first:
 sudo ufw allow 7777
 ```
 
+A password set by hand must be at least **8 characters** — the same length as
+the one generated on first run.
+
+## Where it listens
+
+By default the panel answers on every interface (`0.0.0.0`), which is what you
+want when you open it from a laptop. If you only ever reach it through an SSH
+tunnel, it does not need to answer the internet at all. Set `bind` in
+`/etc/arange-tun/webui.json` and restart the panel:
+
+```json
+{ "bind": "127.0.0.1" }
+```
+
+```bash
+sudo systemctl restart arange-tun-webui
+```
+
+Then reach it over a forwarded port from your own machine:
+
+```bash
+ssh -L 7777:127.0.0.1:7777 root@your-server
+```
+
+The login page is then not on a public port at all, which is worth more than any
+password. Leave `bind` unset to keep the current behaviour.
+
+## HTTPS
+
+`https: true` in the same file serves the panel over TLS — self-signed against
+the server's IP, or a real Let's Encrypt certificate when `tls_domain` is set.
+Worth doing if you reach the panel over the open internet: without it the
+password and the session cookie cross the network in the clear. The session
+cookie is marked `Secure` as soon as HTTPS is on, so it is never sent back
+over a plain connection.
+
 ---
 [← Back to the main README](../README.md)

@@ -231,7 +231,7 @@ func validateACME(domain string, panelPort int) error {
 	// Before the general check, because typing the server's own address here is
 	// the likely mistake and "not a valid domain name" would not explain it.
 	if net.ParseIP(domain) != nil {
-		return fmt.Errorf("Let's Encrypt cannot issue a certificate for an IP address — " +
+		return fmt.Errorf("cannot issue a Let's Encrypt certificate for an IP address — " +
 			"use a domain, or choose the self-signed option, which works on a bare IP")
 	}
 	if !validHostname(domain) {

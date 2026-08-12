@@ -2,6 +2,62 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.21.0 — 2026-08-12
+
+**A security and housekeeping pass.** Nothing here changes what a tunnel does;
+all of it is about what the machine around the tunnel gives away, trusts, or
+keeps forever.
+
+- **The panel no longer asks about your peers in the clear.** Looking up where a
+  tunnel's far end is used three geolocation providers, and the first one in
+  line spoke plain HTTP. The addresses being asked about are the foreign servers
+  this node tunnels to, and the panel asks about them every few seconds — so on
+  the one network the tunnels exist to get past, that was a running, readable
+  announcement of exactly where this machine connects. Every provider is HTTPS
+  now, the plaintext one is gone, and a test fails the build if a future one
+  is not.
+- **A failed lookup is remembered.** Only successes were cached, so an address
+  nobody could answer for was re-asked on every panel refresh: three
+  connections, each waiting out its own six-second timeout, per tunnel, forever
+  — worst on exactly the blocked networks where no provider answers. Misses are
+  now cached too, briefly, and the cache has a ceiling.
+- **The installer verifies the Go toolchain it downloads.** It fetches ~80 MB of
+  compiler from whichever mirror answers first, and then builds the binary this
+  server runs as root with it — previously without checking a single byte. TLS
+  proves the bytes came from that mirror unaltered; it says nothing about the
+  mirror, and these are third-party mirrors chosen for being reachable from a
+  censored network, not for being trusted. The checksum now has to come from a
+  different source than the archive: two mirrors publishing the same hash is
+  enough, since one hostile mirror cannot make an honest one agree with it.
+  `GO_SHA256=<hash>` pins it by hand instead.
+- **Module checksums are verified again.** Both the installer and the panel's
+  build-from-source updater ran with `GOSUMDB=off`, so every dependency arrived
+  from a third-party proxy on trust alone. It never needed to be off: `go.sum`
+  pins every module the build uses, and Go reaches for the checksum database
+  only for something `go.sum` does not already cover — so a normal build never
+  contacts it, and anything else now fails loudly instead of being taken on
+  faith.
+- **The session cookie is `Secure` on an HTTPS panel.** Turning HTTPS on
+  encrypted the connection but left the browser willing to hand the session
+  token back over plain HTTP. It is conditional on purpose: a panel still on
+  `http://` must not be issued a cookie the browser would then refuse to return.
+- **The panel can be taken off the public internet.** A new `bind` key in
+  `webui.json` sets the listen address; `127.0.0.1` puts the panel behind an SSH
+  tunnel and off a port that is otherwise scanned continuously. Unset means
+  every interface, exactly as before.
+- **The failed-login tally forgets.** Addresses that failed once and never came
+  back were counted forever, which on a public port is an unbounded list, and
+  quietly turned "five failures" into "five failures ever" rather than five
+  within a window. Tallies now lapse and are swept.
+- **A hand-set panel password must be at least 8 characters**, matching the
+  length of the one generated on first run. Four was never a password.
+- **Removed the updater's dead release-download path.** Updates have rebuilt
+  from source for some time, but the code and comments describing an
+  archive-and-checksum download were still there, describing something that no
+  longer happened. Also dropped an unused websocket adapter, made `make build`
+  stop rewriting `go.mod`/`go.sum` behind your back, and synced the `VERSION`
+  file, which had drifted three releases behind.
+
 ## v1.20.0 — 2026-08-12
 
 **A performance pass over the panel.** The dashboard refreshes its stats every
