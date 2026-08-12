@@ -2,6 +2,26 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.19.2 — 2026-08-12
+
+**Fixed the Packet tunnel always showing online.** A packet tunnel reported
+"online" purely because its service was running, so an exit node abroad stayed
+green forever — even after its client had been stopped days earlier. Packet
+deliberately has no socket in the kernel's tables, so nothing outside the engine
+could tell; the engine could, and now says so:
+
+- The **server** records every client connection it accepts (counted, since one
+  client opens several) and publishes it to the tunnel's metrics snapshot.
+- The **client** sends a real **PPING** and waits for the **PPONG** — a full
+  round trip proves the whole path, not just that the process is alive.
+- The panel and health check read that instead of assuming. A tunnel that has
+  only just started still reads as online until it has something to report, so a
+  fresh tunnel does not flash red for its first half minute.
+
+Also fixed a busy-wait in the packet client: a failed dial retried with no pause
+at all, spinning the CPU (and spawning a goroutine per turn) for as long as the
+server stayed unreachable. It now backs off between attempts.
+
 ## v1.19.1 — 2026-08-12
 
 **BTC donation in the panel's Support dialog.** The heart button (bottom-right)

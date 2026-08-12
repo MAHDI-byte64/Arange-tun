@@ -67,11 +67,32 @@ func tunnelHealthWith(t Tunnel, pairs [][2]string) Health {
 		h.Connected = true
 		h.State, h.Detail = "online", "running"
 	case t.Transport == "packet":
-		// Packet injects raw TCP packets below the kernel stack, so the tunnel
-		// has no socket in the kernel's TCP table to observe — like WireGuard,
-		// a running service is the only signal available here.
-		h.Connected = true
-		h.State, h.Detail = "online", "running"
+		// Packet injects raw TCP packets below the kernel stack, so there is no
+		// socket in the kernel's tables to observe — which is why this used to
+		// report "running" and leave every packet tunnel green forever, even
+		// after its peer had been stopped. The engine does know: the server
+		// records the clients it accepted, the client pings the server, and both
+		// publish the answer into the tunnel's metrics snapshot. Ask that.
+		//
+		// Not knowing yet is not the same as knowing there is nobody there — a
+		// tunnel that has only just started has written no snapshot — so an
+		// unknown answer keeps the old optimistic reading.
+		if connected, known := reportedPeer(app.ConfigDir, t.Name); known {
+			h.Connected = connected
+			if connected {
+				h.State, h.Detail = "online", "peer connected"
+			} else {
+				h.State = "offline"
+				if t.Role == "server" {
+					h.Detail = "running, but no client is connected"
+				} else {
+					h.Detail = "running, but the server is not answering"
+				}
+			}
+		} else {
+			h.Connected = true
+			h.State, h.Detail = "online", "running"
+		}
 	case t.Transport == "ssh":
 		// SSH is a VPN egress; its liveness is the SSH connection the engine
 		// holds, not an observable reverse-tunnel socket, so a running service
@@ -91,7 +112,7 @@ func tunnelHealthWith(t Tunnel, pairs [][2]string) Health {
 		// somewhere that knew the truth, while the light stayed on because this
 		// did not. The transport does know, and writes it down — so ask that.
 		if isDatagram(t.Transport) && t.Role == "server" {
-			if connected, known := datagramServerPeer(app.ConfigDir, t.Name); known {
+			if connected, known := reportedPeer(app.ConfigDir, t.Name); known {
 				h.Connected = connected
 			}
 		}
@@ -110,29 +131,30 @@ func tunnelHealthWith(t Tunnel, pairs [][2]string) Health {
 	return h
 }
 
-// datagramPeerWindow is how long a snapshot's peer field stays meaningful. The
+// peerWindow is how long a snapshot's peer field stays meaningful. The
 // transport rewrites the file every 30 seconds, so anything much older than a
 // few intervals says nothing about now.
-const datagramPeerWindow = 90 * time.Second
+const peerWindow = 90 * time.Second
 
-// datagramServerPeer reports whether a datagram server currently has a peer,
-// and whether that could be determined at all.
+// reportedPeer reports whether a tunnel currently has a peer, and whether that
+// could be determined at all.
 //
-// A UDP listener is one unconnected socket and keeps no record of who is
-// talking to it, so the kernel cannot answer this — which is why it used to go
-// unanswered. The transport can, and records the peer in the tunnel's metrics
-// snapshot, clearing it when the control channel drops.
+// It is for the transports the kernel cannot answer for: a UDP listener is one
+// unconnected socket that keeps no record of who is talking to it, and a packet
+// tunnel deliberately has no kernel socket at all. Each of those engines does
+// know, and records the peer in the tunnel's metrics snapshot, clearing it when
+// the far end goes away.
 //
 // Not knowing is reported separately from knowing there is nobody there. A
 // tunnel that has only just started has not written a snapshot yet, and calling
 // that "no peer" would show every freshly started tunnel as down for its first
 // half minute.
-func datagramServerPeer(dir, name string) (connected, known bool) {
+func reportedPeer(dir, name string) (connected, known bool) {
 	snap, err := metrics.Read(dir, name)
 	if err != nil {
 		return false, false // no snapshot yet
 	}
-	if time.Since(snap.Taken) > datagramPeerWindow {
+	if time.Since(snap.Taken) > peerWindow {
 		return false, false // too old to mean anything either way
 	}
 	return snap.Peer != "", true

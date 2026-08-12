@@ -16,12 +16,15 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/mahdi-byte64/arange-tun/config"
+	"github.com/mahdi-byte64/arange-tun/internal/metrics"
 	"github.com/mahdi-byte64/arange-tun/internal/packet/engine/client"
 	"github.com/mahdi-byte64/arange-tun/internal/packet/engine/conf"
 	"github.com/mahdi-byte64/arange-tun/internal/packet/engine/flog"
@@ -57,8 +60,73 @@ func RunServer(ctx context.Context, pc *config.PacketConfig, logger *logrus.Logg
 	}
 	logger.Infof("packet server started — exit node listening on :%d (iface %s)", port, cfg.Network.Interface_)
 
+	go publishServerPeer(ctx, srv)
+
 	<-ctx.Done()
 	logger.Println("shutting down packet server...")
+}
+
+// peerPollInterval is how often the adapter republishes the connection state.
+// The metrics snapshot is written every 30s and read with a 90s staleness
+// window, so polling faster than the snapshot would only burn wakeups; polling
+// much slower would leave the panel showing a peer that had already gone.
+const peerPollInterval = 15 * time.Second
+
+// publishServerPeer keeps the tunnel's metrics snapshot in step with who is
+// actually connected.
+//
+// Without this the panel had no way to tell a working exit node from an idle
+// one: the raw session leaves no socket for the kernel to report, so "the
+// service is running" was the only signal and every packet server showed green
+// forever — including one whose client had been stopped days ago. The engine
+// knows, because it accepted the connection; this copies that answer somewhere
+// the panel can read it.
+func publishServerPeer(ctx context.Context, srv *server.Server) {
+	ticker := time.NewTicker(peerPollInterval)
+	defer ticker.Stop()
+	for {
+		if peers := srv.Peers(); len(peers) > 0 {
+			// One address is all the snapshot holds. Sorted so a server with
+			// several clients reports a stable one rather than flapping between
+			// them on every tick.
+			sort.Strings(peers)
+			metrics.ReportPeer(peers[0])
+		} else {
+			metrics.ClearPeer()
+		}
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// publishClientPeer does the same for the entry node, using a real round trip.
+//
+// The client's connections are created once at startup and re-dialed only when
+// something asks to use one, so their existence is not evidence that the server
+// is still there. A PPING that comes back is.
+func publishClientPeer(ctx context.Context, clnt *client.Client, serverAddr string) {
+	ticker := time.NewTicker(peerPollInterval)
+	defer ticker.Stop()
+	for {
+		// Bounded well inside the poll interval: a ping that has not been
+		// answered by now is a ping that is not going to be.
+		pingCtx, cancel := context.WithTimeout(ctx, peerPollInterval/2)
+		err := clnt.Ping(pingCtx)
+		cancel()
+		if err == nil {
+			metrics.ReportPeer(serverAddr)
+		} else {
+			metrics.ClearPeer()
+		}
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // RunClient runs the Iran entry node until ctx ends.
@@ -105,6 +173,8 @@ func RunClient(ctx context.Context, pc *config.PacketConfig, logger *logrus.Logg
 		}
 	}
 	logger.Infof("packet client started — entry node -> %s:%d (iface %s)", serverIP, port, cfg.Network.Interface_)
+
+	go publishClientPeer(ctx, clnt, net.JoinHostPort(serverIP, strconv.Itoa(port)))
 
 	<-ctx.Done()
 	logger.Println("shutting down packet client...")

@@ -130,7 +130,7 @@ func TestDatagramServerWithNoPeerReportsOffline(t *testing.T) {
 		t.Run(tr, func(t *testing.T) {
 			dir := stageSnapshot(t, "t", "", time.Now())
 
-			connected, known := datagramServerPeer(dir, "t")
+			connected, known := reportedPeer(dir, "t")
 			if !known {
 				t.Fatal("a fresh snapshot was treated as unreadable")
 			}
@@ -144,7 +144,7 @@ func TestDatagramServerWithNoPeerReportsOffline(t *testing.T) {
 func TestDatagramServerWithAPeerReportsOnline(t *testing.T) {
 	dir := stageSnapshot(t, "t", "203.0.113.9:41234", time.Now())
 
-	connected, known := datagramServerPeer(dir, "t")
+	connected, known := reportedPeer(dir, "t")
 	if !known || !connected {
 		t.Errorf("a reported peer was not read back: connected=%v known=%v", connected, known)
 	}
@@ -156,13 +156,13 @@ func TestDatagramServerWithAPeerReportsOnline(t *testing.T) {
 func TestUnknownIsNotTheSameAsDisconnected(t *testing.T) {
 	dir := stageSnapshot(t, "other", "", time.Now()) // nothing for "t"
 
-	if _, known := datagramServerPeer(dir, "t"); known {
+	if _, known := reportedPeer(dir, "t"); known {
 		t.Error("a missing snapshot was treated as a definite answer")
 	}
 
 	// The same goes for a snapshot too old to describe now.
 	dir = stageSnapshot(t, "t", "203.0.113.9:41234", time.Now().Add(-10*time.Minute))
-	if _, known := datagramServerPeer(dir, "t"); known {
+	if _, known := reportedPeer(dir, "t"); known {
 		t.Error("a stale snapshot was treated as current")
 	}
 }

@@ -30,10 +30,28 @@ func (c *Client) newConn() (tnet.Conn, error) {
 	return tc.conn, nil
 }
 
+// retryBackoff is how long newStrm waits after a failed attempt.
+//
+// It retried with no pause at all, which is fine while the server is answering
+// — the loop runs once — and pathological when it is not: a dial that fails
+// immediately (no route, port unreachable) span this loop as fast as the CPU
+// allowed, spawning a sendTCPF goroutine per turn, for as long as the caller
+// waited. A short sleep costs nothing on the working path and turns the broken
+// one from a busy-wait into a poll.
+const retryBackoff = 250 * time.Millisecond
+
 func (c *Client) newStrm(ctx context.Context) (tnet.Strm, error) {
-	for {
+	for attempt := 0; ; attempt++ {
 		if err := ctx.Err(); err != nil {
 			return nil, err
+		}
+		if attempt > 0 {
+			// Interruptible: a caller that gave up should not wait out the sleep.
+			select {
+			case <-time.After(retryBackoff):
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
 		}
 		conn, err := c.newConn()
 		if err != nil {
