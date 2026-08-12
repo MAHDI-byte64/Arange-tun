@@ -1279,9 +1279,15 @@
     <h3 id="suptitle" data-i18n>Support Arange-tun</h3>
     <p data-i18n>Free & open-source. If it helps you, a star on GitHub means a lot. 🙏</p>
     <div class="actions" style="margin-bottom:16px">
-      <button class="btn-primary" onclick="window.open('https://github.com/mahdi-byte64','_blank','noopener')">
+      <button class="btn-primary" onclick="window.open('https://github.com/mahdi-byte64/Arange-tun','_blank','noopener')">
         <svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px;display:inline;vertical-align:-3px;margin-right:6px"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.9a3.4 3.4 0 00-1-2.6c3-.3 6.5-1.5 6.5-7A5.4 5.4 0 0020 4.8 5 5 0 0019.9 1S18.7.6 16 2.5a13.4 13.4 0 00-7 0C6.3.6 5.1 1 5.1 1A5 5 0 005 4.8 5.4 5.4 0 003.5 8.5c0 5.5 3.5 6.7 6.5 7a3.4 3.4 0 00-1 2.6V22"/></svg>GitHub
       </button>
+    </div>
+    <label for="sup-btc" data-i18n>Donate — Bitcoin (BTC)</label>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input id="sup-btc" type="text" readonly spellcheck="false" value="bc1qn7fp90l9yr8krhyenxddujqvmlmfzpjx4m3tty"
+        style="flex:1;min-width:0;font-family:ui-monospace,Menlo,monospace;font-size:12px" onclick="this.select()">
+      <button class="btn-ghost" type="button" onclick="copyText($('sup-btc').value,this)" data-i18n>Copy</button>
     </div>
     <div class="actions" style="margin-top:18px">
       <button class="btn-ghost" onclick="closeSupport()" data-i18n>Close</button>
@@ -1830,6 +1836,7 @@ const FA={
   // header & menu
   "Menu":"منو","Settings":"تنظیمات","Alerts":"هشدارها","Health check":"بررسی سلامت",
   "Support Arange-tun":"حمایت از آرنج‌تان","Log out":"خروج",
+  "Donate — Bitcoin (BTC)":"دونیت — بیت‌کوین (BTC)",
   "Uptime":"مدت روشن بودن","IPv4":"IPv4","IPv6":"IPv6","OS":"سیستم‌عامل",
   "Location":"موقعیت","ISP":"سرویس‌دهنده","Tunnels":"تونل‌ها","Load":"بار سیستم",
   "Download":"دانلود","Upload":"آپلود","Total In":"مجموع ورودی","Total Out":"مجموع خروجی",

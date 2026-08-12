@@ -2,6 +2,12 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.19.1 — 2026-08-12
+
+**BTC donation in the panel's Support dialog.** The heart button (bottom-right)
+now shows the Bitcoin address alongside the GitHub link, with a one-click copy —
+the same address that is in the CLI footer.
+
 ## v1.19.0 — 2026-08-12
 
 **Removed the Spoof tunnel.** It added a lot of surface for a niche case; the
