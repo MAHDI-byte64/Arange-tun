@@ -78,7 +78,7 @@ func tunnelHealthy(t Tunnel, pairs [][2]string) bool {
 	// whose liveness is the SSH connection the engine holds — neither has a
 	// kernel socket to observe, so a running service is treated as healthy (as
 	// with WireGuard) rather than restarted on a check that can never succeed.
-	if t.Transport == "packet" || t.Transport == "ssh" || t.Transport == "spoof" {
+	if t.Transport == "packet" || t.Transport == "ssh" {
 		return true
 	}
 

@@ -335,12 +335,6 @@
   .modal code{display:inline-block;margin-top:6px;padding:8px 10px;border-radius:8px;background:rgba(255,255,255,.06);
     border:1px solid var(--stroke);font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--red-soft)}
   .flag{font-size:17px;line-height:1}
-  .sp-tabs{display:flex;gap:6px;margin:12px 0 16px;flex-wrap:wrap}
-  .sp-tab{padding:7px 13px;border-radius:8px;background:var(--bg2);color:var(--muted);border:1px solid var(--stroke);cursor:pointer;font-size:13px}
-  .sp-tab.on{background:var(--accent);color:#fff;border-color:transparent}
-  .sp-inst{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 11px;border:1px solid var(--stroke);border-radius:8px;margin-bottom:8px;flex-wrap:wrap}
-  .sp-inst .n{font-weight:600}
-  .sp-inst .st{font-size:11.5px;color:var(--muted2)}
   .modal .box{max-height:88vh;overflow-y:auto}
   .modal .hint{color:var(--muted2);font-weight:400}
   .sel{width:100%;padding:12px 14px;font-size:14px;color:var(--txt);background:rgba(255,255,255,.05);
@@ -1516,109 +1510,6 @@
   </div>
 </div>
 
-<div class="modal" id="spoofpanel" onclick="if(event.target===this)closeSpoofPanel()">
-  <div class="box" role="dialog" aria-modal="true" aria-labelledby="sptitle" style="width:min(96vw,720px)">
-    <h3 id="sptitle" data-i18n>Spoof — management</h3>
-    <p data-i18n>A UDP pipe carried inside packets with a forged source IP. It only works where the network allows source-IP spoofing — use the Tester first to check your servers.</p>
-
-    <div class="sp-tabs">
-      <button type="button" class="sp-tab on" id="sp-tab-list" onclick="spTab('list')" data-i18n>Instances</button>
-      <button type="button" class="sp-tab" id="sp-tab-new" onclick="spTab('new')" data-i18n>New</button>
-      <button type="button" class="sp-tab" id="sp-tab-test" onclick="spTab('test')" data-i18n>Tester</button>
-      <button type="button" class="sp-tab" id="sp-tab-scan" onclick="spTab('scan')" data-i18n>IP scanner</button>
-    </div>
-
-    <div id="sp-pane-list" class="sp-pane">
-      <div id="sp-instances"></div>
-    </div>
-
-    <div id="sp-pane-new" class="sp-pane" style="display:none">
-      <label for="sp-role" data-i18n>Side</label>
-      <select id="sp-role" class="sel" onchange="spRoleSync()">
-        <option value="server" data-i18n>🌍 Server — forwards to a local service abroad</option>
-        <option value="client" data-i18n>🇮🇷 Client — local UDP pipe to the server</option>
-      </select>
-      <label for="sp-name" data-i18n>Tunnel name</label>
-      <input id="sp-name" type="text" autocomplete="off" spellcheck="false" placeholder="spoof-out" maxlength="40">
-      <label for="sp-transport" data-i18n>Carrier</label>
-      <select id="sp-transport" class="sel">
-        <option value="udp" data-i18n>UDP (default)</option>
-        <option value="tcp" data-i18n>TCP (SYN/PSH)</option>
-        <option value="icmp" data-i18n>ICMP (echo)</option>
-      </select>
-      <label for="sp-key" data-i18n>Shared key (optional — generated if empty)</label>
-      <input id="sp-key" type="text" autocomplete="off" spellcheck="false" placeholder="">
-      <label for="sp-spoofip" data-i18n>Our forged source IP (spoof_ip)</label>
-      <input id="sp-spoofip" type="text" autocomplete="off" spellcheck="false" placeholder="1.2.3.4">
-      <label for="sp-peerspoofip" data-i18n>Peer's forged source IP (peer_spoof_ip)</label>
-      <input id="sp-peerspoofip" type="text" autocomplete="off" spellcheck="false" placeholder="5.6.7.8">
-
-      <div id="sp-server-fields">
-        <label for="sp-listenport" data-i18n>Listen port (receives spoofed packets)</label>
-        <input id="sp-listenport" type="number" min="1" max="65535" step="1" placeholder="8090">
-        <label for="sp-forward" data-i18n>Forward to (the real local service)</label>
-        <input id="sp-forward" type="text" autocomplete="off" spellcheck="false" placeholder="127.0.0.1:51820">
-        <label for="sp-clientip" data-i18n>Client's real IP</label>
-        <input id="sp-clientip" type="text" autocomplete="off" spellcheck="false" placeholder="client public IP">
-        <label for="sp-clientport" data-i18n>Client's receive port</label>
-        <input id="sp-clientport" type="number" min="1" max="65535" step="1" placeholder="5001">
-      </div>
-      <div id="sp-client-fields">
-        <label for="sp-listen" data-i18n>Local listen (the app connects here)</label>
-        <input id="sp-listen" type="text" autocomplete="off" spellcheck="false" placeholder="127.0.0.1:51820">
-        <label for="sp-serverip" data-i18n>Server's real IP</label>
-        <input id="sp-serverip" type="text" autocomplete="off" spellcheck="false" placeholder="server public IP">
-        <label for="sp-serverport" data-i18n>Server's listen port</label>
-        <input id="sp-serverport" type="number" min="1" max="65535" step="1" placeholder="8090">
-        <label for="sp-recvport" data-i18n>Our receive port</label>
-        <input id="sp-recvport" type="number" min="1" max="65535" step="1" placeholder="5001">
-      </div>
-      <p class="hint" style="margin:2px 0 12px;font-size:11.5px;color:var(--muted2)" data-i18n>The two ends must agree: our forged IP is the peer's peer_spoof_ip, our ports mirror theirs. Carry WireGuard over this pipe for a full VPN.</p>
-      <div id="sp-new-msg" class="msg"></div>
-      <div class="actions" style="margin-top:4px">
-        <button class="btn-primary" id="sp-submit" onclick="submitSpoof()" data-i18n>Create tunnel</button>
-      </div>
-    </div>
-
-    <div id="sp-pane-test" class="sp-pane" style="display:none">
-      <p class="hint" style="font-size:12px;color:var(--muted2)" data-i18n>Run this on both servers: start the receiver on the box you send TO, then, within the window, send probes from the other box. If almost none arrive, the network blocks spoofing and this tunnel can't work there.</p>
-      <h4 data-i18n>1) Receiver (run on the destination box)</h4>
-      <label for="sp-t-port" data-i18n>Port</label>
-      <input id="sp-t-port" type="number" min="1" max="65535" step="1" placeholder="8090">
-      <label for="sp-t-transport" data-i18n>Carrier</label>
-      <select id="sp-t-transport" class="sel"><option value="udp">UDP</option><option value="tcp">TCP</option><option value="icmp">ICMP</option></select>
-      <label for="sp-t-seconds" data-i18n>Window (seconds)</label>
-      <input id="sp-t-seconds" type="number" min="5" max="120" step="1" placeholder="30">
-      <div class="actions" style="margin:4px 0 10px"><button class="btn-primary" id="sp-t-recv-btn" onclick="spTestReceive()" data-i18n>Start receiver</button></div>
-      <div id="sp-t-results"></div>
-      <hr style="border:none;border-top:1px solid var(--line);margin:14px 0">
-      <h4 data-i18n>2) Sender (run on the other box)</h4>
-      <label for="sp-t-peerip" data-i18n>Destination box's real IP</label>
-      <input id="sp-t-peerip" type="text" autocomplete="off" spellcheck="false" placeholder="destination public IP">
-      <label for="sp-t-spec" data-i18n>Forged source IPs (single / range / CIDR)</label>
-      <input id="sp-t-spec" type="text" autocomplete="off" spellcheck="false" placeholder="1.2.3.0/24, 5.6.7.8">
-      <label for="sp-t-count" data-i18n>Packets per IP</label>
-      <input id="sp-t-count" type="number" min="1" max="200" step="1" placeholder="20">
-      <div id="sp-test-msg" class="msg"></div>
-      <div class="actions" style="margin-top:4px"><button class="btn-primary" id="sp-t-send-btn" onclick="spTestSend()" data-i18n>Send probes</button></div>
-    </div>
-
-    <div id="sp-pane-scan" class="sp-pane" style="display:none">
-      <p class="hint" style="font-size:12px;color:var(--muted2)" data-i18n>Expand a range or CIDR into a list of IPs to try as forged sources, then take the good ones to the Tester.</p>
-      <label for="sp-scan-spec" data-i18n>IPs (single / range / CIDR)</label>
-      <input id="sp-scan-spec" type="text" autocomplete="off" spellcheck="false" placeholder="1.2.3.0/28  or  1.2.3.4-1.2.3.40">
-      <div id="sp-scan-msg" class="msg"></div>
-      <div class="actions" style="margin:4px 0 10px"><button class="btn-primary" onclick="spScan()" data-i18n>Expand</button></div>
-      <textarea id="sp-scan-out" rows="7" readonly spellcheck="false" style="width:100%" onclick="this.select()"></textarea>
-      <div class="actions" style="margin-top:6px"><button class="btn-ghost" onclick="spScanToTester()" data-i18n>Use in Tester</button></div>
-    </div>
-
-    <div class="actions" style="margin-top:14px">
-      <button class="btn-ghost" onclick="closeSpoofPanel()" data-i18n>Close</button>
-    </div>
-  </div>
-</div>
-
 <div class="modal" id="newtun" onclick="if(event.target===this)closeNewTunnel()">
   <div class="box" role="dialog" aria-modal="true" aria-labelledby="nttitle" style="width:min(94vw,460px)">
     <h3 id="nttitle" data-i18n>New tunnel</h3>
@@ -2126,49 +2017,14 @@ const FA={
   "New Packet tunnel":"تونل پکت جدید",
   "Edit Packet tunnel":"ویرایش تونل پکت",
   "New SSH tunnel":"تونل SSH جدید",
-  "Spoof — management":"Spoof — مدیریت",
-  "A UDP pipe carried inside packets with a forged source IP. It only works where the network allows source-IP spoofing — use the Tester first to check your servers.":"یک پایپ UDP که داخل پکت‌هایی با IP مبدأ جعلی حمل می‌شود. فقط جایی کار می‌کند که شبکه جعل IP مبدأ را اجازه دهد — اول با «تستر» سرورهایت را بررسی کن.",
   "Instances":"اینستنس‌ها",
   "New":"جدید",
   "Tester":"تستر",
-  "IP scanner":"اسکنر IP",
-  "🌍 Server — forwards to a local service abroad":"🌍 سرور — به یک سرویس محلی در خارج فوروارد می‌کند",
-  "🇮🇷 Client — local UDP pipe to the server":"🇮🇷 کلاینت — پایپ UDP محلی به سرور",
   "Carrier":"حامل",
-  "UDP (default)":"UDP (پیش‌فرض)",
-  "TCP (SYN/PSH)":"TCP (SYN/PSH)",
-  "ICMP (echo)":"ICMP (اکو)",
-  "Our forged source IP (spoof_ip)":"IP مبدأ جعلی ما (spoof_ip)",
-  "Peer's forged source IP (peer_spoof_ip)":"IP مبدأ جعلی طرف مقابل (peer_spoof_ip)",
-  "Listen port (receives spoofed packets)":"پورت گوش‌دادن (پکت‌های جعلی را می‌گیرد)",
   "Forward to (the real local service)":"فوروارد به (سرویس محلی واقعی)",
-  "Client's real IP":"IP واقعی کلاینت",
-  "Client's receive port":"پورت دریافت کلاینت",
-  "Local listen (the app connects here)":"گوش‌دادن محلی (اپ به این‌جا وصل می‌شود)",
-  "Server's real IP":"IP واقعی سرور",
-  "Server's listen port":"پورت گوش‌دادن سرور",
-  "Our receive port":"پورت دریافت ما",
-  "The two ends must agree: our forged IP is the peer's peer_spoof_ip, our ports mirror theirs. Carry WireGuard over this pipe for a full VPN.":"دو سمت باید هماهنگ باشند: IP جعلی ما همان peer_spoof_ip طرف مقابل است و پورت‌ها آینهٔ هم‌اند. برای یک VPN کامل، WireGuard را روی این پایپ حمل کن.",
-  "Run this on both servers: start the receiver on the box you send TO, then, within the window, send probes from the other box. If almost none arrive, the network blocks spoofing and this tunnel can't work there.":"این را روی هر دو سرور اجرا کن: گیرنده را روی سروری که به آن می‌فرستی استارت کن، بعد در همان بازه از سرور دیگر پروب بفرست. اگر تقریباً هیچ‌کدام نرسید، شبکه جعل را مسدود می‌کند و این تانل آن‌جا کار نمی‌کند.",
-  "1) Receiver (run on the destination box)":"۱) گیرنده (روی سرور مقصد اجرا کن)",
   "Window (seconds)":"بازه (ثانیه)",
-  "Start receiver":"استارت گیرنده",
-  "2) Sender (run on the other box)":"۲) فرستنده (روی سرور دیگر اجرا کن)",
   "Destination box's real IP":"IP واقعی سرور مقصد",
-  "Forged source IPs (single / range / CIDR)":"IPهای مبدأ جعلی (تکی / بازه / CIDR)",
-  "Packets per IP":"پکت به‌ازای هر IP",
-  "Send probes":"ارسال پروب‌ها",
-  "Expand a range or CIDR into a list of IPs to try as forged sources, then take the good ones to the Tester.":"یک بازه یا CIDR را به فهرستی از IPها باز کن تا به‌عنوان مبدأ جعلی امتحان کنی، بعد خوب‌ها را به «تستر» ببر.",
-  "IPs (single / range / CIDR)":"IPها (تکی / بازه / CIDR)",
-  "Expand":"باز کن",
-  "Use in Tester":"استفاده در تستر",
-  "No spoof tunnels yet. Use “New”.":"هنوز تانل spoof نیست. از «جدید» استفاده کن.",
-  "Listening… send probes from the other box now.":"در حال گوش‌دادن… حالا از سرور دیگر پروب بفرست.",
-  "No spoofed packets arrived — this network blocks source-IP spoofing.":"هیچ پکت جعلی نرسید — این شبکه جعل IP مبدأ را مسدود می‌کند.",
-  "Delivered per forged IP:":"رسیده به‌ازای هر IP جعلی:",
   "packets":"پکت",
-  "Sent probes from":"پروب فرستاده شد از",
-  "IPs. Check the receiver on the other box.":"آی‌پی. گیرنده را روی سرور دیگر ببین.",
   "IPs":"آی‌پی",
   "Loading…":"در حال بارگذاری…",
   "Edit SSH tunnel":"ویرایش تونل SSH",
@@ -3074,8 +2930,7 @@ const TUN_TYPES=[
   {id:'rathole', name:'Rathole v2', ready:true, kind:'reverse', desc:{en:'Pooled data-channel reverse proxy.', fa:'ریورس‌پراکسی با کانال دادهٔ مجزا.'}},
   {id:'packet', name:'Packet', ready:true, kind:'direct', desc:{en:'Raw-packet tunnel — bypasses the kernel stack.', fa:'تونل پکت خام — دور زدن لایهٔ کرنل.'}},
   {id:'wireguard', name:'WireGuard', ready:true, kind:'direct', desc:{en:'VPN egress + SOCKS5 outbound.', fa:'خروج VPN + اوت‌باند SOCKS5.'}},
-  {id:'ssh', name:'SSH', ready:true, kind:'direct', desc:{en:'SOCKS5 over SSH — quick egress with a password.', fa:'SOCKS5 روی SSH — خروج سریع با پسورد.'}},
-  {id:'spoof', name:'Spoof', ready:true, kind:'direct', desc:{en:'Forged source-IP UDP pipe — its own panel.', fa:'پایپ UDP با IP مبدأ جعلی — پنل جدا.'}}
+  {id:'ssh', name:'SSH', ready:true, kind:'direct', desc:{en:'SOCKS5 over SSH — quick egress with a password.', fa:'SOCKS5 روی SSH — خروج سریع با پسورد.'}}
 ];
 function openChooser(){
   const g=$('typegrid'); g.innerHTML='';
@@ -3104,9 +2959,6 @@ function closeChooser(){ $('chooser').classList.remove('on'); }
 
 let tutType=null;
 function chooseType(id){
-  // Spoof has its own management panel rather than the single create form, so it
-  // skips the tutorial/create flow and opens that panel directly.
-  if(id==='spoof'){ closeChooser(); openSpoofPanel(); return; }
   tutType=id;
   const t=TUN_TYPES.find(function(x){return x.id===id;})||{name:id,ready:false};
   const tut=TUTORIALS[id]||TUTORIALS._soon(t.name);
@@ -3334,170 +3186,6 @@ async function submitSSH(){
     closeSSH(); loadTunnels(); go('control');
     toast('“'+name+'” '+(editing?T('saved.'):T('created.')));
   }catch(e){ sshMsg(T('Network error.'),true); btn.disabled=false; }
-}
-
-// ===== Spoof: its own management panel (not the normal create flow) =====
-let spEditMode='';
-function openSpoofPanel(){
-  spEditMode='';
-  spResetNew();
-  spTab('list');
-  spLoadInstances();
-  $('spoofpanel').classList.add('on');
-}
-function closeSpoofPanel(){ $('spoofpanel').classList.remove('on'); }
-function spTab(name){
-  ['list','new','test','scan'].forEach(function(t){
-    $('sp-pane-'+t).style.display = (t===name)?'':'none';
-    $('sp-tab-'+t).classList.toggle('on', t===name);
-  });
-}
-function spRoleSync(){
-  const role=$('sp-role').value;
-  $('sp-server-fields').style.display=role==='server'?'':'none';
-  $('sp-client-fields').style.display=role==='client'?'':'none';
-}
-function spResetNew(){
-  spEditMode='';
-  $('sp-submit').textContent=T('Create tunnel'); $('sp-submit').disabled=false;
-  spMsg('sp-new-msg','');
-  ['sp-name','sp-key','sp-spoofip','sp-peerspoofip','sp-listenport','sp-forward','sp-clientip','sp-clientport','sp-listen','sp-serverip','sp-serverport','sp-recvport'].forEach(id=>{ if($(id)) $(id).value=''; });
-  $('sp-name').readOnly=false; $('sp-role').disabled=false; $('sp-role').value='server'; $('sp-transport').value='udp';
-  spRoleSync();
-}
-function spMsg(id,text,isErr){ const m=$(id); if(!m) return; m.textContent=text||''; m.className='msg'+(text?(isErr?' err':' ok'):''); }
-
-async function spLoadInstances(){
-  const box=$('sp-instances'); box.innerHTML='<div class="msg">'+T('Loading…')+'</div>';
-  let list;
-  try{ list=await (await fetch('/api/spoof/list')).json(); }
-  catch(e){ box.innerHTML='<div class="msg err">'+T('Network error.')+'</div>'; return; }
-  if(!list||!list.length){ box.innerHTML='<div class="msg">'+T('No spoof tunnels yet. Use “New”.')+'</div>'; return; }
-  box.innerHTML='';
-  list.forEach(function(t){
-    const online=t.state==='online';
-    const el=document.createElement('div'); el.className='sp-inst';
-    el.innerHTML='<div><span class="n">'+esc(t.name)+'</span> <span class="st">· '+esc(t.role)+' · '+esc(t.addr||'')+' · '+(online?'🟢':'⚪')+' '+esc(t.state||'')+'</span></div>';
-    const acts=document.createElement('div');
-    const mk=function(label,fn){ const b=document.createElement('button'); b.className='btn-ghost'; b.style.marginLeft='4px'; b.textContent=T(label); b.onclick=fn; return b; };
-    acts.appendChild(mk(online?'Stop':'Start', function(){ spToggle(t.name, online); }));
-    acts.appendChild(mk('Edit', function(){ spEdit(t.name); }));
-    acts.appendChild(mk('Delete', function(){ spDelete(t.name); }));
-    el.appendChild(acts);
-    box.appendChild(el);
-  });
-}
-async function spToggle(name, online){
-  try{
-    const ep=online?'/api/tunnels/stop':'/api/tunnels/start';
-    const r=await fetch(ep,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
-    if(!r.ok){ toast((await r.text()),true); return; }
-    loadTunnels(); spLoadInstances();
-  }catch(e){ toast(T('Network error.'),true); }
-}
-async function spDelete(name){
-  if(!confirm(T('Delete tunnel')+' “'+name+'”?')) return;
-  try{
-    const r=await fetch('/api/tunnels/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
-    if(!r.ok){ toast((await r.text()),true); return; }
-    toast('“'+name+'” '+T('deleted.')); loadTunnels(); spLoadInstances();
-  }catch(e){ toast(T('Network error.'),true); }
-}
-async function spEdit(name){
-  let d;
-  try{
-    const r=await fetch('/api/spoof/get?name='+encodeURIComponent(name));
-    if(!r.ok){ toast((await r.text()),true); return; }
-    d=await r.json();
-  }catch(e){ toast(T('Network error.'),true); return; }
-  spResetNew();
-  spEditMode=name;
-  $('sp-submit').textContent=T('Save changes');
-  const nm=$('sp-name'); nm.value=name; nm.readOnly=true;
-  $('sp-role').value=d.role||'server'; $('sp-role').disabled=true;
-  $('sp-transport').value=d.transport||'udp';
-  $('sp-key').value=d.key||'';
-  $('sp-spoofip').value=d.spoofIP||''; $('sp-peerspoofip').value=d.peerSpoofIP||'';
-  if(d.role==='server'){
-    $('sp-listenport').value=d.listenPort||''; $('sp-forward').value=d.forward||'';
-    $('sp-clientip').value=d.clientIP||''; $('sp-clientport').value=d.clientPort||'';
-  }else{
-    $('sp-listen').value=d.listen||''; $('sp-serverip').value=d.serverIP||'';
-    $('sp-serverport').value=d.serverPort||''; $('sp-recvport').value=d.recvPort||'';
-  }
-  spRoleSync();
-  spTab('new');
-}
-async function submitSpoof(){
-  const role=$('sp-role').value, name=$('sp-name').value.trim();
-  if(!name){ spMsg('sp-new-msg',T('A tunnel name is required.'),true); return; }
-  const editing=!!spEditMode;
-  const btn=$('sp-submit'); btn.disabled=true; spMsg('sp-new-msg', editing?T('Saving…'):T('Creating…'));
-  const common={edit:editing, name, key:$('sp-key').value.trim(), transport:$('sp-transport').value,
-    spoofIP:$('sp-spoofip').value.trim(), peerSpoofIP:$('sp-peerspoofip').value.trim()};
-  let ep, req;
-  if(role==='server'){
-    ep='/api/spoof/server';
-    req=Object.assign({}, common, {listenPort:parseInt($('sp-listenport').value,10)||0, forward:$('sp-forward').value.trim(),
-      clientIP:$('sp-clientip').value.trim(), clientPort:parseInt($('sp-clientport').value,10)||0});
-  }else{
-    ep='/api/spoof/client';
-    req=Object.assign({}, common, {listen:$('sp-listen').value.trim(), serverIP:$('sp-serverip').value.trim(),
-      serverPort:parseInt($('sp-serverport').value,10)||0, recvPort:parseInt($('sp-recvport').value,10)||0});
-  }
-  try{
-    const r=await fetch(ep,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(req)});
-    if(!r.ok){ spMsg('sp-new-msg',(await r.text())||('HTTP '+r.status),true); btn.disabled=false; return; }
-    const res=await r.json();
-    toast('“'+name+'” '+(editing?T('saved.'):T('created.')));
-    if(!editing && res.key){ spMsg('sp-new-msg', T('Shared key')+': '+res.key); }
-    loadTunnels(); spLoadInstances(); spTab('list');
-  }catch(e){ spMsg('sp-new-msg',T('Network error.'),true); btn.disabled=false; }
-}
-
-async function spTestReceive(){
-  const btn=$('sp-t-recv-btn'); btn.disabled=true;
-  const box=$('sp-t-results'); box.innerHTML='<div class="msg">'+T('Listening… send probes from the other box now.')+'</div>';
-  try{
-    const req={port:parseInt($('sp-t-port').value,10)||0, transport:$('sp-t-transport').value, seconds:parseInt($('sp-t-seconds').value,10)||30};
-    const r=await fetch('/api/spoof/test/receive',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(req)});
-    btn.disabled=false;
-    if(!r.ok){ box.innerHTML='<div class="msg err">'+esc(await r.text())+'</div>'; return; }
-    const res=await r.json(); const c=res.counts||{};
-    const keys=Object.keys(c);
-    if(!keys.length){ box.innerHTML='<div class="msg err">'+T('No spoofed packets arrived — this network blocks source-IP spoofing.')+'</div>'; return; }
-    let h='<div class="msg ok">'+T('Delivered per forged IP:')+'</div>';
-    keys.sort();
-    keys.forEach(function(k){ h+='<div class="sp-inst"><span class="n">'+esc(k)+'</span><span class="st">'+c[k]+' '+T('packets')+'</span></div>'; });
-    box.innerHTML=h;
-  }catch(e){ btn.disabled=false; box.innerHTML='<div class="msg err">'+T('Network error.')+'</div>'; }
-}
-async function spTestSend(){
-  const btn=$('sp-t-send-btn'); btn.disabled=true; spMsg('sp-test-msg',T('Sending…'));
-  try{
-    const req={peerIP:$('sp-t-peerip').value.trim(), port:parseInt($('sp-t-port').value,10)||0,
-      transport:$('sp-t-transport').value, spec:$('sp-t-spec').value.trim(), count:parseInt($('sp-t-count').value,10)||20};
-    const r=await fetch('/api/spoof/test/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(req)});
-    btn.disabled=false;
-    if(!r.ok){ spMsg('sp-test-msg',(await r.text()),true); return; }
-    const res=await r.json();
-    spMsg('sp-test-msg', T('Sent probes from')+' '+res.sentIPs+' '+T('IPs. Check the receiver on the other box.'));
-  }catch(e){ btn.disabled=false; spMsg('sp-test-msg',T('Network error.'),true); }
-}
-
-async function spScan(){
-  spMsg('sp-scan-msg','');
-  try{
-    const r=await fetch('/api/spoof/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({spec:$('sp-scan-spec').value.trim(), max:4096})});
-    if(!r.ok){ spMsg('sp-scan-msg',(await r.text()),true); return; }
-    const res=await r.json();
-    $('sp-scan-out').value=(res.ips||[]).join('\n');
-    spMsg('sp-scan-msg', (res.count||0)+' '+T('IPs'));
-  }catch(e){ spMsg('sp-scan-msg',T('Network error.'),true); }
-}
-function spScanToTester(){
-  $('sp-t-spec').value=$('sp-scan-out').value.split('\n').filter(Boolean).join(', ');
-  spTab('test');
 }
 
 // Tutorials shown before the create form. _soon builds a short placeholder for

@@ -2,6 +2,26 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.19.0 — 2026-08-12
+
+**Removed the Spoof tunnel.** It added a lot of surface for a niche case; the
+whole thing is gone — engine, config, manage layer, web routes and its separate
+panel. The other direct tunnels (WireGuard, Packet, SSH) are unchanged.
+
+**The CLI can now create the direct tunnels too.** Until now the interactive
+menu (`sudo arange-tun`) only built reverse tunnels; WireGuard, Packet and SSH
+were web-panel-only. A new main-menu item **3) Direct Tunnel** creates all three
+from the terminal:
+
+- **WireGuard** — server (generates keys, prints a ready client config) or client
+  (paste a wg-quick config, opens a local SOCKS5).
+- **Packet** — server (prints the shared key) or client (dials it, exposes ports).
+- **SSH** — client that dials an SSH login abroad and opens a local SOCKS5.
+
+**Fixed the CLI banner.** The launch logo still drew the old **BACKPACK** ASCII
+art inherited from the fork; it now spells **ARANGE**. A BTC donation address was
+added to the CLI footer.
+
 ## v1.18.1 — 2026-08-10
 
 **Fixed the from-source install and update failing behind Iran's blocks.** On a

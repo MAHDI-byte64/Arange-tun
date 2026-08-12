@@ -69,15 +69,16 @@ func Rule() {
 func Logo(version string) {
 	fmt.Print(Red)
 	fmt.Println(`
- ██████╗  █████╗  ██████╗██╗  ██╗██████╗  █████╗  ██████╗██╗  ██╗
- ██╔══██╗██╔══██╗██╔════╝██║ ██╔╝██╔══██╗██╔══██╗██╔════╝██║ ██╔╝
- ██████╔╝███████║██║     █████╔╝ ██████╔╝███████║██║     █████╔╝
- ██╔══██╗██╔══██║██║     ██╔═██╗ ██╔═══╝ ██╔══██║██║     ██╔═██╗
- ██████╔╝██║  ██║╚██████╗██║  ██╗██║     ██║  ██║╚██████╗██║  ██╗
- ╚═════╝ ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚═╝     ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝`)
+ █████╗ ██████╗  █████╗ ███╗   ██╗ ██████╗ ███████╗
+██╔══██╗██╔══██╗██╔══██╗████╗  ██║██╔════╝ ██╔════╝
+███████║██████╔╝███████║██╔██╗ ██║██║  ███╗█████╗
+██╔══██║██╔══██╗██╔══██║██║╚██╗██║██║   ██║██╔══╝
+██║  ██║██║  ██║██║  ██║██║ ╚████║╚██████╔╝███████╗
+╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚══════╝`)
 	fmt.Print(Reset)
 	fmt.Printf("%s Arange-tun  %s%s%s\n", Bold+White, Red, version, Reset)
-	fmt.Println(Gray + " GitHub : https://github.com/mahdi-byte64" + Reset)
+	fmt.Println(Gray + " GitHub : https://github.com/mahdi-byte64/Arange-tun" + Reset)
+	fmt.Println(Gray + " Donate (BTC): bc1qn7fp90l9yr8krhyenxddujqvmlmfzpjx4m3tty" + Reset)
 }
 
 // Prompt reads a trimmed line after printing label.
@@ -166,6 +167,28 @@ func readChoice(n int) int {
 		}
 		Error(fmt.Sprintf("Invalid choice. Enter a number between 1 and %d (or 0).", n))
 	}
+}
+
+// PromptMultiline reads lines until one equals endMarker (case-insensitive,
+// trimmed) or EOF (Ctrl-D), and returns everything before it joined with
+// newlines. It is for pasting blocks that span many lines — a WireGuard config,
+// for instance — where a single-line Prompt cannot work.
+func PromptMultiline(endMarker string) string {
+	var lines []string
+	for {
+		line, err := reader.ReadString('\n')
+		trimmed := strings.TrimSpace(line)
+		if strings.EqualFold(trimmed, endMarker) {
+			break
+		}
+		// Keep the raw line (minus the trailing newline) so indentation inside the
+		// pasted block is preserved.
+		lines = append(lines, strings.TrimRight(line, "\r\n"))
+		if err != nil { // EOF or read error ends the paste too.
+			break
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // PressEnter waits for the user to acknowledge.

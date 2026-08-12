@@ -20,7 +20,7 @@ Go · AGPL-3.0 · Linux amd64/arm64 · one self-contained binary · CLI **and** 
 - [Install](#-install)
 - [How reverse tunneling works](#-how-reverse-tunneling-works)
 - [Tunnel types — pick the right one](#-tunnel-types--pick-the-right-one)
-  - [Backhaul](#backhaul--the-built-in-engine) · [frp](#frp--built-in-reverse-proxy) · [Rathole v2](#rathole-v2--pooled-reverse-proxy) · [Packet](#packet--raw-packets-below-the-kernel) · [WireGuard](#wireguard--vpn-egress) · [SSH](#ssh--socks5-over-ssh) · [Spoof](#spoof--forged-source-ip-udp-pipe)
+  - [Backhaul](#backhaul--the-built-in-engine) · [frp](#frp--built-in-reverse-proxy) · [Rathole v2](#rathole-v2--pooled-reverse-proxy) · [Packet](#packet--raw-packets-below-the-kernel) · [WireGuard](#wireguard--vpn-egress) · [SSH](#ssh--socks5-over-ssh)
 - [Transports (Backhaul engine)](#-transports-backhaul-engine)
 - [The web dashboard](#-the-web-dashboard)
 - [Using the CLI](#-using-the-cli)
@@ -107,7 +107,6 @@ which groups them into **Reverse** (port forwarding) and **Direct** (VPN outboun
 | **Packet** | Reverse *(inverted)* | 🌍 abroad = server · 🇮🇷 Iran = client | DPI/firewalls are aggressive — this hides *below* the kernel stack. |
 | **WireGuard** | Direct (VPN egress) | 🌍 abroad = server · 🇮🇷 Iran = client (SOCKS5) | You want a full VPN exit, optionally AmneziaWG-obfuscated. |
 | **SSH** | Direct (VPN egress) | 🇮🇷 Iran = client only | You just need a quick egress and can SSH into a box abroad. |
-| **Spoof** | Direct *(its own panel)* | forged source IP, both ends | A Layer-3 firewall filters on source IP — and your servers allow spoofing. |
 
 Each type opens with a **built-in setup guide** in the panel before its form. Here's
 the short version of each.
@@ -179,25 +178,6 @@ whose traffic leaves through it, reconnecting automatically if the link drops.
   use it for convenience, not as a hardened channel.
 
 ---
-
-
-### Spoof — forged source-IP UDP pipe
-
-A niche, powerful option for the hardest Layer-3 blocks: a UDP pipe carried inside
-packets whose **source IP is forged** (mutual bidirectional spoofing), so a firewall
-that filters on source/destination IP sees a whitelisted-looking flow. Carry
-WireGuard over it for a full VPN. It is a pure-Go take on
-[ParsaKSH/spoof-tunnel](https://github.com/ParsaKSH/spoof-tunnel)'s technique.
-
-- **Its own panel.** Clicking **Spoof** in the chooser opens a dedicated management
-  panel (same look as the rest): create/edit/start-stop spoof instances, a **spoof
-  tester** (does a forged source IP actually get delivered?), and an **IP scanner**
-  (expand single/range/CIDR).
-- **Only works where the network allows source-IP spoofing** — most datacenters
-  block it. **Run the tester first** on both servers; if almost no packets arrive,
-  this tunnel can't work there (a network limit, not a bug).
-- Needs **root** and **libpcap**, Linux only. Not wire-compatible with the upstream
-  spoof-tunnel (two Arange-tun ends talk to each other).
 
 ## 🔌 Transports (Backhaul engine)
 

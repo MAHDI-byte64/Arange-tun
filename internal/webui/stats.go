@@ -440,7 +440,7 @@ func GatherTunnels() []TunnelInfo {
 				Country:    manage.TunnelCountry(t.Name),
 				Ping:       -1,
 			}
-			if t.Transport == "wireguard" || t.Transport == "packet" || t.Transport == "ssh" || t.Transport == "spoof" {
+			if t.Transport == "wireguard" || t.Transport == "packet" || t.Transport == "ssh" {
 				// WireGuard and SSH are VPN egresses and Packet injects raw packets
 				// below the kernel stack: none has an observable liveness socket, so
 				// their state comes from health and their traffic from the metrics

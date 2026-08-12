@@ -384,44 +384,6 @@ type SSHConfig struct {
 	LogLevel string `toml:"log_level"`
 }
 
-// SpoofConfig is the Spoof tunnel: a UDP pipe that carries traffic inside
-// packets whose SOURCE IP is forged, so a Layer-3 firewall that filters on
-// source/destination IP sees a whitelisted-looking flow. Both ends forge their
-// source IP (mutual bidirectional spoofing). It only works where the network
-// permits forged source IPs (most datacenters block it — the spoof tester
-// checks). The pipe is a single UDP flow, meant to carry WireGuard or any UDP
-// service. Like WireGuard/Packet it has its own section and engine.
-type SpoofConfig struct {
-	Role string `toml:"role"` // "client" (local) or "server" (remote)
-
-	Key       string `toml:"key"`       // shared secret; ChaCha20-Poly1305 key is derived from it
-	Transport string `toml:"transport"` // carrier: "udp" (default), "tcp", "icmp"
-
-	// The forged source addresses. SpoofIP is what THIS end stamps as its source;
-	// PeerSpoofIP is what the peer stamps (so we can filter its packets).
-	SpoofIP     string `toml:"spoof_ip"`      // our forged source IP
-	PeerSpoofIP string `toml:"peer_spoof_ip"` // the peer's forged source IP
-
-	// Client (local) fields.
-	Listen     string `toml:"listen"`      // local UDP listen for the app, e.g. "127.0.0.1:1080"
-	ServerIP   string `toml:"server_ip"`   // the server's REAL IP
-	ServerPort int    `toml:"server_port"` // the port the server listens on (our send dst)
-	RecvPort   int    `toml:"recv_port"`   // port we receive the server's spoofed replies on
-
-	// Server (remote) fields.
-	ListenPort int    `toml:"listen_port"` // port we receive spoofed packets on
-	Forward    string `toml:"forward"`     // where to relay the inner UDP flow, e.g. "127.0.0.1:51820"
-	ClientIP   string `toml:"client_ip"`   // the client's REAL IP (our reply dst)
-	ClientPort int    `toml:"client_port"` // the client's recv port
-
-	// Network parameters (optional; empty auto-detects the default-route interface
-	// and this host's IPv4).
-	Interface string `toml:"interface"`
-	LocalIP   string `toml:"local_ip"`
-
-	LogLevel string `toml:"log_level"`
-}
-
 // Config represents the complete configuration, including both server and client settings.
 type Config struct {
 	Server    ServerConfig    `toml:"server"`
@@ -429,5 +391,4 @@ type Config struct {
 	WireGuard WireGuardConfig `toml:"wireguard"`
 	Packet    PacketConfig    `toml:"packet"`
 	SSH       SSHConfig       `toml:"ssh"`
-	Spoof     SpoofConfig     `toml:"spoof"`
 }

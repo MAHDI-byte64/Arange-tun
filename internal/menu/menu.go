@@ -63,20 +63,22 @@ func Run() {
 		case "2":
 			manage.SetupClient()
 		case "3":
-			manageMenu()
+			directTunnelMenu()
 		case "4":
-			backupMenu()
+			manageMenu()
 		case "5":
-			webPanelMenu()
+			backupMenu()
 		case "6":
-			optimizeMenu()
+			webPanelMenu()
 		case "7":
-			telegramMenu()
+			optimizeMenu()
 		case "8":
-			updateMenu()
+			telegramMenu()
 		case "9":
+			updateMenu()
+		case "10":
 			uninstallMenu()
-		case "10", "0":
+		case "11", "0":
 			tui.Info("Goodbye!")
 			return
 		default:
@@ -101,20 +103,21 @@ func printUpdateBanner() {
 // printMenu renders the main menu: red numbers, white titles, gray descriptions.
 func printMenu() {
 	fmt.Println()
-	menuItem(1, "Setup Server", "Iran side — exposes ports to users")
-	menuItem(2, "Setup Client", "Kharej side — dials out to the Iran server")
-	menuItem(3, "Manage", "tunnels, ports, transport, status, health check")
-	menuItem(4, "Backup & Restore", "save or restore the full configuration")
-	menuItem(5, "Web Panel", "monitoring web UI — link, login code, port")
-	menuItem(6, "Optimize", "kernel & network tuning — BBR, buffers, limits")
-	menuItem(7, "Telegram Bot", "status reports, relayed through a tunnel")
+	menuItem(1, "Setup Server", "Iran side — exposes ports to users (reverse)")
+	menuItem(2, "Setup Client", "Kharej side — dials out to the Iran server (reverse)")
+	menuItem(3, "Direct Tunnel", "WireGuard / Packet / SSH — Iran side dials out")
+	menuItem(4, "Manage", "tunnels, ports, transport, status, health check")
+	menuItem(5, "Backup & Restore", "save or restore the full configuration")
+	menuItem(6, "Web Panel", "monitoring web UI — link, login code, port")
+	menuItem(7, "Optimize", "kernel & network tuning — BBR, buffers, limits")
+	menuItem(8, "Telegram Bot", "status reports, relayed through a tunnel")
 	updateDesc := "safe update with automatic rollback"
 	if tag, ok := manage.UpdateAvailable(); ok {
 		updateDesc = tag + " is out — safe update with automatic rollback"
 	}
-	menuItem(8, "Update", updateDesc)
-	menuItem(9, "Uninstall", "remove everything")
-	menuItem(10, "Exit", "")
+	menuItem(9, "Update", updateDesc)
+	menuItem(10, "Uninstall", "remove everything")
+	menuItem(11, "Exit", "")
 	fmt.Println()
 }
 

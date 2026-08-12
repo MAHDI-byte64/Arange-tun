@@ -78,11 +78,6 @@ func tunnelHealthWith(t Tunnel, pairs [][2]string) Health {
 		// reports online.
 		h.Connected = true
 		h.State, h.Detail = "online", "running"
-	case t.Transport == "spoof":
-		// Spoof is a forged-source-IP datagram pipe with no observable connection
-		// state; a running service is the signal we have.
-		h.Connected = true
-		h.State, h.Detail = "online", "running"
 	default:
 		h.Connected = tunnelHealthy(t, pairs)
 		// tunnelHealthy answers the watchdog's question — "is this worth
