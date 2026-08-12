@@ -17,6 +17,15 @@ func systemctl(args ...string) (string, error) {
 	return strings.TrimSpace(string(out)), err
 }
 
+// systemctlOut runs a systemctl subcommand and returns its standard output
+// only. It exists for the calls whose output is read positionally: a warning on
+// stderr would be interleaved by CombinedOutput and shift every line after it,
+// which for a batched query means answering about the wrong unit.
+func systemctlOut(args ...string) (string, error) {
+	out, err := exec.Command("systemctl", args...).Output()
+	return strings.TrimSpace(string(out)), err
+}
+
 // DaemonReload reloads the systemd manager configuration.
 func DaemonReload() error {
 	_, err := systemctl("daemon-reload")
@@ -27,6 +36,53 @@ func DaemonReload() error {
 func IsActive(service string) bool {
 	out, _ := systemctl("is-active", service)
 	return out == "active"
+}
+
+// ActiveStates answers IsActive for many units at once, keyed by unit name.
+//
+// systemd takes a list and prints one verdict per unit in order, so asking
+// about every tunnel costs the same single process as asking about one. Asking
+// separately did not: the panel refreshes its stats every four seconds and its
+// tunnel list every six, each walking every tunnel, so a machine with a handful
+// of them was spawning a systemctl several times a second forever just to keep
+// a light green.
+//
+// The verdicts are matched to units by position, so this only trusts the reply
+// when it has exactly one line per unit. Anything else — an unexpected warning,
+// a systemd that answered differently — falls back to asking one at a time,
+// because a misaligned batch would confidently report the wrong unit's state,
+// which is far worse than the process it saves.
+func ActiveStates(services []string) map[string]bool {
+	if len(services) == 0 {
+		return map[string]bool{}
+	}
+	// is-active exits non-zero unless every unit is active, so the error is
+	// expected here and carries no information — the verdicts are on stdout.
+	out, _ := systemctlOut(append([]string{"is-active"}, services...)...)
+	if states, ok := matchActiveStates(services, out); ok {
+		return states
+	}
+	states := make(map[string]bool, len(services))
+	for _, s := range services {
+		states[s] = IsActive(s)
+	}
+	return states
+}
+
+// matchActiveStates pairs each unit with its verdict by position, reporting
+// whether the reply lined up at all. Split out from ActiveStates so the pairing
+// — the part that would silently mislabel units if it were wrong — can be
+// tested without a running systemd.
+func matchActiveStates(services []string, out string) (map[string]bool, bool) {
+	lines := strings.Split(out, "\n")
+	if len(lines) != len(services) {
+		return nil, false
+	}
+	states := make(map[string]bool, len(services))
+	for i, s := range services {
+		states[s] = strings.TrimSpace(lines[i]) == "active"
+	}
+	return states, true
 }
 
 // IsEnabled reports whether a unit is enabled at boot.

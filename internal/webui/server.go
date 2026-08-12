@@ -242,8 +242,11 @@ func Serve() error {
 
 	addr := fmt.Sprintf("0.0.0.0:%d", cfg.Port)
 	httpServer := &http.Server{
-		Addr:         addr,
-		Handler:      mux,
+		Addr: addr,
+		// Everything is gzipped on the way out; see compress.go. The panel is
+		// often reached over a slow or filtered link, and its one page is 270 KB
+		// of text.
+		Handler:      gzipMiddleware(mux),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
@@ -363,8 +366,7 @@ func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		w.Write(loginHTML)
 		return
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(loginHTML)
+	servePrecompressed(w, r, "text/html; charset=utf-8", loginHTML, &loginGz)
 }
 
 func (s *server) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -380,8 +382,7 @@ func (s *server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(dashboardHTML)
+	servePrecompressed(w, r, "text/html; charset=utf-8", dashboardHTML, &dashboardGz)
 }
 
 func (s *server) handleStats(w http.ResponseWriter, r *http.Request) {

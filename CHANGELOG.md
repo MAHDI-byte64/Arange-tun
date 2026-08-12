@@ -2,6 +2,35 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.20.0 — 2026-08-12
+
+**A performance pass over the panel.** The dashboard refreshes its stats every
+four seconds and its tunnel list every six, and each refresh was redoing work it
+did not need to. Four things changed, all of them things the panel was paying
+for continuously, forever, on a small VPS:
+
+- **The page is now compressed.** The dashboard is one self-contained 271 KB
+  file of markup, CSS and script, and was sent uncompressed on every load. It
+  gzips to **79 KB — under a third** of the size. Every API response is
+  compressed too (they are small, but polled constantly). The page is packed
+  once at startup rather than per request, since it never changes.
+- **One `systemctl` instead of one per tunnel.** Both endpoints asked systemd
+  about each tunnel separately, so a machine with a handful of them spawned a
+  process several times a second just to keep a light green. systemd takes a
+  list, so it is now a single call. If the reply does not line up exactly, it
+  falls back to asking individually rather than risk mislabelling a tunnel.
+- **One socket snapshot instead of one per server tunnel.** Each server tunnel
+  ran its own `ss` and parsed every socket on the machine to keep its own slice
+  of the answer. Now one snapshot serves the whole page.
+- **Latency and DNS are cached briefly.** A ping subprocess per tunnel per
+  refresh, and a DNS lookup per tunnel per refresh for any tunnel addressed by
+  name, are now reused for a short while. A *failed* probe expires much sooner
+  than a successful one, so a tunnel that has just come back does not keep
+  showing red.
+
+Also fixed a busy-wait in the packet client's dialer, which retried a failed
+dial with no pause at all.
+
 ## v1.19.2 — 2026-08-12
 
 **Fixed the Packet tunnel always showing online.** A packet tunnel reported

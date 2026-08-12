@@ -22,7 +22,7 @@ type Health struct {
 // service runs but the peer is not connected — the case a plain systemd check
 // would wrongly call healthy.
 func TunnelHealth(t Tunnel) Health {
-	return tunnelHealthWith(t, establishedPairs())
+	return tunnelHealthWith(t, establishedPairs(), nil)
 }
 
 // AllHealth reports the health of every tunnel, keyed by name, from a single
@@ -39,21 +39,35 @@ func AllHealth() map[string]Health {
 	pairs := establishedPairs()
 	tunnels := List()
 
+	// One systemctl for the whole set rather than one per tunnel; see
+	// ActiveStates.
+	services := make([]string, len(tunnels))
+	for i, t := range tunnels {
+		services[i] = t.Service
+	}
+	active := ActiveStates(services)
+
 	out := make(map[string]Health, len(tunnels))
 	for _, t := range tunnels {
-		out[t.Name] = tunnelHealthWith(t, pairs)
+		out[t.Name] = tunnelHealthWith(t, pairs, active)
 	}
 	return out
 }
 
 // tunnelHealthWith computes health reusing an already-collected socket table,
-// so checking many tunnels costs a single `ss` call.
-func tunnelHealthWith(t Tunnel, pairs [][2]string) Health {
+// so checking many tunnels costs a single `ss` call. active, when non-nil, is a
+// batched unit-state lookup (see ActiveStates) used instead of asking systemd
+// about this one unit on its own; nil means ask.
+func tunnelHealthWith(t Tunnel, pairs [][2]string, active map[string]bool) Health {
+	isActive, batched := active[t.Service]
+	if !batched {
+		isActive = IsActive(t.Service)
+	}
 	h := Health{
 		Name:      t.Name,
 		Service:   t.Service,
 		Installed: fileExists(app.ServiceDir + "/" + t.Service),
-		Active:    IsActive(t.Service),
+		Active:    isActive,
 	}
 	switch {
 	case !h.Installed:

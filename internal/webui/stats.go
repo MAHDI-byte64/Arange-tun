@@ -298,8 +298,14 @@ func GatherSystem() SystemStats {
 
 	tunnels := manage.List()
 	s.TunnelsTotal = len(tunnels)
-	for _, t := range tunnels {
-		if manage.IsActive(t.Service) {
+	// One systemctl for every tunnel, not one each: this endpoint is polled
+	// every few seconds.
+	services := make([]string, len(tunnels))
+	for i, t := range tunnels {
+		services[i] = t.Service
+	}
+	for _, running := range manage.ActiveStates(services) {
+		if running {
 			s.TunnelsRunning++
 		}
 	}
@@ -416,6 +422,9 @@ func GatherTunnels() []TunnelInfo {
 	// datagram listener has none.
 	health := manage.AllHealth()
 
+	// One socket snapshot for the whole page, not one per server tunnel.
+	peers := establishedPeers()
+
 	var wg sync.WaitGroup
 	for i, t := range tunnels {
 		wg.Add(1)
@@ -471,18 +480,18 @@ func GatherTunnels() []TunnelInfo {
 				// but we can detect the connected client(s) — the kharej peers
 				// dialing in — and measure/geo-locate them. This gives the Iran
 				// web panel real per-tunnel health + latency to each kharej.
-				peers := serverPeers(t.Addr)
+				connected := peers.peersFor(t.Addr)
 				// A datagram listener has no peers in the socket table — the
 				// kernel genuinely does not know. The transport does, and writes
 				// it to the metrics file, so fall back to that rather than
 				// showing a working tunnel with no ping and no location.
-				if len(peers) == 0 && snapErr == nil {
+				if len(connected) == 0 && snapErr == nil {
 					if ip := peerHost(snap.Peer); ip != "" {
-						peers = []peerConn{{IP: ip, RTT: -1}}
+						connected = []peerConn{{IP: ip, RTT: -1}}
 					}
 				}
-				if len(peers) > 0 {
-					p := peers[0]
+				if len(connected) > 0 {
+					p := connected[0]
 					// Prefer the kernel-measured RTT of the live tunnel socket
 					// (works even where ICMP is blocked); fall back to ping.
 					info.Ping = p.RTT
@@ -563,7 +572,20 @@ func TunnelLogs(name string) string {
 
 // --- helpers ----------------------------------------------------------------
 
+// tcpPing measures a TCP connect to host:port in milliseconds, or -1 if it
+// fails. Cached like icmpPing — a dial to an unreachable host costs the full
+// two-second timeout, once per tunnel per refresh.
+//
+// Note that its result also decides liveness for the TCP transports, which is
+// why a failed probe is cached only briefly (see pingFailedTTL): a tunnel that
+// has just come back must not keep showing red for half a minute.
 func tcpPing(host, port string) int {
+	return pingMemo.get("tcp|"+net.JoinHostPort(host, port), func() int {
+		return measureTCP(host, port)
+	})
+}
+
+func measureTCP(host, port string) int {
 	if port == "" {
 		port = "80"
 	}
@@ -583,32 +605,41 @@ type peerConn struct {
 	RTT int
 }
 
-// serverPeers returns the unique remote peers connected to the tunnel's control
-// port — i.e. the client (kharej) servers dialed in — using `ss -tin`. The
-// `-i` flag adds a second, indented info line per socket containing `rtt:`,
-// which is the real latency of the tunnel connection (no ICMP needed).
-func serverPeers(bindAddr string) []peerConn {
-	_, tport := splitHostPort(bindAddr)
-	if tport == "" {
-		return nil
-	}
+// peerTable maps a local (listening) port to the unique remote peers connected
+// to it. One snapshot answers for every tunnel on the machine.
+type peerTable map[string][]peerConn
+
+// establishedPeers reads the socket table once and groups every established
+// connection by the local port it landed on, with the kernel-measured RTT of
+// each socket. The `-i` flag adds a second, indented info line per socket
+// containing `rtt:`, which is the real latency of the tunnel connection (no
+// ICMP needed).
+//
+// This is read once per refresh and shared, because the panel refreshes every
+// few seconds and the table is machine-wide: asking per tunnel meant spawning
+// an `ss` for each one and parsing every socket on the box N times over to keep
+// a different 1/N of the answer each time.
+func establishedPeers() peerTable {
 	out, err := exec.Command("ss", "-Htin", "state", "established").Output()
 	if err != nil {
 		return nil
 	}
 
-	seen := map[string]struct{}{}
-	var peers []peerConn
+	table := make(peerTable)
+	seen := map[string]struct{}{} // local port + peer IP, to dedupe
+	var curPort string
 	var cur *peerConn
 
 	flush := func() {
-		if cur != nil {
-			if _, dup := seen[cur.IP]; !dup {
-				seen[cur.IP] = struct{}{}
-				peers = append(peers, *cur)
-			}
-			cur = nil
+		if cur == nil {
+			return
 		}
+		key := curPort + "|" + cur.IP
+		if _, dup := seen[key]; !dup {
+			seen[key] = struct{}{}
+			table[curPort] = append(table[curPort], *cur)
+		}
+		cur = nil
 	}
 
 	for _, line := range strings.Split(string(out), "\n") {
@@ -629,17 +660,27 @@ func serverPeers(bindAddr string) []peerConn {
 			continue
 		}
 		local, peer := f[len(f)-2], f[len(f)-1]
-		if _, lp := splitHostPort(local); lp != tport {
+		_, lp := splitHostPort(local)
+		if lp == "" {
 			continue
 		}
 		ph, _ := splitHostPort(peer)
 		if ph == "" || ph == "127.0.0.1" || ph == "::1" {
 			continue
 		}
-		cur = &peerConn{IP: ph, RTT: -1}
+		curPort, cur = lp, &peerConn{IP: ph, RTT: -1}
 	}
 	flush()
-	return peers
+	return table
+}
+
+// peersFor returns the peers connected to the tunnel's control port.
+func (pt peerTable) peersFor(bindAddr string) []peerConn {
+	_, tport := splitHostPort(bindAddr)
+	if tport == "" {
+		return nil
+	}
+	return pt[tport]
 }
 
 // parseRTT extracts the smoothed RTT (in ms) from an `ss -i` info line.
@@ -663,9 +704,15 @@ func parseRTT(line string) int {
 	return int(f + 0.5)
 }
 
-// icmpPing returns the round-trip time to ip in milliseconds using the system
-// ping command, or -1 if unreachable/blocked.
+// icmpPing returns the round-trip time to ip in milliseconds, or -1 if
+// unreachable/blocked. Measured at most once per pingTTL per address: this runs
+// once per tunnel on a page that refreshes every few seconds, and each call is
+// a subprocess that waits up to a second.
 func icmpPing(ip string) int {
+	return pingMemo.get("icmp|"+ip, func() int { return measureICMP(ip) })
+}
+
+func measureICMP(ip string) int {
 	out, err := exec.Command("ping", "-c", "1", "-W", "1", ip).CombinedOutput()
 	if err != nil {
 		return -1
@@ -690,15 +737,20 @@ func icmpPing(ip string) int {
 	return int(f + 0.5)
 }
 
+// resolveIP turns a tunnel address's host half into an IP. A literal is
+// returned as-is; a name is looked up at most once per dnsTTL, since the panel
+// would otherwise resolve it again for every tunnel on every refresh.
 func resolveIP(host string) string {
 	if net.ParseIP(host) != nil {
 		return host
 	}
-	ips, err := net.LookupIP(host)
-	if err != nil || len(ips) == 0 {
-		return ""
-	}
-	return ips[0].String()
+	return dnsMemo.get(host, func() string {
+		ips, err := net.LookupIP(host)
+		if err != nil || len(ips) == 0 {
+			return ""
+		}
+		return ips[0].String()
+	})
 }
 
 // tunnelPortOf reduces a bind address to the part that matters. A server binds

@@ -273,7 +273,7 @@ func tunnelChecks() []Check {
 func tunnelChecksFor(t Tunnel, pairs [][2]string) []Check {
 	var out []Check
 	g := "Tunnel: " + t.Name
-	h := tunnelHealthWith(t, pairs)
+	h := tunnelHealthWith(t, pairs, nil)
 
 	// Service + real connectivity.
 	switch h.State {
