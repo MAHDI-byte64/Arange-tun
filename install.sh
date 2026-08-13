@@ -27,6 +27,20 @@ INSTALL_DIR="/root/Arange-tun"
 GO_VERSION="1.24.5"
 GO_MIN_MINOR=24
 GO_MIN_PATCH=4   # go.mod requires go >= 1.24.4
+
+# Official SHA256 of the Go toolchain archive for GO_VERSION, per architecture,
+# from https://go.dev/dl/. These ship inside this script — which arrives over
+# TLS from GitHub — so the check needs no second network source at install time,
+# and a mirror that served a tampered archive cannot also make it match. This is
+# what lets the verification work on a server that can reach only one Go mirror
+# (the common case on the networks this runs on), instead of refusing because no
+# *independent* checksum host answered. Update BOTH values whenever GO_VERSION
+# moves; a stale value here fails closed with a checksum mismatch, which is safe
+# but blocks the install until it is corrected.
+declare -A GO_SHA256_PINNED=(
+  [amd64]="10ad9e86233e74c0f6590fe5426895de6bf388964210eac34a6d83f38918ecdc"
+  [arm64]="0df02e6aeb3d3c06c95ff201d575907c736d6c62cfa4b6934c11203f1d600ffa"
+)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-/tmp}")" 2>/dev/null && pwd || echo /tmp)"
 
 # Module and toolchain fetching, set once for every go invocation in this run.
@@ -146,14 +160,19 @@ go_independent_sha256() {
   return 0
 }
 
-# verify_go_tarball <path> — abort unless the archive hashes to what an
-# independent source says it should. GO_SHA256 in the environment pins the value
-# by hand instead, for an operator who has the official checksum or whose
-# network reaches only the one mirror.
+# verify_go_tarball <path> — abort unless the archive hashes to what it should.
+# The expected value comes, in order of preference, from: GO_SHA256 in the
+# environment (a hand-supplied override); the checksum pinned in this script for
+# GO_VERSION; or, only for a version this script does not pin, an independent
+# mirror. The first two need no network and work where just one Go mirror is
+# reachable — which is why the pinned value exists.
 verify_go_tarball() {
   local out="$1" file="go${GO_VERSION}.linux-${ARCH}.tar.gz" want got rc=0
   if [[ -n "${GO_SHA256:-}" ]]; then
     want="$(echo "$GO_SHA256" | tr -d '[:space:]' | tr 'A-F' 'a-f')"
+  elif [[ -n "${GO_SHA256_PINNED[$ARCH]:-}" ]]; then
+    info "Checking the toolchain against the pinned official checksum..."
+    want="${GO_SHA256_PINNED[$ARCH]}"
   else
     info "Checking the toolchain against an independent checksum..."
     # The status has to be captured on the assignment itself; reading $? inside
@@ -164,8 +183,8 @@ verify_go_tarball() {
     [[ $rc -eq 0 ]] || want=""
   fi
   if [[ ! "$want" =~ ^[0-9a-f]{64}$ ]]; then
-    err "No independent checksum for ${file} could be fetched — every source"
-    err "other than the one that served the archive was unreachable."
+    err "No checksum for ${file} could be established — this script does not pin"
+    err "${GO_VERSION}, and every independent source was unreachable."
     err "Refusing to build with an unverified Go toolchain. Either:"
     err "  - install Go ${GO_VERSION} or newer yourself and re-run this script"
     err "    (an existing toolchain on PATH is used as-is), or"
