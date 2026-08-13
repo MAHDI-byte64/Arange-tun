@@ -2,6 +2,38 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.24.0 — 2026-08-13
+
+**New tunnel type: Hedioum — a pooled SOCKS5 egress over camouflaged pipes.** An
+eighth tunnel type, managed exactly like the others (create → start → monitor →
+edit → delete, from the CLI or the panel). It is a two-node egress that carries
+SOCKS5 over a self-scaling pool of multiplexed, encrypted pipes, each
+impersonating a real protocol (SSH, TLS, SMTP or IMAP), with per-pipe bandwidth
+jitter to blur DPI patterns and a decoy web persona (Apache or DirectAdmin)
+served to anyone who probes the abroad node without the token.
+
+- **Two roles, inverted topology like Packet.** The **foreign** role is the
+  abroad exit (it listens, generates a shared token, and dials the open
+  internet); the **iran** role is the entry hub (it opens a local SOCKS5 for
+  x-ui/Xray and keeps a warm pool to the foreign node). Both ends authenticate
+  with the shared token and must agree on the camouflage.
+- **New `[hedioum]` config section, engine dispatch, and a `hedioum` transport**
+  across List/health/watchdog. The iran hub publishes its live-pool count into
+  the tunnel's metrics snapshot, so — like Packet — a hub whose foreign node has
+  gone away is shown offline rather than green forever.
+- **Panel + CLI.** A new chooser card, a two-role create/edit form with a setup
+  guide (both English and Persian), and a matching CLI flow under *Direct
+  Tunnel*. Camouflage, egress IP mode, decoy persona, and an optional
+  Let's Encrypt domain (ACME) are all configurable on the foreign side.
+- **Engine vendored with the author's permission.** The engine is vendored from
+  [Hedioum Pool Tunnel](https://github.com/hedioum/Hedioum-Pool-Tunnel) by
+  hedioum, with attribution, under `internal/hedioum/engine/` (see its
+  `NOTICE.md`). The upstream CLI, TUI, installer and self-updater are not
+  included; the two daemons are driven by Arange-tun's own config and run under
+  its per-tunnel systemd service through a thin adapter. Only pure-Go
+  dependencies are added (yamux; uTLS and x/crypto were already present), so the
+  Go 1.24 toolchain pin and the installer are unaffected.
+
 ## v1.23.0 — 2026-08-13
 
 **Datagram (UDP) transport fixes, ported from upstream BackPack v1.7.1.** The

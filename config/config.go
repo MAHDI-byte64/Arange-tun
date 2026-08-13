@@ -384,6 +384,71 @@ type SSHConfig struct {
 	LogLevel string `toml:"log_level"`
 }
 
+// HedioumConfig is the Hedioum tunnel: a two-node connection-pool proxy that
+// carries SOCKS5 traffic over many multiplexed, camouflaged pipes. Its engine is
+// vendored (with the author's permission — see internal/hedioum/engine/NOTICE.md)
+// from Hedioum Pool Tunnel by hedioum: https://github.com/hedioum/Hedioum-Pool-Tunnel
+//
+// Its topology is the same inverted shape as Packet: the "foreign" role is the
+// abroad exit node (it dials the open internet) and the "iran" role is the entry
+// that exposes a local SOCKS5 which X-UI/Xray point their outbound at. The two
+// ends authenticate with a shared token. It has its own section and engine, like
+// WireGuard and Packet, and ignores the [server]/[client] sections.
+type HedioumConfig struct {
+	Role string `toml:"role"` // "foreign" (abroad exit) or "iran" (entry hub)
+
+	// AuthToken is the shared secret; it must be identical on both ends.
+	AuthToken string `toml:"auth_token"`
+
+	// Mimic is the camouflage protocol the pipes impersonate: "ssh" (default),
+	// "tls", "smtp" or "imap". Both ends must agree.
+	Mimic string `toml:"mimic"`
+
+	// ---- Foreign (abroad exit) fields ----
+
+	// ListenPort is the public port the camouflage listener binds on the foreign
+	// node (the port the iran hub dials).
+	ListenPort int `toml:"listen_port"`
+	// EgressIPMode controls how the foreign node dials the open internet: "ipv4"
+	// (default, no IPv6 identity leak), "ipv6" or "dual". EgressBindIP optionally
+	// pins the source IP on multi-IP servers.
+	EgressIPMode string `toml:"egress_ip_mode"`
+	EgressBindIP string `toml:"egress_bind_ip"`
+	// DecoyPort is the local port the real sshd was relocated to; unauthorized
+	// probes on the public listen port are proxied here (default 2022).
+	DecoyPort int `toml:"decoy_port"`
+	// HTTPDecoyPort serves a plaintext decoy web page so the box looks like an
+	// ordinary web host to reputation scanners (default 80; negative disables it).
+	HTTPDecoyPort int `toml:"http_decoy_port"`
+	// DecoyStyle selects the camouflage persona: "apache" (default) or
+	// "directadmin".
+	DecoyStyle string `toml:"decoy_style"`
+	// Domain, when set, makes the TLS mimic present a real Let's Encrypt cert (via
+	// ACME) for this domain instead of self-signed. Requires the domain's A/AAAA
+	// records to point at this server. ACMEEmail is the optional account email.
+	Domain    string `toml:"domain"`
+	ACMEEmail string `toml:"acme_email"`
+
+	// ---- Iran (entry hub) fields ----
+
+	// ServerAddr is the foreign node's public host or IP, ServerPort its listen
+	// port (the ListenPort configured on the foreign side).
+	ServerAddr string `toml:"server_addr"`
+	ServerPort int    `toml:"server_port"`
+	// SocksPort is the localhost SOCKS5 port the hub exposes for X-UI/Xray.
+	SocksPort int `toml:"socks_port"`
+	// ServerName is the TLS SNI/CN the pipes present (mimic "tls" only; optional).
+	ServerName string `toml:"server_name"`
+	// Pool sizing and per-pipe bandwidth targets (Chaos Mesh dynamic scaling). All
+	// optional — the engine applies sensible defaults when zero.
+	MinConnections      int `toml:"min_connections"`
+	MaxConnections      int `toml:"max_connections"`
+	BandwidthLimitMbps  int `toml:"bandwidth_limit_mbps"`
+	BandwidthJitterMbps int `toml:"bandwidth_jitter_mbps"`
+
+	LogLevel string `toml:"log_level"` // none/debug/info/warn/error (default info)
+}
+
 // Config represents the complete configuration, including both server and client settings.
 type Config struct {
 	Server    ServerConfig    `toml:"server"`
@@ -391,4 +456,5 @@ type Config struct {
 	WireGuard WireGuardConfig `toml:"wireguard"`
 	Packet    PacketConfig    `toml:"packet"`
 	SSH       SSHConfig       `toml:"ssh"`
+	Hedioum   HedioumConfig   `toml:"hedioum"`
 }

@@ -20,7 +20,7 @@ Go · AGPL-3.0 · Linux amd64/arm64 · one self-contained binary · CLI **and** 
 - [Install](#-install)
 - [How reverse tunneling works](#-how-reverse-tunneling-works)
 - [Tunnel types — pick the right one](#-tunnel-types--pick-the-right-one)
-  - [Backhaul](#backhaul--the-built-in-engine) · [frp](#frp--built-in-reverse-proxy) · [Rathole v2](#rathole-v2--pooled-reverse-proxy) · [Packet](#packet--raw-packets-below-the-kernel) · [WireGuard](#wireguard--vpn-egress) · [SSH](#ssh--socks5-over-ssh)
+  - [Backhaul](#backhaul--the-built-in-engine) · [frp](#frp--built-in-reverse-proxy) · [Rathole v2](#rathole-v2--pooled-reverse-proxy) · [Packet](#packet--raw-packets-below-the-kernel) · [WireGuard](#wireguard--vpn-egress) · [SSH](#ssh--socks5-over-ssh) · [Hedioum](#hedioum--pooled-socks5-over-camouflaged-pipes)
 - [Transports (Backhaul engine)](#-transports-backhaul-engine)
 - [The web dashboard](#-the-web-dashboard)
 - [Using the CLI](#-using-the-cli)
@@ -35,7 +35,7 @@ Go · AGPL-3.0 · Linux amd64/arm64 · one self-contained binary · CLI **and** 
 ## ✨ Why Arange-tun
 
 - **One binary, two front-ends.** An interactive **CLI** and a login-protected **web dashboard** that do exactly the same things — create, edit, monitor, back up.
-- **Seven tunnel types under one roof.** From a simple reverse proxy to raw-packet DPI evasion and one-command SSH egress — all managed the same way.
+- **Eight tunnel types under one roof.** From a simple reverse proxy to raw-packet DPI evasion, one-command SSH egress and pooled camouflaged SOCKS5 — all managed the same way.
 - **Built for filtered networks.** Fingerprint-free Stealth, TLS mimicry, AmneziaWG, and raw-packet injection that hides *below* the kernel stack.
 - **Runs itself.** systemd services, a self-healing watchdog, automatic rollback, Telegram alerts that reach you *through* a tunnel even from Iran.
 - **No mystery binaries.** Every engine is compiled from the source in this repo — nothing is downloaded and run blind.
@@ -95,7 +95,7 @@ the Iran address and the token the server shows.
 
 ## 🧩 Tunnel types — pick the right one
 
-Arange-tun manages seven tunnel types. They all share the same lifecycle (create →
+Arange-tun manages eight tunnel types. They all share the same lifecycle (create →
 start → monitor → edit → delete), from the CLI or the panel's **New tunnel** chooser,
 which groups them into **Reverse** (port forwarding) and **Direct** (VPN outbound).
 
@@ -107,6 +107,7 @@ which groups them into **Reverse** (port forwarding) and **Direct** (VPN outboun
 | **Packet** | Reverse *(inverted)* | 🌍 abroad = server · 🇮🇷 Iran = client | DPI/firewalls are aggressive — this hides *below* the kernel stack. |
 | **WireGuard** | Direct (VPN egress) | 🌍 abroad = server · 🇮🇷 Iran = client (SOCKS5) | You want a full VPN exit, optionally AmneziaWG-obfuscated. |
 | **SSH** | Direct (VPN egress) | 🇮🇷 Iran = client only | You just need a quick egress and can SSH into a box abroad. |
+| **Hedioum** | Direct (VPN egress) | 🌍 abroad = foreign · 🇮🇷 Iran = hub (SOCKS5) | You want a pooled SOCKS5 exit that mimics SSH/TLS/mail and self-scales. |
 
 Each type opens with a **built-in setup guide** in the panel before its form. Here's
 the short version of each.
@@ -177,6 +178,25 @@ whose traffic leaves through it, reconnecting automatically if the link drops.
 - Security is intentionally light (password login, host key trusted on first use) —
   use it for convenience, not as a hardened channel.
 
+### Hedioum — pooled SOCKS5 over camouflaged pipes
+
+A two-node egress that carries **SOCKS5 over a self-scaling pool of camouflaged pipes**.
+Each pipe impersonates a real protocol — **SSH, TLS, SMTP or IMAP** — is encrypted with
+ChaCha20-Poly1305, and jitters its bandwidth to blur DPI patterns. The abroad node also
+serves a **decoy** (an Apache or DirectAdmin page) to anyone who probes it without the
+token, so it looks like an ordinary server.
+
+- **🌍 abroad (foreign):** pick a **camouflage** and a listen port, optionally a domain
+  for a real **Let's Encrypt** certificate (ACME); it generates a shared **token**.
+- **🇮🇷 Iran (hub):** point it at the foreign IP/port with the **same camouflage** and
+  the **token**, and choose a local SOCKS5 port; add a SOCKS outbound in your panel at
+  `127.0.0.1:<port>`. The pool grows and shrinks with load on its own.
+
+> The Hedioum engine is vendored **with the author's permission** from
+> [Hedioum Pool Tunnel](https://github.com/hedioum/Hedioum-Pool-Tunnel) by **hedioum**;
+> all credit for its design belongs to them. See
+> [`internal/hedioum/engine/NOTICE.md`](internal/hedioum/engine/NOTICE.md).
+
 ---
 
 ## 🔌 Transports (Backhaul engine)
@@ -211,7 +231,7 @@ From the dashboard you can:
   obfuscation, and an optional advanced-tuning section with the same manual knobs the
   CLI offers).
 - **✏️ Edit, ⏸️ stop/▶️ start, 🔁 restart or 🗑️ delete** a tunnel from its Details dialog —
-  including WireGuard, Packet and SSH tunnels.
+  including WireGuard, Packet, SSH and Hedioum tunnels.
 - **📊 Monitor** live CPU / RAM / disk / traffic, each tunnel's state, real ping and
   logs — with per-tunnel and long-term metrics.
 - **⚙️ Manage** backup, Telegram setup and the panel password in Settings, and **update**
@@ -368,5 +388,10 @@ Each topic has its own page under [`docs/`](docs/):
 
 Released under the **GNU Affero General Public License v3.0 (AGPL-3.0)** — see
 [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+**Credits:** the **Hedioum** tunnel embeds the engine of
+[Hedioum Pool Tunnel](https://github.com/hedioum/Hedioum-Pool-Tunnel) by **hedioum**,
+vendored **with the author's permission** and with attribution — see
+[`internal/hedioum/engine/NOTICE.md`](internal/hedioum/engine/NOTICE.md).
 
 **GitHub:** [mahdi-byte64](https://github.com/mahdi-byte64) — open an issue on the repository.

@@ -1516,6 +1516,83 @@
   </div>
 </div>
 
+<div class="modal" id="hedtun" onclick="if(event.target===this)closeHedioum()">
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="hedtitle" style="width:min(94vw,520px)">
+    <h3 id="hedtitle" data-i18n>New Hedioum tunnel</h3>
+    <p data-i18n>Hedioum is a two-node connection-pool proxy: it carries SOCKS5 traffic over many multiplexed, camouflaged pipes (SSH/TLS/SMTP/IMAP), with a self-scaling pool and per-pipe bandwidth jitter to evade DPI. The foreign side is the abroad exit; the Iran side exposes a local SOCKS5 and dials out.</p>
+
+    <label for="hed-role" data-i18n>Side</label>
+    <select id="hed-role" onchange="hedSync()">
+      <option value="foreign" data-i18n>🌍 Foreign — exit node abroad (generates a token)</option>
+      <option value="iran" data-i18n>🇮🇷 Iran — entry hub that exposes SOCKS5</option>
+    </select>
+
+    <label for="hed-name" data-i18n>Tunnel name</label>
+    <input id="hed-name" type="text" autocomplete="off" spellcheck="false" placeholder="hedioum-out" maxlength="40">
+
+    <label for="hed-mimic" data-i18n>Camouflage (must match both ends)</label>
+    <select id="hed-mimic" class="sel">
+      <option value="ssh" data-i18n>SSH — looks like an SSH server (recommended)</option>
+      <option value="tls" data-i18n>TLS — looks like HTTPS</option>
+      <option value="smtp" data-i18n>SMTP — looks like a mail server (STARTTLS)</option>
+      <option value="imap" data-i18n>IMAP — looks like a mail server (STARTTLS)</option>
+    </select>
+
+    <div id="hed-foreign-fields">
+      <label for="hed-port" data-i18n>Listen port</label>
+      <input id="hed-port" type="number" min="1" max="65535" step="1" placeholder="8443">
+      <label for="hed-token" data-i18n>Shared token (optional — generated if empty)</label>
+      <input id="hed-token" type="text" autocomplete="off" spellcheck="false" placeholder="">
+      <label for="hed-egress" data-i18n>Egress IP mode</label>
+      <select id="hed-egress" class="sel">
+        <option value="ipv4" data-i18n>IPv4 only (recommended — no IPv6 identity leak)</option>
+        <option value="dual" data-i18n>Dual stack (IPv4 + IPv6)</option>
+        <option value="ipv6" data-i18n>IPv6 only</option>
+      </select>
+      <label for="hed-decoy" data-i18n>Decoy persona (served to unauthorized probes)</label>
+      <select id="hed-decoy" class="sel">
+        <option value="apache" data-i18n>Apache — the default Apache2 web page</option>
+        <option value="directadmin" data-i18n>DirectAdmin — a hosting panel box</option>
+      </select>
+      <label for="hed-domain" data-i18n>Domain (optional — real Let's Encrypt cert via ACME)</label>
+      <input id="hed-domain" type="text" autocomplete="off" spellcheck="false" placeholder="example.com">
+      <label for="hed-acme" data-i18n>ACME email (optional — expiry notices)</label>
+      <input id="hed-acme" type="text" autocomplete="off" spellcheck="false" placeholder="you@example.com">
+    </div>
+
+    <div id="hed-iran-fields">
+      <label for="hed-server" data-i18n>Foreign server — abroad IP or domain</label>
+      <input id="hed-server" type="text" autocomplete="off" spellcheck="false" placeholder="1.2.3.4">
+      <label for="hed-serverport" data-i18n>Foreign listen port</label>
+      <input id="hed-serverport" type="number" min="1" max="65535" step="1" placeholder="8443">
+      <label for="hed-itoken" data-i18n>Shared token — copy it from the foreign node</label>
+      <input id="hed-itoken" type="text" autocomplete="off" spellcheck="false" placeholder="">
+      <label for="hed-socksport" data-i18n>Local SOCKS5 port</label>
+      <input id="hed-socksport" type="number" min="1" max="65535" step="1" placeholder="1080">
+      <p class="hint" style="margin:-8px 0 14px;font-size:11.5px;color:var(--muted2)" data-i18n>The SOCKS5 proxy binds to 127.0.0.1 — set it as an outbound in your panel (x-ui / 3x-ui) on this same server.</p>
+    </div>
+
+    <div id="hed-msg" class="msg"></div>
+    <div class="actions" style="margin-top:6px">
+      <button class="btn-ghost" onclick="closeHedioum()" data-i18n>Close</button>
+      <button class="btn-primary" id="hed-submit" onclick="submitHedioum()" data-i18n>Create tunnel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="hedresult" onclick="if(event.target===this)closeHedioumResult()">
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="hedrtitle" style="width:min(94vw,520px)">
+    <h3 id="hedrtitle" data-i18n>Hedioum foreign node created</h3>
+    <p data-i18n>Copy this shared token to the Iran machine — there, create a Hedioum “Iran” tunnel, point it at this server's address and port, pick the same camouflage, and paste the token.</p>
+    <label for="hed-outtoken" data-i18n>Shared token</label>
+    <input id="hed-outtoken" type="text" readonly spellcheck="false" onclick="this.select()">
+    <div class="actions" style="margin-top:6px">
+      <button class="btn-ghost" type="button" onclick="copyText($('hed-outtoken').value,this)" data-i18n>Copy</button>
+      <button class="btn-primary" onclick="closeHedioumResult()" data-i18n>Done</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="newtun" onclick="if(event.target===this)closeNewTunnel()">
   <div class="box" role="dialog" aria-modal="true" aria-labelledby="nttitle" style="width:min(94vw,460px)">
     <h3 id="nttitle" data-i18n>New tunnel</h3>
@@ -2069,6 +2146,29 @@ const FA={
   "Packet server created":"سرور پکت ساخته شد",
   "Copy this shared key to the Iran machine — there, create a Packet “client” tunnel, point it at this server's address and port, and paste the key.":"این کلید مشترک را روی ماشین ایران کپی کن — آنجا یک تانل پکت «کلاینت» بساز، آن را به آدرس و پورت این سرور اشاره بده و کلید را paste کن.",
   "Shared key":"کلید مشترک",
+  "New Hedioum tunnel":"تونل Hedioum جدید",
+  "Hedioum is a two-node connection-pool proxy: it carries SOCKS5 traffic over many multiplexed, camouflaged pipes (SSH/TLS/SMTP/IMAP), with a self-scaling pool and per-pipe bandwidth jitter to evade DPI. The foreign side is the abroad exit; the Iran side exposes a local SOCKS5 and dials out.":"Hedioum یک پراکسی دو-نودی با استخر اتصال است: ترافیک SOCKS5 را روی چندین پایپ استتارشدهٔ مالتی‌پلکس (SSH/TLS/SMTP/IMAP) با استخر خودمقیاس و نوسانِ پهنای‌باند برای فرار از DPI حمل می‌کند. سمت خارج نقطهٔ خروج است؛ سمت ایران یک SOCKS5 محلی باز می‌کند و بیرون dial می‌زند.",
+  "🌍 Foreign — exit node abroad (generates a token)":"🌍 خارج — نود خروج در خارج (توکن می‌سازد)",
+  "🇮🇷 Iran — entry hub that exposes SOCKS5":"🇮🇷 ایران — هابِ ورودی که SOCKS5 را نمایش می‌دهد",
+  "Camouflage (must match both ends)":"استتار (باید در هر دو سمت یکسان باشد)",
+  "SSH — looks like an SSH server (recommended)":"SSH — شبیه یک سرور SSH (پیشنهادی)",
+  "TLS — looks like HTTPS":"TLS — شبیه HTTPS",
+  "SMTP — looks like a mail server (STARTTLS)":"SMTP — شبیه یک سرور ایمیل (STARTTLS)",
+  "IMAP — looks like a mail server (STARTTLS)":"IMAP — شبیه یک سرور ایمیل (STARTTLS)",
+  "Listen port":"پورت گوش‌دادن",
+  "Shared token (optional — generated if empty)":"توکن مشترک (اختیاری — اگر خالی باشد ساخته می‌شود)",
+  "Egress IP mode":"حالت آی‌پیِ خروج",
+  "Decoy persona (served to unauthorized probes)":"شخصیت تقلبی (به کاوش‌های غیرمجاز نشان داده می‌شود)",
+  "Apache — the default Apache2 web page":"Apache — صفحهٔ وب پیش‌فرض Apache2",
+  "DirectAdmin — a hosting panel box":"DirectAdmin — یک باکس پنل هاستینگ",
+  "Domain (optional — real Let's Encrypt cert via ACME)":"دامنه (اختیاری — گواهی واقعی Let's Encrypt از طریق ACME)",
+  "ACME email (optional — expiry notices)":"ایمیل ACME (اختیاری — اعلان انقضا)",
+  "Foreign server — abroad IP or domain":"سرور خارج — آی‌پی یا دامنهٔ خارج",
+  "Foreign listen port":"پورت گوش‌دادنِ خارج",
+  "Shared token — copy it from the foreign node":"توکن مشترک — از نود خارج کپی کن",
+  "Hedioum foreign node created":"نود خارجِ Hedioum ساخته شد",
+  "Copy this shared token to the Iran machine — there, create a Hedioum “Iran” tunnel, point it at this server's address and port, pick the same camouflage, and paste the token.":"این توکن مشترک را روی ماشین ایران کپی کن — آنجا یک تونل «ایران» Hedioum بساز، آن را به آدرس و پورت این سرور اشاره بده، همان استتار را انتخاب کن و توکن را paste کن.",
+  "Shared token":"توکن مشترک",
   "Protocol":"پروتکل",
   "TCP — for the usual x-ui / Xray inbounds":"TCP — برای اینباندهای معمول x-ui / Xray",
   "UDP — for WireGuard, Hysteria, QUIC and other datagram services":"UDP — برای WireGuard، Hysteria، QUIC و سرویس‌های دیتاگرامی دیگر",
@@ -2548,6 +2648,7 @@ function trLabel(t){
   if(t==='wireguard') return 'WireGuard';
   if(t==='packet') return 'Packet';
   if(t==='ssh') return 'SSH';
+  if(t==='hedioum') return 'Hedioum';
   return t.toUpperCase();
 }
 
@@ -2947,7 +3048,8 @@ const TUN_TYPES=[
   {id:'rathole', name:'Rathole v2', ready:true, kind:'reverse', desc:{en:'Pooled data-channel reverse proxy.', fa:'ریورس‌پراکسی با کانال دادهٔ مجزا.'}},
   {id:'packet', name:'Packet', ready:true, kind:'direct', desc:{en:'Raw-packet tunnel — bypasses the kernel stack.', fa:'تونل پکت خام — دور زدن لایهٔ کرنل.'}},
   {id:'wireguard', name:'WireGuard', ready:true, kind:'direct', desc:{en:'VPN egress + SOCKS5 outbound.', fa:'خروج VPN + اوت‌باند SOCKS5.'}},
-  {id:'ssh', name:'SSH', ready:true, kind:'direct', desc:{en:'SOCKS5 over SSH — quick egress with a password.', fa:'SOCKS5 روی SSH — خروج سریع با پسورد.'}}
+  {id:'ssh', name:'SSH', ready:true, kind:'direct', desc:{en:'SOCKS5 over SSH — quick egress with a password.', fa:'SOCKS5 روی SSH — خروج سریع با پسورد.'}},
+  {id:'hedioum', name:'Hedioum', ready:true, kind:'direct', desc:{en:'Pooled SOCKS5 over camouflaged pipes (SSH/TLS).', fa:'SOCKS5 روی پایپ‌های استتارشده و استخر پویا (SSH/TLS).'}}
 ];
 function openChooser(){
   const g=$('typegrid'); g.innerHTML='';
@@ -2996,6 +3098,7 @@ function tutProceed(){
   else if(tutType==='wireguard') openWireGuard();
   else if(tutType==='packet') openPacket();
   else if(tutType==='ssh') openSSH();
+  else if(tutType==='hedioum') openHedioum();
 }
 
 // WireGuard is not a reverse tunnel, so it has its own form: a server generates
@@ -3152,6 +3255,92 @@ async function submitPacket(){
       toast('“'+name+'” '+(editing?T('saved.'):T('created.')));
     }
   }catch(e){ pktMsg(T('Network error.'),true); btn.disabled=false; }
+}
+
+// Hedioum, like Packet, is a two-node egress with its own form. The foreign
+// (abroad) side generates a shared token; the Iran side is pointed at it and
+// exposes a local SOCKS5.
+let hedEditMode='';
+function openHedioum(){
+  $('hedtitle').textContent=T('New Hedioum tunnel');
+  hedMsg('');
+  hedEditMode='';
+  $('hed-submit').disabled=false; $('hed-submit').textContent=T('Create tunnel');
+  ['hed-name','hed-port','hed-token','hed-domain','hed-acme','hed-server','hed-serverport','hed-itoken','hed-socksport'].forEach(id=>{ if($(id)) $(id).value=''; });
+  $('hed-name').readOnly=false;
+  $('hed-role').value='foreign'; $('hed-role').disabled=false;
+  $('hed-mimic').value='ssh'; $('hed-egress').value='ipv4'; $('hed-decoy').value='apache';
+  hedSync();
+  $('hedtun').classList.add('on');
+}
+// openHedioumEdit reuses the Hedioum form to edit an existing tunnel: the same
+// fields, prefilled, with the name and side locked and the submit turned into a
+// save.
+async function openHedioumEdit(name){
+  let d;
+  try{
+    const r=await fetch('/api/hedioum/get?name='+encodeURIComponent(name));
+    if(!r.ok){ toast((await r.text())||T('Could not load the tunnel.'),true); return; }
+    d=await r.json();
+  }catch(e){ toast(T('Network error.'),true); return; }
+  closeDetails();
+  openHedioum();
+  hedEditMode=name;
+  $('hedtitle').textContent=T('Edit Hedioum tunnel');
+  $('hed-submit').textContent=T('Save changes');
+  const nm=$('hed-name'); nm.value=name; nm.readOnly=true;
+  $('hed-role').value=d.role||'foreign'; $('hed-role').disabled=true;
+  $('hed-mimic').value=d.mimic||'ssh';
+  if(d.role==='foreign'){
+    $('hed-port').value=d.listenPort||'';
+    $('hed-token').value=d.authToken||'';
+    $('hed-egress').value=d.egressIPMode||'ipv4';
+    $('hed-decoy').value=d.decoyStyle||'apache';
+    $('hed-domain').value=d.domain||'';
+    $('hed-acme').value=d.acmeEmail||'';
+  }else{
+    $('hed-server').value=d.serverAddr||'';
+    $('hed-serverport').value=d.serverPort||'';
+    $('hed-itoken').value=d.authToken||'';
+    $('hed-socksport').value=d.socksPort||'';
+  }
+  hedSync();
+  $('hedtun').classList.add('on');
+}
+function closeHedioum(){ $('hedtun').classList.remove('on'); }
+function closeHedioumResult(){ $('hedresult').classList.remove('on'); }
+function hedSync(){
+  const role=$('hed-role').value;
+  $('hed-foreign-fields').style.display=role==='foreign'?'':'none';
+  $('hed-iran-fields').style.display=role==='iran'?'':'none';
+}
+function hedMsg(text,isErr){ const m=$('hed-msg'); m.textContent=text||''; m.className='msg'+(text?(isErr?' err':' ok'):''); }
+async function submitHedioum(){
+  const role=$('hed-role').value, name=$('hed-name').value.trim();
+  if(!name){ hedMsg(T('A tunnel name is required.'),true); return; }
+  const editing=!!hedEditMode;
+  const btn=$('hed-submit'); btn.disabled=true; hedMsg(editing?T('Saving…'):T('Creating…'));
+  try{
+    if(role==='foreign'){
+      const req={name, listenPort:parseInt($('hed-port').value,10)||0, authToken:$('hed-token').value.trim(),
+        mimic:$('hed-mimic').value, egressIPMode:$('hed-egress').value, decoyStyle:$('hed-decoy').value,
+        domain:$('hed-domain').value.trim(), acmeEmail:$('hed-acme').value.trim(), edit:editing};
+      const r=await fetch('/api/hedioum/foreign',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(req)});
+      if(!r.ok){ hedMsg((await r.text())||('HTTP '+r.status),true); btn.disabled=false; return; }
+      const res=await r.json();
+      closeHedioum(); loadTunnels(); go('control');
+      if(editing){ toast('“'+name+'” '+T('saved.')); }
+      else { $('hed-outtoken').value=res.token||''; $('hedresult').classList.add('on'); }
+    }else{
+      const req={name, serverAddr:$('hed-server').value.trim(), serverPort:parseInt($('hed-serverport').value,10)||0,
+        authToken:$('hed-itoken').value.trim(), mimic:$('hed-mimic').value,
+        socksPort:parseInt($('hed-socksport').value,10)||0, edit:editing};
+      const r=await fetch('/api/hedioum/iran',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(req)});
+      if(!r.ok){ hedMsg((await r.text())||('HTTP '+r.status),true); btn.disabled=false; return; }
+      closeHedioum(); loadTunnels(); go('control');
+      toast('“'+name+'” '+(editing?T('saved.'):T('created.')));
+    }
+  }catch(e){ hedMsg(T('Network error.'),true); btn.disabled=false; }
 }
 
 // SSH is a client-only VPN egress: log in to a server abroad and open a local
@@ -3323,6 +3512,29 @@ const TUTORIALS={
       '<li>مشخصات لاگین سرور و یک <b>پورت SOCKS5 محلی</b> (مثلاً ۱۰۸۰) را وارد کن.</li>'+
       '<li>در پنل، یک <b>اوت‌باند SOCKS</b> به <code>127.0.0.1:&lt;همان پورت&gt;</code> اضافه کن. هر ترافیکی که از آن رد کنی با آی‌پی سرور SSH خارج می‌شود.</li></ol>'+
       '<p>اگر ارتباط SSH قطع شود، خودکار وصل می‌شود. امنیتش سبک است (لاگین با پسورد، کلید میزبان در اولین اتصال مورد اعتماد)، پس بیشتر برای راحتی از آن استفاده کن تا یک کانال سخت‌گیرانه.</p>'+
+      '<p>برای باز شدن فرم، این راهنما را ببند.</p>'}},
+  hedioum:{title:{en:'Hedioum — setup guide', fa:'Hedioum — راهنمای راه‌اندازی'},body:{
+    en:'<p><b>Hedioum</b> is a two-node egress that carries SOCKS5 over a <b>self-scaling pool of camouflaged pipes</b>. Each pipe impersonates a real protocol — <b>SSH, TLS, SMTP or IMAP</b> — is encrypted with ChaCha20-Poly1305, and jitters its bandwidth to blur DPI patterns. The abroad node also serves a decoy (an Apache or DirectAdmin page) to anyone who probes it without the token, so it looks like an ordinary server.</p>'+
+      '<h4>The two sides</h4><ul>'+
+      '<li><b>🌍 Foreign</b> — the exit node abroad. It listens on a port, generates a <b>shared token</b>, and dials the open internet.</li>'+
+      '<li><b>🇮🇷 Iran</b> — the entry hub. It opens a local <b>SOCKS5</b> and keeps a warm pool of pipes to the foreign node.</li></ul>'+
+      '<h4>Steps</h4><ol>'+
+      '<li>Create the <b>Foreign</b> node first: pick a <b>camouflage</b> (SSH is the safest default), a listen port, optionally a domain for a real Let\'s Encrypt cert, and copy the generated <b>token</b>.</li>'+
+      '<li>Create the <b>Iran</b> hub: enter the foreign IP and port, the <b>same camouflage</b>, paste the <b>token</b>, and choose a local SOCKS5 port.</li>'+
+      '<li>In your panel (x-ui / 3x-ui), add a <b>SOCKS outbound</b> pointing at <code>127.0.0.1:&lt;that port&gt;</code>.</li></ol>'+
+      '<p>Both ends must use the <b>same camouflage and token</b>. The pool grows and shrinks with load on its own.</p>'+
+      '<p><span style="opacity:.8">Engine vendored with permission from <b>Hedioum Pool Tunnel</b> by hedioum.</span></p>'+
+      '<p>Close this guide to open the form.</p>',
+    fa:'<p><b>Hedioum</b> یک خروج دو-نودی است که SOCKS5 را روی یک <b>استخر خودمقیاس از پایپ‌های استتارشده</b> حمل می‌کند. هر پایپ خود را شبیه یک پروتکل واقعی نشان می‌دهد — <b>SSH، TLS، SMTP یا IMAP</b> — با ChaCha20-Poly1305 رمز می‌شود و پهنای‌باندش را نوسان می‌دهد تا الگوهای DPI را محو کند. نود خارج برای هر کسی که بدون توکن کاوش کند یک صفحهٔ تقلبی (Apache یا DirectAdmin) نشان می‌دهد تا مثل یک سرور معمولی دیده شود.</p>'+
+      '<h4>دو سمت</h4><ul>'+
+      '<li><b>🌍 خارج (Foreign)</b> — نود خروج در خارج. روی یک پورت گوش می‌دهد، یک <b>توکن مشترک</b> می‌سازد و به اینترنت آزاد dial می‌زند.</li>'+
+      '<li><b>🇮🇷 ایران (Iran)</b> — هابِ ورودی. یک <b>SOCKS5</b> محلی باز می‌کند و یک استخر گرم از پایپ‌ها به نود خارج نگه می‌دارد.</li></ul>'+
+      '<h4>مراحل</h4><ol>'+
+      '<li>اول نود <b>خارج</b> را بساز: یک <b>استتار</b> (SSH امن‌ترین پیش‌فرض است)، یک پورت گوش‌دادن، در صورت تمایل یک دامنه برای گواهی واقعی Let\'s Encrypt انتخاب کن و <b>توکن</b> ساخته‌شده را کپی کن.</li>'+
+      '<li>هابِ <b>ایران</b> را بساز: آی‌پی و پورت خارج، <b>همان استتار</b>، <b>توکن</b> را پیست کن و یک پورت SOCKS5 محلی انتخاب کن.</li>'+
+      '<li>در پنل (x-ui / 3x-ui) یک <b>اوت‌باند SOCKS</b> به <code>127.0.0.1:&lt;همان پورت&gt;</code> اضافه کن.</li></ol>'+
+      '<p>هر دو سمت باید از <b>استتار و توکن یکسان</b> استفاده کنند. استخر خودش با بار زیاد و کم می‌شود.</p>'+
+      '<p><span style="opacity:.8">موتور با اجازه از <b>Hedioum Pool Tunnel</b> ساختهٔ hedioum vendor شده است.</span></p>'+
       '<p>برای باز شدن فرم، این راهنما را ببند.</p>'}},
   _soon:function(name){ return {
     title:{en:name+' — coming soon', fa:name+' — به‌زودی'},body:{
@@ -3598,6 +3810,7 @@ async function editTunnel(name){
   if(tt==='wireguard'){ openWireGuardEdit(name); return; }
   if(tt==='packet'){ openPacketEdit(name); return; }
   if(tt==='ssh'){ openSSHEdit(name); return; }
+  if(tt==='hedioum'){ openHedioumEdit(name); return; }
   let req;
   try{
     const r=await fetch('/api/tunnels/get?name='+encodeURIComponent(name));

@@ -11,6 +11,7 @@ require (
 	github.com/goccy/go-yaml v1.19.2
 	github.com/gopacket/gopacket v1.6.1
 	github.com/gorilla/websocket v1.5.3
+	github.com/hashicorp/yamux v0.1.2
 	github.com/quic-go/quic-go v0.54.0
 	github.com/refraction-networking/utls v1.8.2
 	github.com/shirou/gopsutil/v4 v4.24.8

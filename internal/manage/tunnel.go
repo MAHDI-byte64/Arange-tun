@@ -62,6 +62,18 @@ func List() []Tunnel {
 			t.Role = "client"
 			t.Transport = "ssh"
 			t.Addr = fmt.Sprintf("%s:%d", cfg.SSH.Host, cfg.SSH.Port)
+		case cfg.Hedioum.Role != "":
+			// Hedioum is a two-node pool proxy with an inverted topology, like
+			// Packet: the iran hub exposes a local SOCKS5 and dials the foreign
+			// (abroad) exit. For the hub the address is the foreign server it dials;
+			// for the foreign it is the port it listens on.
+			t.Role = cfg.Hedioum.Role
+			t.Transport = "hedioum"
+			if cfg.Hedioum.Role == "iran" {
+				t.Addr = fmt.Sprintf("%s:%d", cfg.Hedioum.ServerAddr, cfg.Hedioum.ServerPort)
+			} else {
+				t.Addr = fmt.Sprintf(":%d", cfg.Hedioum.ListenPort)
+			}
 		case cfg.Server.BindAddr != "":
 			t.Role = "server"
 			t.Transport = string(cfg.Server.Transport)

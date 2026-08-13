@@ -278,6 +278,93 @@ func (s *server) handlePacketClientCreate(w http.ResponseWriter, r *http.Request
 	writeJSON(w, map[string]any{"status": "ok", "name": strings.TrimSpace(req.Name)})
 }
 
+// handleHedioumForeignCreate starts a Hedioum exit node (abroad) and returns the
+// shared token the iran hub must be given.
+func (s *server) handleHedioumForeignCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxTunnelBody)
+	var req struct {
+		Name         string `json:"name"`
+		ListenPort   int    `json:"listenPort"`
+		AuthToken    string `json:"authToken"`
+		Mimic        string `json:"mimic"`
+		EgressIPMode string `json:"egressIPMode"`
+		Domain       string `json:"domain"`
+		ACMEEmail    string `json:"acmeEmail"`
+		DecoyStyle   string `json:"decoyStyle"`
+		Edit         bool   `json:"edit"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "could not read the request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	var token string
+	var err error
+	if req.Edit {
+		token, err = manage.UpdateHedioumForeign(req.Name, req.ListenPort, req.AuthToken, req.Mimic, req.EgressIPMode, req.Domain, req.ACMEEmail, req.DecoyStyle)
+	} else {
+		token, err = manage.CreateHedioumForeign(req.Name, req.ListenPort, req.AuthToken, req.Mimic, req.EgressIPMode, req.Domain, req.ACMEEmail, req.DecoyStyle)
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]any{"status": "ok", "name": strings.TrimSpace(req.Name), "token": token, "edit": req.Edit})
+}
+
+// handleHedioumIranCreate starts a Hedioum entry hub (Iran) that exposes a local
+// SOCKS5 and dials the abroad foreign node.
+func (s *server) handleHedioumIranCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxTunnelBody)
+	var req struct {
+		Name       string `json:"name"`
+		ServerAddr string `json:"serverAddr"`
+		ServerPort int    `json:"serverPort"`
+		AuthToken  string `json:"authToken"`
+		Mimic      string `json:"mimic"`
+		SocksPort  int    `json:"socksPort"`
+		Edit       bool   `json:"edit"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "could not read the request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	var err error
+	if req.Edit {
+		err = manage.UpdateHedioumIran(req.Name, req.ServerAddr, req.ServerPort, req.AuthToken, req.Mimic, req.SocksPort)
+	} else {
+		err = manage.CreateHedioumIran(req.Name, req.ServerAddr, req.ServerPort, req.AuthToken, req.Mimic, req.SocksPort)
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]any{"status": "ok", "name": strings.TrimSpace(req.Name)})
+}
+
+// handleHedioumGet returns a hedioum tunnel's config so the panel can prefill its
+// edit form.
+func (s *server) handleHedioumGet(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimSpace(r.URL.Query().Get("name"))
+	if name == "" {
+		http.Error(w, "missing tunnel name", http.StatusBadRequest)
+		return
+	}
+	view, err := manage.HedioumForEdit(name)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, view)
+}
+
 // handleTunnelGet returns an existing tunnel's config in the same shape the
 // create form uses, so the panel can prefill it for editing.
 func (s *server) handleTunnelGet(w http.ResponseWriter, r *http.Request) {

@@ -23,6 +23,7 @@ func directTunnelMenu() {
 			{Title: "WireGuard", Desc: "VPN egress + local SOCKS5 — server (exit) or client (Iran)"},
 			{Title: "Packet", Desc: "raw-packet (pcap) tunnel below the kernel stack — needs root + libpcap"},
 			{Title: "SSH", Desc: "SOCKS5 over an SSH login abroad — client only"},
+			{Title: "Hedioum", Desc: "pooled SOCKS5 over camouflaged pipes — foreign (exit) or iran (hub)"},
 		})
 		switch idx {
 		case 0:
@@ -31,6 +32,8 @@ func directTunnelMenu() {
 			packetCreateMenu()
 		case 2:
 			sshCreateMenu()
+		case 3:
+			hedioumCreateMenu()
 		default:
 			return
 		}
@@ -229,5 +232,94 @@ func sshCreateMenu() {
 		return
 	}
 	tui.Success(fmt.Sprintf("SSH client created — SOCKS5 proxy on %s:%d.", bind, socksPort))
+	tui.PressEnter()
+}
+
+// ---------------------------------------------------------------------------
+// Hedioum
+// ---------------------------------------------------------------------------
+
+func hedioumCreateMenu() {
+	tui.Clear()
+	tui.Title("Hedioum tunnel")
+	tui.Warn("Two nodes: the FOREIGN side is the abroad exit; the IRAN side exposes a")
+	tui.Warn("local SOCKS5 and dials out. Create the foreign first — it prints a token.")
+	fmt.Println()
+	switch tui.ChooseOpt("Which side is this?", []tui.Option{
+		{Title: "Foreign (abroad exit node)", Desc: "listens for the hub and prints the shared token"},
+		{Title: "Iran (entry hub — exposes SOCKS5)", Desc: "dials the foreign node using the shared token"},
+	}) {
+	case 0:
+		hedioumForeignCreate()
+	case 1:
+		hedioumIranCreate()
+	}
+}
+
+// askHedioumMimic reads the camouflage protocol, defaulting to ssh.
+func askHedioumMimic() string {
+	switch tui.ChooseOpt("Camouflage (must match both ends)", []tui.Option{
+		{Title: "SSH", Desc: "looks like an SSH server (recommended)"},
+		{Title: "TLS", Desc: "looks like HTTPS"},
+		{Title: "SMTP", Desc: "looks like a mail server (STARTTLS)"},
+		{Title: "IMAP", Desc: "looks like a mail server (STARTTLS)"},
+	}) {
+	case 1:
+		return "tls"
+	case 2:
+		return "smtp"
+	case 3:
+		return "imap"
+	default:
+		return "ssh"
+	}
+}
+
+func hedioumForeignCreate() {
+	fmt.Println()
+	name, ok := askName()
+	if !ok {
+		return
+	}
+	port := tui.PromptInt("Listen port", 8443)
+	mimic := askHedioumMimic()
+	token := tui.Prompt("Shared token (leave empty to generate a strong one): ")
+	domain := tui.Prompt("Domain for a real Let's Encrypt cert (optional): ")
+	acme := ""
+	if strings.TrimSpace(domain) != "" {
+		acme = tui.Prompt("ACME account email (optional): ")
+	}
+
+	genToken, err := manage.CreateHedioumForeign(name, port, token, mimic, "ipv4", domain, acme, "apache")
+	if err != nil {
+		tui.Error("Failed: " + err.Error())
+		tui.PressEnter()
+		return
+	}
+	tui.Success("Hedioum foreign node created and started.")
+	fmt.Println()
+	tui.Info("Shared token — copy it to the Iran hub:")
+	tui.Success("  " + genToken)
+	tui.PressEnter()
+}
+
+func hedioumIranCreate() {
+	fmt.Println()
+	name, ok := askName()
+	if !ok {
+		return
+	}
+	server := tui.Prompt("Foreign server IP or domain: ")
+	serverPort := tui.PromptInt("Foreign listen port", 8443)
+	mimic := askHedioumMimic()
+	token := tui.Prompt("Shared token (from the foreign node): ")
+	socksPort := tui.PromptInt("Local SOCKS5 port (apps connect here)", 1080)
+
+	if err := manage.CreateHedioumIran(name, server, serverPort, token, mimic, socksPort); err != nil {
+		tui.Error("Failed: " + err.Error())
+		tui.PressEnter()
+		return
+	}
+	tui.Success(fmt.Sprintf("Hedioum iran hub created — SOCKS5 proxy on 127.0.0.1:%d.", socksPort))
 	tui.PressEnter()
 }

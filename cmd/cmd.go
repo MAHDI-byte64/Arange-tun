@@ -11,6 +11,7 @@ import (
 	"github.com/mahdi-byte64/arange-tun/config"
 	"github.com/mahdi-byte64/arange-tun/internal/client"
 	"github.com/mahdi-byte64/arange-tun/internal/frp"
+	"github.com/mahdi-byte64/arange-tun/internal/hedioum"
 	"github.com/mahdi-byte64/arange-tun/internal/packet"
 	"github.com/mahdi-byte64/arange-tun/internal/rathole"
 	sshtunnel "github.com/mahdi-byte64/arange-tun/internal/ssh"
@@ -150,6 +151,26 @@ func runEngine(cfg *config.Config, ctx context.Context, configPath string, apply
 		go sshtunnel.RunClient(ctx, &cfg.SSH, log)
 		<-ctx.Done()
 		logger.Println("shutting down ssh...")
+		return
+	}
+
+	// Hedioum is a two-node connection-pool proxy with the same inverted topology
+	// as Packet — the "foreign" role is the abroad exit, the "iran" role is the
+	// entry hub that exposes a local SOCKS5 — so like WireGuard and Packet it has
+	// its own config section and (vendored) engine.
+	if role := cfg.Hedioum.Role; role != "" {
+		startMetrics(ctx, configPath, "hedioum", role)
+		log := utils.NewLoggerWithFormat(cfg.Hedioum.LogLevel, cfg.Server.LogFormat)
+		switch role {
+		case "iran":
+			go hedioum.RunIran(ctx, &cfg.Hedioum, log)
+		case "foreign":
+			go hedioum.RunForeign(ctx, &cfg.Hedioum, log)
+		default:
+			logger.Fatalf("hedioum: unknown role %q", role)
+		}
+		<-ctx.Done()
+		logger.Println("shutting down hedioum...")
 		return
 	}
 

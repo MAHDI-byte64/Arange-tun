@@ -113,6 +113,29 @@ func tunnelHealthWith(t Tunnel, pairs [][2]string, active map[string]bool) Healt
 		// reports online.
 		h.Connected = true
 		h.State, h.Detail = "online", "running"
+	case t.Transport == "hedioum":
+		// Hedioum is a two-node pool proxy. The iran hub keeps a warm pool of
+		// pipes to the foreign node and writes the live count into the metrics
+		// snapshot, so — like Packet — a hub whose foreign has gone away is shown
+		// offline instead of green forever. The foreign (abroad exit) has no
+		// single peer to observe (it accepts pipes from any number of hubs), so a
+		// running service is its signal, the same as a WireGuard/SSH exit.
+		if t.Role == "iran" {
+			if connected, known := reportedPeer(app.ConfigDir, t.Name); known {
+				h.Connected = connected
+				if connected {
+					h.State, h.Detail = "online", "pool connected"
+				} else {
+					h.State, h.Detail = "offline", "running, but the foreign node is not answering"
+				}
+			} else {
+				h.Connected = true
+				h.State, h.Detail = "online", "running"
+			}
+		} else {
+			h.Connected = true
+			h.State, h.Detail = "online", "running"
+		}
 	default:
 		h.Connected = tunnelHealthy(t, pairs)
 		// tunnelHealthy answers the watchdog's question — "is this worth
