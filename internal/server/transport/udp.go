@@ -52,6 +52,29 @@ type UdpConfig struct {
 	Heartbeat    time.Duration // in seconds, for udp conn and control channel
 	ChannelSize  int
 	WebPort      int
+	// SO_RCVBUF/SO_SNDBUF size the datagram sockets (0 = kernel default). The
+	// default is small enough that a datagram flood — a speed test, a busy game
+	// server — overruns it and the kernel drops packets before any goroutine
+	// reads them, which looks like the tunnel stalling under load. Honoured on
+	// the TCP transports already; applied to the UDP sockets here too.
+	SO_RCVBUF int
+	SO_SNDBUF int
+}
+
+// applyUDPBuffers sizes a UDP socket to the configured SO_RCVBUF/SO_SNDBUF. A
+// failure is only warned about: an unsized socket still works, it just holds
+// less under a burst.
+func (s *UdpTransport) applyUDPBuffers(conn *net.UDPConn) {
+	if s.config.SO_RCVBUF > 0 {
+		if err := conn.SetReadBuffer(s.config.SO_RCVBUF); err != nil {
+			s.logger.Warnf("failed to set UDP read buffer to %d: %v", s.config.SO_RCVBUF, err)
+		}
+	}
+	if s.config.SO_SNDBUF > 0 {
+		if err := conn.SetWriteBuffer(s.config.SO_SNDBUF); err != nil {
+			s.logger.Warnf("failed to set UDP write buffer to %d: %v", s.config.SO_SNDBUF, err)
+		}
+	}
 }
 
 func NewUDPServer(parentCtx context.Context, config *UdpConfig, logger *logrus.Logger) *UdpTransport {
@@ -325,6 +348,7 @@ func (s *UdpTransport) tunnelListener(g *udpGen) {
 	if err != nil {
 		s.logger.Fatalf("failed to listen on tunnel UDP port: %v", err)
 	}
+	s.applyUDPBuffers(listener)
 
 	defer listener.Close()
 
@@ -400,9 +424,15 @@ func (s *UdpTransport) acceptTunnelConn(g *udpGen, listener *net.UDPConn) {
 				s.logger.Debugf("accepted tunnel connection from %s", addr.String())
 			default:
 				s.logger.Warn("UDP tunnel channel is full")
-				// Close the newly created connection as it couldn't be added
+				// Close the newly created connection as it couldn't be added.
 				close(tunnelConn.payload)
+				// Under the lock: this is the one path that deleted from the
+				// tunnel-side table without holding activeMu, and a concurrent
+				// map write from the accept path above can corrupt a Go map
+				// outright.
+				s.activeMu.Lock()
 				delete(s.activeConnections, key)
+				s.activeMu.Unlock()
 			}
 		}
 	}
@@ -509,6 +539,7 @@ func (s *UdpTransport) localListener(g *udpGen, localAddr, remoteAddr string) {
 	if err != nil {
 		s.logger.Fatalf("failed to listen on local UDP port: %v", err)
 	}
+	s.applyUDPBuffers(listener)
 
 	defer listener.Close()
 
@@ -593,9 +624,14 @@ func (s *UdpTransport) localListener(g *udpGen, localAddr, remoteAddr string) {
 
 				default:
 					s.logger.Warn("UDP channel is full, dropping packet.")
-					// Close the newly created connection as it couldn't be added
+					// Close the newly created connection as it couldn't be added.
 					close(newUDPConn.payload)
+					// Under the lock: handleLoop and udpCopy delete from this same
+					// map from their own goroutines, so an unlocked delete here can
+					// corrupt it.
+					mu.Lock()
 					delete(activeConnections, key)
+					mu.Unlock()
 				}
 			}
 		}
@@ -612,6 +648,21 @@ func (s *UdpTransport) handleLoop(g *udpGen, udpChan chan *LocalUDPConn, activeC
 			return
 		case localConn := <-udpChan:
 			if time.Now().UnixMilli()-localConn.timeCreated > 3000 { // 3000ms
+				// Stale before it could be paired with a tunnel connection — the
+				// pool was briefly empty, or traffic arrived before the client
+				// finished connecting. Dropping it from service is not enough: its
+				// source address stayed in the table, and nothing else ever
+				// removed it, so every later datagram from that peer was filed
+				// against this payload channel that no goroutine reads — the peer
+				// went silent for good and only a restart cured it. Remove the
+				// entry so the next datagram starts a fresh flow. Guarded on
+				// identity in case a newer flow already replaced it.
+				key := localConn.addr.String()
+				mu.Lock()
+				if (*activeConnections)[key] == localConn {
+					delete(*activeConnections, key)
+				}
+				mu.Unlock()
 				s.logger.Debugf("timeouted local connection: %d ms", time.Now().UnixMilli()-localConn.timeCreated)
 				continue
 			}

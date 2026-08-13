@@ -245,6 +245,8 @@ func (s *Server) Start() {
 			Sniffer:     s.config.Sniffer,
 			WebPort:     s.config.WebPort,
 			SnifferLog:  s.config.SnifferLog,
+			SO_RCVBUF:   s.config.SO_RCVBUF,
+			SO_SNDBUF:   s.config.SO_SNDBUF,
 		}
 
 		udpServer := transport.NewUDPServer(s.ctx, udpConfig, s.logger)

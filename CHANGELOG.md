@@ -2,6 +2,36 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.23.0 — 2026-08-13
+
+**Datagram (UDP) transport fixes, ported from upstream BackPack v1.7.1.** The
+self-contained ones that do not need the larger control-channel refactor:
+
+- **Two data races on the server's connection tables.** On the "channel full"
+  path the tunnel-side table was deleted from without its lock, and the
+  local-side table the same, which can corrupt a Go map outright. Both deletes
+  are now under the lock that guards the map.
+- **A UDP flow that went silent for good.** A source whose flow could not be
+  paired with a tunnel connection in time was dropped from service but left in
+  the table, so every later datagram from that peer was filed against a payload
+  channel nothing read — the peer stayed silent until the service was restarted.
+  The stale entry is now removed, so the next datagram starts a fresh flow.
+- **UDP sockets ignored so_rcvbuf / so_sndbuf.** The buffer sizes were honoured
+  on the TCP transports and not on UDP, so a datagram flood (a speed test, a
+  busy game server) overran the kernel default and packets were dropped before
+  any goroutine read them. The UDP sockets are now sized to the configured
+  value.
+- **One bad forwarding target took down the whole UDP client.** A target that
+  would not resolve, or a failed dial, called Fatalf and killed the process —
+  every other tunnelled port with it. It now drops the one flow and lets the
+  rest carry on.
+
+Note: the "a client that restarts on its own leaves a dead tunnel" fix and the
+matching data race in the datagram restart path are **not** included — they
+depend on a larger rework of the control-channel run state that is safer as its
+own change. QUIC, the panel's tunnel management, and refusing proxy/interface
+settings on QUIC were already present.
+
 ## v1.22.0 — 2026-08-12
 
 **Fixed the peer country/ISP row going blank in the panel.** After the

@@ -14,15 +14,23 @@ import (
 const BufferSize = 16 * 1024
 
 func UDPDialer(tcp net.Conn, remoteAddr string, logger *logrus.Logger, usage *web.Usage, remotePort int, sniffer bool) {
+	// A bad forwarding target must take down only this one flow, not the whole
+	// client. Fatalf killed the process — every other tunnelled port with it —
+	// and on a failed dial the old code then dereferenced the nil connection one
+	// line later. Drop the flow (close its stream) and let the rest carry on.
 	remoteUDPAddr, err := net.ResolveUDPAddr("udp", remoteAddr)
 	if err != nil {
-		logger.Fatalf("failed to resolve remote address: %v", err)
+		logger.Errorf("failed to resolve remote UDP address %q — dropping this flow: %v", remoteAddr, err)
+		tcp.Close()
+		return
 	}
 
 	// Dial the remote UDP server
 	remoteConn, err := net.DialUDP("udp", nil, remoteUDPAddr)
 	if err != nil {
-		logger.Fatalf("failed to dial remote UDP address: %v", err)
+		logger.Errorf("failed to dial remote UDP address %q — dropping this flow: %v", remoteAddr, err)
+		tcp.Close()
+		return
 	}
 
 	defer remoteConn.Close()
