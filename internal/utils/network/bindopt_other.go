@@ -2,7 +2,10 @@
 
 package network
 
-import "errors"
+import (
+	"errors"
+	"net"
+)
 
 // errNotLinux is returned rather than silently ignored. Both of these are Linux
 // socket options; a configuration that asks for one on another system has asked
@@ -15,5 +18,7 @@ import "errors"
 var errNotLinux = errors.New("only available on Linux")
 
 func bindToInterface(fd uintptr, name string) error { return errNotLinux }
+
+func bindPacketConnToInterface(pc net.PacketConn, name string) error { return errNotLinux }
 
 func setFirewallMark(fd uintptr, mark int) error { return errNotLinux }

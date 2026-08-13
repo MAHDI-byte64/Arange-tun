@@ -1,8 +1,11 @@
 package cmd
 
 import (
+	"net"
 	"os"
+	"os/exec"
 	"runtime"
+	"strings"
 
 	"github.com/mahdi-byte64/arange-tun/config"
 	"github.com/mahdi-byte64/arange-tun/internal/app"
@@ -164,6 +167,7 @@ func applyDefaults(cfg *config.Config) {
 	warnUnusedStreamBuffer(cfg)
 	checkOutbound(cfg)
 	checkXdi(cfg)
+	checkSpoof(cfg)
 }
 
 // checkXdi refuses an xdi tunnel that cannot possibly work, before it tries.
@@ -185,6 +189,121 @@ func checkXdi(cfg *config.Config) {
 		logger.Fatalf("the xdi transport needs a raw ICMP socket, which requires root or CAP_NET_RAW — run as root, or grant the capability with: setcap cap_net_raw+ep %s", app.BinPath)
 	}
 	logger.Warn("xdi is experimental: it carries the tunnel inside ICMP echo (ping) packets, for networks that filter UDP and TCP but not ICMP. It is slower than the other transports and heavier on ICMP rate limits.")
+}
+
+// checkSpoof refuses a spoof tunnel that cannot possibly work, before it tries,
+// and validates the profile so an unknown one is named here rather than silently
+// defaulting deep in the transport.
+//
+// Like xdi it needs a raw socket (root or CAP_NET_RAW) and is Linux only. The
+// warning is deliberately blunt: source spoofing only carries traffic where the
+// upstream network does not drop forged-source packets, and the tcp profile
+// additionally needs a firewall rule so the host kernel does not RST the flow.
+func checkSpoof(cfg *config.Config) {
+	usesSpoof := cfg.Server.Transport == config.SPOOF || cfg.Client.Transport == config.SPOOF
+	if !usesSpoof {
+		return
+	}
+	if runtime.GOOS != "linux" {
+		logger.Fatalf("the spoof transport is only available on Linux (it needs a raw IP socket)")
+	}
+	if os.Geteuid() != 0 {
+		logger.Fatalf("the spoof transport needs a raw IP socket, which requires root or CAP_NET_RAW — run as root, or grant the capability with: setcap cap_net_raw+ep %s", app.BinPath)
+	}
+	// Validate both directions' profiles of whichever side is on spoof here. A
+	// direction defaults to spoof_profile, then to udp.
+	sc := cfg.Server.SpoofConfig
+	if cfg.Client.Transport == config.SPOOF {
+		sc = cfg.Client.SpoofConfig
+	}
+	for _, p := range []string{sc.SpoofProfile, sc.SpoofUplink, sc.SpoofDownlink} {
+		if _, err := network.ParseSpoofProfile(p); err != nil {
+			logger.Fatalf("invalid spoof profile: %v", err)
+		}
+	}
+	up, down := network.ResolveSpoofDirections(sc.SpoofProfile, sc.SpoofUplink, sc.SpoofDownlink)
+	if up != down {
+		logger.Infof("spoof is asymmetric: uplink (client→server) %s, downlink (server→client) %s. Both ends must set the same pair.", up, down)
+	}
+	// The kernel RSTs a forged TCP segment on the side that RECEIVES tcp, so the
+	// iptables rule matters whenever either direction is tcp.
+	if up == "tcp" || down == "tcp" {
+		if _, err := exec.LookPath("iptables"); err != nil {
+			logger.Warn("a tcp spoof direction needs the iptables binary to suppress the kernel's RSTs, and it was not found. The tunnel will run, but those RSTs may disrupt it. Install iptables, or use udp/icmp.")
+		} else {
+			logger.Info("tcp spoof direction: a targeted iptables rule dropping the kernel's RSTs on the tunnel port is installed on start and removed on stop.")
+		}
+	}
+
+	// The server cannot learn the client's real address from the forged packets,
+	// so it must be told it. The client derives the server's real address from
+	// remote_addr, so spoof_peer_ip is optional there.
+	if cfg.Server.Transport == config.SPOOF && net.ParseIP(cfg.Server.SpoofPeerIP).To4() == nil {
+		logger.Fatalf("the spoof transport needs spoof_peer_ip set to the client's real IPv4 address on the server (it cannot be learned from the forged packets)")
+	}
+
+	// A typo in any forged source is caught here rather than silently sending
+	// nothing.
+	pool := cfg.Server.SpoofSrcPool
+	if cfg.Client.Transport == config.SPOOF {
+		pool = cfg.Client.SpoofSrcPool
+	}
+	for _, ip := range pool {
+		if net.ParseIP(ip).To4() == nil {
+			logger.Fatalf("invalid IPv4 %q in spoof_src_pool", ip)
+		}
+	}
+
+	// Reverse-path filtering is the most common reason a spoof tunnel comes up
+	// but carries nothing: this side receives on ordinary AF_INET sockets, which
+	// sit above the kernel's IP input, so a strict rp_filter drops the forged-
+	// source packets before they ever reach the tunnel. Relax it on the receiving
+	// host. Warn always, because both ends receive.
+	if v := readRPFilter(); v == 1 {
+		logger.Warn("reverse-path filtering is strict (net.ipv4.conf.all.rp_filter=1): the kernel will DROP incoming forged-source packets before the tunnel sees them. Relax it on this host: sysctl -w net.ipv4.conf.all.rp_filter=2 (and the same for the receiving interface, e.g. net.ipv4.conf.eth0.rp_filter=2).")
+	} else {
+		logger.Info("spoof needs reverse-path filtering relaxed on the receiving host (rp_filter=2 or 0 on net.ipv4.conf.all and the receiving interface) or the kernel drops the forged-source packets.")
+	}
+
+	// For icmp, the host kernel still auto-answers each incoming echo request
+	// with a reply to the forged source — harmless to the tunnel (the direction
+	// byte discards it) but noisy and a signature. An operator can silence it.
+	if up == "icmp" || down == "icmp" {
+		logger.Info("spoof_profile icmp: to stop the kernel spraying echo replies at the forged sources, set net.ipv4.icmp_echo_ignore_all=1 on the server (this also stops it answering normal pings).")
+	}
+
+	// Pipe mode carries WireGuard rather than forwarding ports; sanity-check its
+	// endpoint and remind the operator to leave MTU headroom for the framing.
+	if sc.SpoofPipe {
+		addr := sc.SpoofPipeAddr
+		if addr == "" {
+			addr = "127.0.0.1:51820"
+		}
+		if _, _, err := net.SplitHostPort(addr); err != nil {
+			logger.Fatalf("spoof_pipe_addr %q must be host:port (the WireGuard UDP endpoint on this host)", addr)
+		}
+		logger.Infof("spoof pipe mode: WireGuard endpoint %s. Point WireGuard's `endpoint` at the client's %s, and set its MTU to ~1380 to leave room for the spoof framing.", addr, addr)
+	}
+
+	logger.Warn("spoof is experimental: it forges the source address of raw IP packets. It only carries traffic where the upstream network does not drop forged-source packets (no egress/BCP38 filtering) — prove this with the spoof tester on your real route before relying on it.")
+}
+
+// readRPFilter reports net.ipv4.conf.all.rp_filter, or -1 if it cannot be read
+// (non-Linux, or the file is absent). 0 = off, 1 = strict, 2 = loose.
+func readRPFilter() int {
+	b, err := os.ReadFile("/proc/sys/net/ipv4/conf/all/rp_filter")
+	if err != nil {
+		return -1
+	}
+	switch strings.TrimSpace(string(b)) {
+	case "0":
+		return 0
+	case "1":
+		return 1
+	case "2":
+		return 2
+	}
+	return -1
 }
 
 // checkOutbound rejects a proxy or a routing binding that cannot work, at load
@@ -219,7 +338,7 @@ func checkOutbound(cfg *config.Config) {
 	// tunnel would come up and quietly leave by the wrong link — or, with a
 	// proxy, come up and carry nothing at all.
 	switch cfg.Client.Transport {
-	case config.UDP, config.KCP, config.XDI, config.QUIC:
+	case config.UDP, config.KCP, config.XDI, config.QUIC, config.SPOOF:
 		logger.Fatalf("proxy, local_addr, interface and so_mark are not supported on the %s transport: its data is not carried over the TCP dialer these settings apply to. Use tcp, tcpmux, ws, wss or wsmux, or remove them.", cfg.Client.Transport)
 	}
 

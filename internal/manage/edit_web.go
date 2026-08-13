@@ -9,6 +9,10 @@ import (
 	"github.com/mahdi-byte64/arange-tun/internal/optimize"
 )
 
+// boolPtr returns a pointer to b, for the optional (*bool) fields of
+// AdvancedTuning that distinguish "unset" from "explicitly false".
+func boolPtr(b bool) *bool { return &b }
+
 // Web edit path. TunnelForEdit reads a tunnel's on-disk config back into a
 // TunnelRequest so the panel can prefill the same form it creates from, and
 // UpdateTunnel writes the edited request over the existing tunnel and restarts
@@ -66,31 +70,52 @@ func TunnelForEdit(name string) (TunnelRequest, error) {
 			}
 		}
 
-		if s.Preset == "" || s.MaxConnections > 0 || s.BandwidthMbps > 0 || s.MSS > 0 {
-			nd, au, zc := s.Nodelay, s.AcceptUDP, s.ZeroCopy
+		if s.Preset == "" || s.MaxConnections > 0 || s.BandwidthMbps > 0 || s.MSS > 0 || string(s.Transport) == "spoof" {
+			nd, au, zc, sp := s.Nodelay, s.AcceptUDP, s.ZeroCopy, s.SpoofPipe
 			req.Advanced = &AdvancedTuning{
-				Nodelay:         &nd,
-				KeepAlive:       s.Keepalive,
-				Heartbeat:       s.Heartbeat,
-				LogLevel:        s.LogLevel,
-				LogFormat:       s.LogFormat,
-				ChannelSize:     s.ChannelSize,
-				AcceptUDP:       &au,
-				MuxCon:          s.MuxCon,
-				MuxVersion:      s.MuxVersion,
-				MuxFrameSize:    s.MaxFrameSize,
-				MuxRecvBuffer:   s.MaxReceiveBuffer,
-				MuxStreamBuffer: s.MaxStreamBuffer,
-				KCPMTU:          s.MTU,
-				KCPInterval:     s.Interval,
-				KCPSndWnd:       s.SndWnd,
-				KCPRcvWnd:       s.RcvWnd,
-				KCPDataShards:   s.DataShards,
-				KCPParityShards: s.ParityShards,
-				MSS:             s.MSS,
-				MaxConnections:  s.MaxConnections,
-				BandwidthMbps:   s.BandwidthMbps,
-				ZeroCopy:        &zc,
+				Nodelay:          &nd,
+				KeepAlive:        s.Keepalive,
+				Heartbeat:        s.Heartbeat,
+				LogLevel:         s.LogLevel,
+				LogFormat:        s.LogFormat,
+				ChannelSize:      s.ChannelSize,
+				AcceptUDP:        &au,
+				MuxCon:           s.MuxCon,
+				MuxVersion:       s.MuxVersion,
+				MuxFrameSize:     s.MaxFrameSize,
+				MuxRecvBuffer:    s.MaxReceiveBuffer,
+				MuxStreamBuffer:  s.MaxStreamBuffer,
+				KCPMTU:           s.MTU,
+				KCPInterval:      s.Interval,
+				KCPSndWnd:        s.SndWnd,
+				KCPRcvWnd:        s.RcvWnd,
+				KCPDataShards:    s.DataShards,
+				KCPParityShards:  s.ParityShards,
+				MSS:              s.MSS,
+				SpoofProfile:     s.SpoofProfile,
+				SpoofUplink:      s.SpoofUplink,
+				SpoofDownlink:    s.SpoofDownlink,
+				SpoofSrcIP:       s.SpoofSrcIP,
+				SpoofSrcPool:     s.SpoofSrcPool,
+				SpoofPeerIP:      s.SpoofPeerIP,
+				SpoofInterface:   s.SpoofInterface,
+				SpoofPipe:        &sp,
+				SpoofPipeAddr:    s.SpoofPipeAddr,
+				SpoofSockBuf:     s.SpoofSockBuf,
+				SpoofPeerSrcIP:   s.SpoofPeerSrcIP,
+				SpoofICMPReply:   boolPtr(s.SpoofICMPReply),
+				SpoofMTU:         s.SpoofMTU,
+				SpoofTTLJitter:   boolPtr(s.SpoofTTLJitter),
+				SpoofRandomDSCP:  boolPtr(s.SpoofRandomDSCP),
+				SpoofShufflePort: boolPtr(s.SpoofShufflePort),
+				SpoofPortMin:     s.SpoofPortMin,
+				SpoofPortMax:     s.SpoofPortMax,
+				SpoofPadding:     boolPtr(s.SpoofPadding),
+				SpoofPaddingMax:  s.SpoofPaddingMax,
+				SpoofFakeTLS:     boolPtr(s.SpoofFakeTLS),
+				MaxConnections:   s.MaxConnections,
+				BandwidthMbps:    s.BandwidthMbps,
+				ZeroCopy:         &zc,
 			}
 		}
 
@@ -114,28 +139,49 @@ func TunnelForEdit(name string) (TunnelRequest, error) {
 		req.TLSSni = c.TLSSni
 		req.SimpleAuth = c.SimpleAuth
 
-		if c.Preset == "" || c.MSS > 0 {
-			nd, ap, zc := c.Nodelay, c.AggressivePool, c.ZeroCopy
+		if c.Preset == "" || c.MSS > 0 || string(c.Transport) == "spoof" {
+			nd, ap, zc, sp := c.Nodelay, c.AggressivePool, c.ZeroCopy, c.SpoofPipe
 			req.Advanced = &AdvancedTuning{
-				Nodelay:         &nd,
-				KeepAlive:       c.Keepalive,
-				LogLevel:        c.LogLevel,
-				LogFormat:       c.LogFormat,
-				ConnectionPool:  c.ConnectionPool,
-				AggressivePool:  &ap,
-				MuxCon:          c.MuxSession,
-				MuxVersion:      c.MuxVersion,
-				MuxFrameSize:    c.MaxFrameSize,
-				MuxRecvBuffer:   c.MaxReceiveBuffer,
-				MuxStreamBuffer: c.MaxStreamBuffer,
-				KCPMTU:          c.MTU,
-				KCPInterval:     c.Interval,
-				KCPSndWnd:       c.SndWnd,
-				KCPRcvWnd:       c.RcvWnd,
-				KCPDataShards:   c.DataShards,
-				KCPParityShards: c.ParityShards,
-				MSS:             c.MSS,
-				ZeroCopy:        &zc,
+				Nodelay:          &nd,
+				KeepAlive:        c.Keepalive,
+				LogLevel:         c.LogLevel,
+				LogFormat:        c.LogFormat,
+				ConnectionPool:   c.ConnectionPool,
+				AggressivePool:   &ap,
+				MuxCon:           c.MuxSession,
+				MuxVersion:       c.MuxVersion,
+				MuxFrameSize:     c.MaxFrameSize,
+				MuxRecvBuffer:    c.MaxReceiveBuffer,
+				MuxStreamBuffer:  c.MaxStreamBuffer,
+				KCPMTU:           c.MTU,
+				KCPInterval:      c.Interval,
+				KCPSndWnd:        c.SndWnd,
+				KCPRcvWnd:        c.RcvWnd,
+				KCPDataShards:    c.DataShards,
+				KCPParityShards:  c.ParityShards,
+				MSS:              c.MSS,
+				SpoofProfile:     c.SpoofProfile,
+				SpoofUplink:      c.SpoofUplink,
+				SpoofDownlink:    c.SpoofDownlink,
+				SpoofSrcIP:       c.SpoofSrcIP,
+				SpoofSrcPool:     c.SpoofSrcPool,
+				SpoofPeerIP:      c.SpoofPeerIP,
+				SpoofInterface:   c.SpoofInterface,
+				SpoofPipe:        &sp,
+				SpoofPipeAddr:    c.SpoofPipeAddr,
+				SpoofSockBuf:     c.SpoofSockBuf,
+				SpoofPeerSrcIP:   c.SpoofPeerSrcIP,
+				SpoofICMPReply:   boolPtr(c.SpoofICMPReply),
+				SpoofMTU:         c.SpoofMTU,
+				SpoofTTLJitter:   boolPtr(c.SpoofTTLJitter),
+				SpoofRandomDSCP:  boolPtr(c.SpoofRandomDSCP),
+				SpoofShufflePort: boolPtr(c.SpoofShufflePort),
+				SpoofPortMin:     c.SpoofPortMin,
+				SpoofPortMax:     c.SpoofPortMax,
+				SpoofPadding:     boolPtr(c.SpoofPadding),
+				SpoofPaddingMax:  c.SpoofPaddingMax,
+				SpoofFakeTLS:     boolPtr(c.SpoofFakeTLS),
+				ZeroCopy:         &zc,
 			}
 		}
 

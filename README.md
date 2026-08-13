@@ -209,7 +209,7 @@ experimental ICMP option, all with connection pooling:
 | **TCP** | TCP · TCP Mux · TCP + Stealth | *Stealth* wraps TCP in a Noise layer with **no fingerprint** — random-looking bytes with nothing for DPI to match. Best under heavy filtering. |
 | **UDP** | UDP · UDP + KCP · QUIC | *KCP* adds reliable delivery with **forward error correction**, repairing loss without waiting for a retransmit. *QUIC* multiplexes many reliable streams over one UDP flow, with its own loss recovery and a TLS 1.3 handshake underneath. |
 | **WebSocket** | WS · WS Mux · WSS · WSS Mux | *WSS* uses TLS with a real Chrome fingerprint and a Let's Encrypt (or self-signed) certificate; a **decoy site** answers non-tunnel probes so the server looks like a normal HTTPS website. |
-| **Experimental** | xDi (ICMP) | Tunnels inside ping packets, for networks that filter TCP/UDP but not ICMP. |
+| **Experimental** | xDi (ICMP) · IP Spoofing | *xDi* tunnels inside ping packets, for networks that filter TCP/UDP but not ICMP. *IP Spoofing* carries KCP inside raw IPv4 packets with a **forged source address** (udp/icmp/tcp profiles, a rotating source pool, DPI-evasion obfuscation and a WireGuard pipe mode) — for a path that filters on the real flow. Both are Linux-only and need root. |
 
 If a kharej server is DPI-filtered, **TCP + Stealth** or **WSS** usually get the tunnel
 through; a network-layer IP block or a "dirty" exit is a clean-IP / CDN matter. Full

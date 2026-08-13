@@ -47,6 +47,7 @@ var transportGroups = []struct {
 	}},
 	{"Experimental", "newer ideas, still being proven — not for production yet", []transportEntry{
 		{"xDi (ICMP)", "tunnels inside ping packets, for networks that filter UDP/TCP but not ICMP — Linux, needs root", "xdi"},
+		{"IP Spoofing", "forges the source of raw IP packets, for a path that filters on the real flow — Linux, needs root; prove it on your route", "spoof"},
 	}},
 }
 
@@ -288,6 +289,130 @@ func promptACMEDomain(currentDomain, currentEmail string) (domain, email string,
 	return domain, email, true
 }
 
+// askSpoof collects the IP-spoofing carrier's settings. It runs on both ends
+// for the spoof transport and is a no-op for every other transport.
+//
+// The forged source is what the far end and the network see; whether replies
+// find their way back is a property of the route, which is why the wizard says
+// out loud that it must be proven — with the spoof tester (Manage → IP Spoofing
+// tester).
+func askSpoof(s *TunnelSpec) {
+	if s.Transport != "spoof" {
+		return
+	}
+	fmt.Println()
+	tui.Warn("IP Spoofing is experimental. It forges the source address of raw IP")
+	tui.Warn("packets. It only carries traffic where the upstream network does not")
+	tui.Warn("drop forged-source packets — prove it with the spoof tester first.")
+	fmt.Println()
+
+	// The two ends must agree on the profile(s). Most tunnels use one profile
+	// both ways; an asymmetric path can set each direction independently.
+	tui.Info("Packet profile — what the tunnel looks like on the wire. Both ends must match.")
+	s.SpoofProfile = askSpoofProfile("Profile (both directions)")
+
+	fmt.Println()
+	tui.Info("If this path filters differently by direction, set each direction on its")
+	tui.Info("own (uplink = client→server, downlink = server→client). Test each with")
+	tui.Info("the spoof tester.")
+	if tui.Confirm("Set a different profile per direction (asymmetric)", false) {
+		s.SpoofUplink = askSpoofProfile("Uplink (client→server)")
+		s.SpoofDownlink = askSpoofProfile("Downlink (server→client)")
+	}
+
+	// The server cannot learn the client's real address from the forged packets,
+	// so it must be told it. The client already knows the server's real address
+	// from the tunnel address it dialled.
+	if s.Role == "server" {
+		tui.Info("The client forges its source, so the server cannot see where to send")
+		tui.Info("replies. Enter the client's REAL public IPv4 address.")
+		for {
+			raw := strings.TrimSpace(tui.Prompt("Client's real IPv4: "))
+			if net.ParseIP(raw).To4() != nil {
+				s.SpoofPeerIP = raw
+				break
+			}
+			tui.Error("Enter a valid IPv4 address, e.g. 203.0.113.10")
+		}
+	}
+
+	tui.Info("Forged source IP(s) stamped on outgoing packets. Give one, or several")
+	tui.Info("comma-separated to rotate through a pool (evades per-IP limits/blocks).")
+	tui.Warn("Use the spoof tester to find which ones actually pass. Empty spoofs nothing.")
+	raw := strings.TrimSpace(tui.PromptDefault("Spoof source IP(s)", ""))
+	if raw != "" {
+		var pool []string
+		for _, part := range strings.Split(raw, ",") {
+			ip := strings.TrimSpace(part)
+			if ip == "" {
+				continue
+			}
+			if net.ParseIP(ip).To4() == nil {
+				tui.Warn(fmt.Sprintf("skipping invalid IPv4 %q", ip))
+				continue
+			}
+			pool = append(pool, ip)
+		}
+		if len(pool) == 1 {
+			s.SpoofSrcIP = pool[0]
+		} else if len(pool) > 1 {
+			s.SpoofSrcIP = pool[0]
+			s.SpoofSrcPool = pool
+		}
+	}
+
+	if names := routableInterfaces(); len(names) > 0 {
+		tui.Info("Egress interface to send the raw packets from (optional).")
+		tui.Warn("Available: " + strings.Join(names, ", ") + " — leave empty to let the kernel route.")
+		for {
+			iface := strings.TrimSpace(tui.PromptDefault("Interface", ""))
+			if iface == "" {
+				break
+			}
+			if _, err := net.InterfaceByName(iface); err != nil {
+				tui.Error(fmt.Sprintf("no such interface: %v", err))
+				continue
+			}
+			s.SpoofInterface = iface
+			break
+		}
+	}
+
+	fmt.Println()
+	tui.Info("WireGuard pipe: carry a whole-device WireGuard VPN over this tunnel")
+	tui.Info("instead of forwarding ports. WireGuard brings its own encryption, so")
+	tui.Info("there is no KCP underneath. Forwarded ports are ignored in this mode.")
+	if tui.Confirm("Enable WireGuard pipe mode", false) {
+		s.SpoofPipe = true
+		def := "127.0.0.1:51820"
+		if s.Role == "server" {
+			tui.Info("Where the real WireGuard listens on THIS server (datagrams are forwarded here).")
+		} else {
+			tui.Info("Where the tunnel listens for WireGuard — point WireGuard's `endpoint` here.")
+		}
+		s.SpoofPipeAddr = strings.TrimSpace(tui.PromptDefault("WireGuard UDP endpoint", def))
+		if s.SpoofPipeAddr == "" {
+			s.SpoofPipeAddr = def
+		}
+	}
+}
+
+// askSpoofProfile prompts for one packet profile and returns its config value.
+func askSpoofProfile(title string) string {
+	switch tui.ChooseOpt(title, []tui.Option{
+		{Title: "UDP", Desc: "most compatible — plain datagrams (recommended)"},
+		{Title: "ICMP", Desc: "looks like ping traffic — good where UDP is filtered"},
+		{Title: "TCP", Desc: "looks like a TCP flow — auto-manages an iptables RST rule"},
+	}) {
+	case 1:
+		return "icmp"
+	case 2:
+		return "tcp"
+	default:
+		return "udp"
+	}
+}
+
 // askProxyProtocol offers to forward the real client IP to the service behind
 // the tunnel. Without it that service sees every connection as coming from the
 // tunnel itself, which is why per-user device limits in VPN panels stop working
@@ -391,6 +516,7 @@ func SetupServer() {
 	}
 	askSimpleAuth(&s, transport)
 
+	askSpoof(&s)
 	askProxyProtocol(&s)
 
 	ApplyPreset(&s, choosePreset())
@@ -442,10 +568,11 @@ func SetupClient() {
 		s.EdgeIP = strings.TrimSpace(tui.PromptDefault("Edge IP", ""))
 	}
 	askSimpleAuth(&s, transport)
+	askSpoof(&s)
 
 	// Only offered where it can actually work: the datagram transports carry
 	// their data in UDP, which a TCP proxy cannot relay.
-	if transport != "udp" && transport != "kcp" && transport != "xdi" {
+	if transport != "udp" && transport != "kcp" && transport != "xdi" && transport != "spoof" {
 		fmt.Println()
 		tui.Info("Optional proxy: reach the tunnel server through a SOCKS5 or HTTP proxy,")
 		tui.Info("for a machine that cannot open outbound connections directly.")

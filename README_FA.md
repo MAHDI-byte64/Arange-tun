@@ -279,7 +279,7 @@ connection pooling:
 | **TCP** | TCP, TCP Mux, TCP + Stealth | *Stealth* wraps TCP in a Noise layer with **no fingerprint** — random-looking bytes with nothing for DPI to match. Best under heavy filtering. |
 | **UDP** | UDP, UDP + KCP | *KCP* adds reliable delivery with **forward error correction**, repairing loss without waiting for a retransmit. |
 | **WebSocket** | WS, WS Mux, WSS, WSS Mux | *WSS* uses TLS with a real Chrome fingerprint and a Let's Encrypt (or self-signed) certificate; a **decoy site** answers non-tunnel probes so the server looks like a normal HTTPS website. |
-| **Experimental** | xDi (ICMP) | Tunnels inside ping packets, for networks that filter TCP/UDP but not ICMP. |
+| **Experimental** | xDi (ICMP) · IP Spoofing | ‏xDi تونل را داخل پکت‌های پینگ می‌برد؛ IP Spoofing تونل KCP را داخل پکت‌های خام IPv4 با **سورس جعلی** حمل می‌کند (پروفایل‌های udp/icmp/tcp، استخر سورس چرخشی، ابهام‌سازی ضدDPI و حالت پایپ WireGuard). هر دو فقط لینوکس و نیازمند root. |
 
 </div>
 

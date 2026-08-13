@@ -19,3 +19,12 @@ the rathole reverse-proxy protocol by rapiz1 and contributors
 2.0. No rathole source code is copied; the protocol — its control/data-channel
 handshake, message framing, and forwarding design — was reimplemented in Go from
 the published specification and source.
+
+The "IP Spoofing" transport (the spoof_* config keys; the spoof carrier in
+internal/utils/network/spoof*.go and the KCP integration in kcp.go; the
+per-side spoofpipe transports; the spoof tester in internal/spooftest and
+internal/manage/spooftest.go) is derived from Backpack by Amin Mohammadi
+(AminMGMT) — https://github.com/AminMGMT/backpack — which is licensed under the
+GNU Affero General Public License v3.0, the same licence as this project. The
+code was ported with attribution under that licence; the tunnel token salts and
+module paths were adapted to Arange-tun.

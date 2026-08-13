@@ -1625,6 +1625,7 @@
       </optgroup>
       <optgroup label="Experimental">
         <option value="xdi">xDi (ICMP)</option>
+        <option value="spoof">IP Spoofing</option>
       </optgroup>
       <option value="frp" hidden>frp</option>
       <option value="frpu" hidden>frp (udp)</option>
@@ -1793,6 +1794,29 @@
           <label>Recv window<input id="nt-kcprcv" type="number" min="0" step="1" placeholder="preset"></label>
           <label>FEC data<input id="nt-kcpdata" type="number" min="0" step="1" placeholder="preset"></label>
           <label>FEC parity<input id="nt-kcpparity" type="number" min="0" step="1" placeholder="preset"></label>
+        </div>
+      </div>
+      <div id="nt-adv-spoof" style="display:none">
+        <p class="acclabel" style="margin-bottom:8px" data-i18n>IP Spoofing (raw forged-source packets)</p>
+        <p class="hint" style="margin:-4px 0 10px;font-size:11.5px;color:var(--muted2)" data-i18n>Experimental. Forges the source of raw IP packets — only carries traffic where the network does not drop forged-source packets. Both ends must use the same profile. Needs root; prove it with the CLI's spoof tester.</p>
+        <label for="nt-spoofprofile" data-i18n>Packet profile (both ends must match)</label>
+        <select id="nt-spoofprofile" class="sel">
+          <option value="udp" data-i18n>UDP — most compatible (recommended)</option>
+          <option value="icmp" data-i18n>ICMP — looks like ping, for paths that filter UDP</option>
+          <option value="tcp" data-i18n>TCP — looks like a TCP flow (auto RST-drop rule)</option>
+        </select>
+        <label for="nt-spoofsrc" data-i18n>Forged source IP(s) — comma-separated to rotate a pool</label>
+        <input id="nt-spoofsrc" type="text" autocomplete="off" spellcheck="false" placeholder="203.0.113.7, 203.0.113.8">
+        <div id="nt-spoofpeer-row">
+          <label for="nt-spoofpeer" data-i18n>Client's real IPv4 (required on the server side)</label>
+          <input id="nt-spoofpeer" type="text" autocomplete="off" spellcheck="false" placeholder="198.51.100.5">
+        </div>
+        <label for="nt-spoofiface" data-i18n>Egress interface (optional)</label>
+        <input id="nt-spoofiface" type="text" autocomplete="off" spellcheck="false" placeholder="eth0">
+        <label class="tg" style="margin:6px 0 8px"><input type="checkbox" id="nt-spoofpipe" onchange="ntSync()"><span data-i18n>WireGuard pipe mode (carry a WireGuard VPN instead of forwarding ports)</span></label>
+        <div id="nt-spoofpipeaddr-row" style="display:none">
+          <label for="nt-spoofpipeaddr" data-i18n>WireGuard UDP endpoint on this host</label>
+          <input id="nt-spoofpipeaddr" type="text" autocomplete="off" spellcheck="false" placeholder="127.0.0.1:51820">
         </div>
       </div>
       <label class="tg" id="nt-zc-row" style="display:none;margin-bottom:14px"><input type="checkbox" id="nt-zerocopy"><span data-i18n>Zero-copy forwarding (experimental)</span></label>
@@ -2232,6 +2256,17 @@ const FA={
   "Connection pool size":"اندازهٔ استخر اتصال",
   "Aggressive pool":"استخر تهاجمی",
   "Zero-copy forwarding (experimental)":"فوروارد zero-copy (آزمایشی)",
+  "IP Spoofing (raw forged-source packets)":"IP Spoofing (پکت‌های خام با سورس جعلی)",
+  "Experimental. Forges the source of raw IP packets — only carries traffic where the network does not drop forged-source packets. Both ends must use the same profile. Needs root; prove it with the CLI's spoof tester.":"آزمایشی. سورس پکت‌های خام IP را جعل می‌کند — فقط جایی ترافیک را حمل می‌کند که شبکه پکت‌های با سورس جعلی را دراپ نکند. هر دو سمت باید از پروفایل یکسان استفاده کنند. نیاز به root دارد؛ با تستر اسپوف در CLI آن را ثابت کن.",
+  "Packet profile (both ends must match)":"پروفایل پکت (باید در هر دو سمت یکسان باشد)",
+  "UDP — most compatible (recommended)":"UDP — سازگارترین (پیشنهادی)",
+  "ICMP — looks like ping, for paths that filter UDP":"ICMP — شبیه پینگ، برای مسیرهایی که UDP را فیلتر می‌کنند",
+  "TCP — looks like a TCP flow (auto RST-drop rule)":"TCP — شبیه یک جریان TCP (قانون خودکار حذف RST)",
+  "Forged source IP(s) — comma-separated to rotate a pool":"آی‌پی(های) سورس جعلی — با کاما جدا کن تا یک استخر چرخشی شود",
+  "Egress interface (optional)":"اینترفیس خروج (اختیاری)",
+  "WireGuard pipe mode (carry a WireGuard VPN instead of forwarding ports)":"حالت پایپ WireGuard (به‌جای فوروارد پورت‌ها یک VPN وایرگارد را حمل کن)",
+  "WireGuard UDP endpoint on this host":"اندپوینت UDP وایرگارد روی این هاست",
+  "Client's real IPv4 (required on the server side)":"آی‌پی واقعی IPv4 کلاینت (در سمت سرور الزامی است)",
   "Create tunnel":"ساخت تونل",
   "Create another":"ساخت یکی دیگر",
   "Creating…":"در حال ساخت…",
@@ -2649,6 +2684,8 @@ function trLabel(t){
   if(t==='packet') return 'Packet';
   if(t==='ssh') return 'SSH';
   if(t==='hedioum') return 'Hedioum';
+  if(t==='xdi') return 'xDi (ICMP)';
+  if(t==='spoof') return 'IP Spoofing';
   return t.toUpperCase();
 }
 
@@ -2981,9 +3018,9 @@ function closeDetails(){ $('details').classList.remove('on'); detName=null; }
 // form only ever shows what applies to the chosen side and transport.
 const ntNeedsTLS=t=>t==='wss'||t==='wssmux';
 const ntIsWS=t=>t==='ws'||t==='wss'||t==='wsmux'||t==='wssmux';
-const ntIsMux=t=>['tcpmux','wsmux','wssmux','kcp','xdi'].includes(t);
-const ntIsKCP=t=>t==='kcp'||t==='xdi';
-const ntIsDatagram=t=>t==='udp'||t==='kcp'||t==='xdi'||t==='quic';
+const ntIsMux=t=>['tcpmux','wsmux','wssmux','kcp','xdi','spoof'].includes(t);
+const ntIsKCP=t=>t==='kcp'||t==='xdi'||t==='spoof';
+const ntIsDatagram=t=>t==='udp'||t==='kcp'||t==='xdi'||t==='quic'||t==='spoof';
 const ntSupportsPP=t=>['tcp','tcpmux','kcp','wsmux','wssmux','stealth','quic'].includes(t);
 // The transports that carry TCP segments, and so can have their size clamped.
 const ntSupportsMSS=t=>['tcp','tcpmux','stealth','ws','wss','wsmux','wssmux'].includes(t);
@@ -3555,8 +3592,10 @@ function openNewTunnel(){
    'nt-localaddr','nt-fallback','nt-token','nt-tlshost','nt-acmedomain','nt-acmeemail',
    'nt-tlscert','nt-tlskey','nt-keepalive','nt-heartbeat','nt-maxconn','nt-bw','nt-channelsize',
    'nt-connpool','nt-muxcon','nt-muxver','nt-muxframe','nt-muxrecv','nt-muxstream',
-   'nt-kcpmtu','nt-kcpint','nt-kcpsnd','nt-kcprcv','nt-kcpdata','nt-kcpparity','nt-mss'].forEach(id=>{ if($(id)) $(id).value=''; });
-  ['nt-ipv6','nt-pp','nt-lb','nt-simpleauth','nt-adv-on','nt-acceptudp','nt-aggpool','nt-zerocopy'].forEach(id=>{ if($(id)) $(id).checked=false; });
+   'nt-kcpmtu','nt-kcpint','nt-kcpsnd','nt-kcprcv','nt-kcpdata','nt-kcpparity','nt-mss',
+   'nt-spoofsrc','nt-spoofpeer','nt-spoofiface','nt-spoofpipeaddr'].forEach(id=>{ if($(id)) $(id).value=''; });
+  ['nt-ipv6','nt-pp','nt-lb','nt-simpleauth','nt-adv-on','nt-acceptudp','nt-aggpool','nt-zerocopy','nt-spoofpipe'].forEach(id=>{ if($(id)) $(id).checked=false; });
+  if($('nt-spoofprofile')) $('nt-spoofprofile').value='udp';
   $('nt-role').value='server'; $('nt-transport').value='tcp'; $('nt-preset').value='turbo';
   $('nt-tlsmode').value='self'; $('nt-nodelay').value=''; $('nt-loglevel').value=''; $('nt-logformat').value='';
   $('nt-name').dataset.touched='';
@@ -3624,7 +3663,12 @@ function ntFrpProtoChange(){
 }
 function closeNewTunnel(){ $('newtun').classList.remove('on'); }
 function ntRoleChange(){ ntSync(); ntSuggestName(); }
-function ntTransportChange(){ ntSync(); }
+function ntTransportChange(){
+  // Spoof's forged-source settings live in the advanced section but are not
+  // optional (the server needs the peer IP), so open it automatically.
+  if($('nt-transport').value==='spoof') $('nt-adv-on').checked=true;
+  ntSync();
+}
 
 // ntSuggestName fills a default name from the port, but never overwrites a name
 // the user has already typed.
@@ -3672,6 +3716,11 @@ function ntSync(){
   $('nt-adv-mux').style.display=ntIsMux(tr)?'':'none';
   $('nt-adv-kcp').style.display=ntIsKCP(tr)?'':'none';
   $('nt-adv-mss').style.display=ntSupportsMSS(tr)?'':'none';
+  // Spoof: the forged-source knobs, with the peer field only meaningful on the
+  // server and the WireGuard endpoint only when pipe mode is on.
+  $('nt-adv-spoof').style.display=tr==='spoof'?'':'none';
+  $('nt-spoofpeer-row').style.display=(tr==='spoof'&&role==='server')?'':'none';
+  $('nt-spoofpipeaddr-row').style.display=(tr==='spoof'&&$('nt-spoofpipe').checked)?'':'none';
   $('nt-zc-row').style.display=tr==='tcp'?'':'none';
 }
 
@@ -3722,6 +3771,18 @@ function ntAdvanced(){
   if(ntIsKCP(tr)){
     num('kcpMTU','nt-kcpmtu'); num('kcpInterval','nt-kcpint'); num('kcpSndWnd','nt-kcpsnd');
     num('kcpRcvWnd','nt-kcprcv'); num('kcpDataShards','nt-kcpdata'); num('kcpParityShards','nt-kcpparity');
+  }
+  if(tr==='spoof'){
+    a.spoofProfile=$('nt-spoofprofile').value;
+    const pool=ntList('nt-spoofsrc');
+    if(pool.length===1){ a.spoofSrcIP=pool[0]; }
+    else if(pool.length>1){ a.spoofSrcIP=pool[0]; a.spoofSrcPool=pool; }
+    if(role==='server'){ const pv=$('nt-spoofpeer').value.trim(); if(pv) a.spoofPeerIP=pv; }
+    const ifc=$('nt-spoofiface').value.trim(); if(ifc) a.spoofInterface=ifc;
+    if($('nt-spoofpipe').checked){
+      a.spoofPipe=true;
+      const pa=$('nt-spoofpipeaddr').value.trim(); if(pa) a.spoofPipeAddr=pa;
+    }
   }
   if(tr==='tcp' && $('nt-zerocopy').checked) a.zeroCopy=true;
   return Object.keys(a).length?a:undefined;
@@ -3871,6 +3932,12 @@ function ntFill(req){
     ntSetNum('nt-muxrecv',a.muxRecvBuffer); ntSetNum('nt-muxstream',a.muxStreamBuffer);
     ntSetNum('nt-kcpmtu',a.kcpMTU); ntSetNum('nt-kcpint',a.kcpInterval); ntSetNum('nt-kcpsnd',a.kcpSndWnd);
     ntSetNum('nt-kcprcv',a.kcpRcvWnd); ntSetNum('nt-kcpdata',a.kcpDataShards); ntSetNum('nt-kcpparity',a.kcpParityShards);
+    if(a.spoofProfile) $('nt-spoofprofile').value=a.spoofProfile;
+    $('nt-spoofsrc').value=(a.spoofSrcPool&&a.spoofSrcPool.length?a.spoofSrcPool:(a.spoofSrcIP?[a.spoofSrcIP]:[])).join(', ');
+    $('nt-spoofpeer').value=a.spoofPeerIP||'';
+    $('nt-spoofiface').value=a.spoofInterface||'';
+    if(typeof a.spoofPipe==='boolean') $('nt-spoofpipe').checked=a.spoofPipe;
+    $('nt-spoofpipeaddr').value=a.spoofPipeAddr||'';
     if(typeof a.zeroCopy==='boolean') $('nt-zerocopy').checked=a.zeroCopy;
   }
   // The built-in reverse-proxy tunnels have no transport choice — keep the

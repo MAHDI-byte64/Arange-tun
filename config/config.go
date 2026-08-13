@@ -26,6 +26,14 @@ const (
 	// ICMP, where the tunnel rides in ping packets. Linux only, and needs a raw
 	// socket. Everything above the packet layer is identical to KCP.
 	XDI TransportType = "xdi"
+	// SPOOF carries the KCP transport inside raw IPv4 packets whose source
+	// address is forged — experimental "IP Spoofing". It is for a path that
+	// treats the source IP as identity: the packets leave with a forged source,
+	// but on the wire they appear to come from spoof_src_ip. Like xdi it is KCP
+	// over a different packet layer; everything above is identical. Linux only,
+	// needs a raw socket (root), and the spoof_* keys configure it. Ported from
+	// the upstream BackPack engine (AGPL-3.0).
+	SPOOF TransportType = "spoof"
 )
 
 // KCPConfig holds the tuning of the KCP transport: a reliable, retransmitting
@@ -72,6 +80,108 @@ func (k KCPConfig) WithDefaults() KCPConfig {
 		k.DataShards, k.ParityShards = 0, 0
 	}
 	return k
+}
+
+// SpoofConfig holds the IP-spoofing carrier's settings, embedded in both the
+// server and client config so the spoof_* keys sit at the top level of the
+// table. It only takes effect when transport = "spoof"; every field is ignored
+// otherwise. Ported from the upstream BackPack engine (AGPL-3.0).
+//
+// The carrier forges the source address of the raw packets it sends. Routing
+// still uses the real peer — the server's bind address, the client's remote
+// address — so the packet actually arrives; only the source in the on-wire
+// header is replaced with SpoofSrcIP. The two ends must agree on the profile
+// and, where it matters, on the spoofed addresses.
+type SpoofConfig struct {
+	// SpoofProfile is the L4 shim wrapped around each datagram, which decides
+	// what the packet looks like to inspection: "udp" (default), "icmp" (looks
+	// like ping) or "tcp" (looks like a TCP flow; the receiving side auto-manages
+	// an iptables rule to drop the kernel's RSTs). It sets BOTH directions unless
+	// SpoofUplink/SpoofDownlink override them.
+	SpoofProfile string `toml:"spoof_profile"`
+	// SpoofUplink and SpoofDownlink set the profile per direction, for a path
+	// whose filtering is not symmetric — e.g. ICMP survives client→server while
+	// UDP survives server→client. Uplink is client→server, downlink is
+	// server→client; both ends must set the same pair. Empty falls back to
+	// SpoofProfile, which is the symmetric case.
+	SpoofUplink   string `toml:"spoof_uplink"`
+	SpoofDownlink string `toml:"spoof_downlink"`
+	// SpoofSrcIP is the forged source address stamped on every outgoing packet.
+	// Empty leaves the host's real source in place, which spoofs nothing.
+	SpoofSrcIP string `toml:"spoof_src_ip"`
+	// SpoofSrcPool is an optional list of forged sources to rotate through: each
+	// time the carrier (re)connects it picks one, so the tunnel is not pinned to
+	// a single address a firewall might rate-limit or block. SpoofSrcIP, if set,
+	// is always a member. Empty means use SpoofSrcIP alone.
+	SpoofSrcPool []string `toml:"spoof_src_pool"`
+	// SpoofPeerIP is the peer's REAL IPv4 address — where the forged packets are
+	// actually routed. On the server it is REQUIRED: because the client forges
+	// its source, the server cannot learn where to send replies from the packets
+	// themselves and must be told the client's real address. On the client it is
+	// optional and defaults to the host of RemoteAddr.
+	SpoofPeerIP string `toml:"spoof_peer_ip"`
+	// SpoofDstIP is a forged destination written only into the cosmetic L4 shim
+	// of the profiles that carry one; the packet is still routed to the real
+	// peer. Empty mirrors SpoofSrcIP. Ignored by the udp profile.
+	SpoofDstIP string `toml:"spoof_dst_ip"`
+	// SpoofInterface pins the raw socket to a named egress device (e.g. "eth0"),
+	// for a multi-homed host where the forged source would otherwise pick the
+	// wrong link. Empty lets the kernel route by the real destination.
+	SpoofInterface string `toml:"spoof_interface"`
+	// SpoofPipe switches the spoof transport from a KCP tunnel to a raw UDP pipe
+	// for WireGuard: instead of forwarding ports, it relays datagrams between a
+	// local WireGuard socket and the forged-source channel, so a whole-device VPN
+	// rides over it. WireGuard supplies its own encryption and loss handling, so
+	// no KCP sits underneath. Ports/mux settings are ignored in this mode.
+	SpoofPipe bool `toml:"spoof_pipe"`
+	// SpoofPipeAddr is this host's WireGuard UDP endpoint. On the client it is
+	// where the tunnel listens and where WireGuard's `endpoint` points; on the
+	// server it is where the real WireGuard listens and datagrams are forwarded.
+	// Defaults to 127.0.0.1:51820.
+	SpoofPipeAddr string `toml:"spoof_pipe_addr"`
+	// SpoofSockBuf sizes the send and receive socket buffers (SO_SNDBUF /
+	// SO_RCVBUF) of the raw and UDP sockets the carrier owns, in bytes. A large
+	// buffer is what lets the forged-source flow reach real bandwidth: under a
+	// burst the kernel parks packets here instead of dropping them before the
+	// read loop drains them. 0 uses the carrier default (4 MiB).
+	SpoofSockBuf int `toml:"spoof_sockbuf"`
+	// SpoofPeerSrcIP pins the forged source the peer stamps on its packets, so
+	// anything arriving with a different source is dropped before the encryption
+	// ever looks at it. Empty accepts any source. Set it to the peer's
+	// spoof_src_ip for a tighter, cheaper receive path.
+	SpoofPeerSrcIP string `toml:"spoof_peer_src_ip"`
+	// SpoofICMPReply makes an icmp/icmpv6 tunnel look like a real ping exchange:
+	// the client sends Echo Requests and the server answers with Echo Replies,
+	// instead of both ends sending Requests. Cosmetic; both ends must set it the
+	// same. Ignored by the udp/tcp profiles.
+	SpoofICMPReply bool `toml:"spoof_icmp_reply"`
+	// SpoofMTU is the largest IP packet the carrier emits before it fragments in
+	// userspace. 0 uses 1500. Lower it on a path with a smaller MTU.
+	SpoofMTU int `toml:"spoof_mtu"`
+
+	// The DPI-evasion knobs below are optional obfuscation ported from the
+	// reference spooftunnel. The header cosmetics (ttl/dscp/source-port) need no
+	// agreement between the two ends; the wire-changing ones (padding, fake TLS)
+	// must be set the same on both.
+
+	// SpoofTTLJitter varies the IP TTL per packet across realistic OS defaults
+	// {64,128,255} instead of a fixed 64, to blur TTL-based fingerprints.
+	SpoofTTLJitter bool `toml:"spoof_ttl_jitter"`
+	// SpoofRandomDSCP varies the IP DSCP/ToS byte per packet across plausible
+	// values instead of leaving it 0.
+	SpoofRandomDSCP bool `toml:"spoof_random_dscp"`
+	// SpoofShufflePort randomises the L4 SOURCE port per packet (udp/tcp) within
+	// [SpoofPortMin,SpoofPortMax], so the flow does not sit on one source port.
+	SpoofShufflePort bool `toml:"spoof_shuffle_port"`
+	SpoofPortMin     int  `toml:"spoof_port_min"`
+	SpoofPortMax     int  `toml:"spoof_port_max"`
+	// SpoofPadding appends 1..SpoofPaddingMax random bytes to every payload
+	// (self-describing, so the receiver strips them). Both ends must set it same.
+	SpoofPadding    bool `toml:"spoof_padding"`
+	SpoofPaddingMax int  `toml:"spoof_padding_max"`
+	// SpoofFakeTLS prepends a fake TLS 1.2 record header to each TCP segment. TCP
+	// profile only; both ends must agree.
+	SpoofFakeTLS bool `toml:"spoof_fake_tls"`
 }
 
 // ServerConfig represents the configuration for the server.
@@ -150,6 +260,9 @@ type ServerConfig struct {
 	// Embedded so the kcp_* keys sit at the top level of the [server] table
 	// alongside every other tuning key.
 	KCPConfig
+	// Embedded so the spoof_* keys sit at the top level too. Only used when
+	// transport = "spoof".
+	SpoofConfig
 }
 
 // ClientConfig represents the configuration for the client.
@@ -242,6 +355,9 @@ type ClientConfig struct {
 	// Embedded so the kcp_* keys sit at the top level of the [client] table
 	// alongside every other tuning key.
 	KCPConfig
+	// Embedded so the spoof_* keys sit at the top level too. Only used when
+	// transport = "spoof".
+	SpoofConfig
 }
 
 // ObfsMode resolves the effective obfuscation mode of a server config,

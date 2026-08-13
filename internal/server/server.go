@@ -87,9 +87,33 @@ func (s *Server) Start() {
 		tcpServer := transport.NewTCPServer(s.ctx, tcpConfig, s.logger)
 		go tcpServer.Start()
 
-	case config.KCP, config.XDI:
+	case config.KCP, config.XDI, config.SPOOF:
+		// The spoof transport in pipe mode is a bare datagram relay for
+		// WireGuard, not a KCP tunnel — handle it separately and stop here.
+		if s.config.Transport == config.SPOOF && s.config.SpoofPipe {
+			up, down := network.ResolveSpoofDirections(s.config.SpoofProfile, s.config.SpoofUplink, s.config.SpoofDownlink)
+			pipeAddr := s.config.SpoofPipeAddr
+			if pipeAddr == "" {
+				pipeAddr = "127.0.0.1:51820"
+			}
+			pipeCfg := &transport.SpoofPipeConfig{
+				Token: s.config.Token,
+				Carrier: network.SpoofCarrier{
+					Uplink: up, Downlink: down,
+					SrcIP: s.config.SpoofSrcIP, SrcPool: s.config.SpoofSrcPool,
+					PeerIP: s.config.SpoofPeerIP, Interface: s.config.SpoofInterface,
+				},
+				PeerIP:   s.config.SpoofPeerIP,
+				PipeAddr: pipeAddr,
+				Retry:    time.Duration(s.config.Heartbeat) * time.Second,
+			}
+			go transport.NewSpoofPipeServer(s.ctx, pipeCfg, s.logger).Start()
+			break
+		}
+
 		kcp := s.config.KCPConfig.WithDefaults()
 		useICMP := s.config.Transport == config.XDI
+		useSpoof := s.config.Transport == config.SPOOF
 		kcpConfig := &transport.KcpConfig{
 			BindAddr:         s.config.BindAddr,
 			Heartbeat:        time.Duration(s.config.Heartbeat) * time.Second,
@@ -120,6 +144,19 @@ func (s *Server) Start() {
 			DataShards:       kcp.DataShards,
 			ParityShards:     kcp.ParityShards,
 			UseICMP:          useICMP,
+			UseSpoof:         useSpoof,
+			SpoofProfile:     s.config.SpoofProfile,
+			SpoofUplink:      s.config.SpoofUplink,
+			SpoofDownlink:    s.config.SpoofDownlink,
+			SpoofSrcIP:       s.config.SpoofSrcIP,
+			SpoofSrcPool:     s.config.SpoofSrcPool,
+			SpoofPeerIP:      s.config.SpoofPeerIP,
+			SpoofInterface:   s.config.SpoofInterface,
+			SpoofSockBuf:     s.config.SpoofSockBuf,
+			SpoofPeerSrcIP:   s.config.SpoofPeerSrcIP,
+			SpoofICMPReply:   s.config.SpoofICMPReply,
+			SpoofMTU:         s.config.SpoofMTU,
+			SpoofDPI:         network.SpoofDPIFromConfig(s.config.SpoofConfig),
 		}
 
 		kcpServer := transport.NewKcpServer(s.ctx, kcpConfig, s.logger)

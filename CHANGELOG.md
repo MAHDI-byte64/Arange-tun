@@ -2,6 +2,39 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.25.0 — 2026-08-13
+
+**New transport: `spoof` — IP Spoofing (raw forged-source packets).** A new
+reverse-tunnel transport that carries the KCP session inside raw IPv4 packets
+whose source address is forged, for a path that treats the source IP as identity.
+Like `xdi` it swaps only the packet layer — everything above KCP is unchanged —
+and it is chosen in the same create form / CLI wizard as the other transports.
+Ported from the upstream BackPack engine by Amin Mohammadi (AminMGMT), which is
+AGPL-3.0 like this project; see the NOTICE file.
+
+- **Three packet profiles** — `udp` (default), `icmp` (looks like ping) and `tcp`
+  (looks like a TCP flow; a targeted iptables rule drops the kernel's RSTs on the
+  tunnel port, installed on start and removed on stop). Profiles can be set per
+  direction (`spoof_uplink` / `spoof_downlink`) for an asymmetric path, and the
+  wire also supports `icmpv6`/`ipip`/`gre` via config.
+- **Forged-source pool** (`spoof_src_pool`) rotated per (re)connect so the tunnel
+  is not pinned to one address a firewall can block; the server is told the
+  client's real IPv4 (`spoof_peer_ip`) because the forged packets cannot reveal
+  it. Optional egress-interface pinning and a 4 MiB default socket buffer.
+- **DPI-evasion obfuscation** (all optional, config-level): per-packet TTL jitter,
+  random DSCP, source-port shuffling, self-describing payload padding, and a fake
+  TLS 1.2 record header on the tcp profile.
+- **WireGuard pipe mode** (`spoof_pipe`) carries a whole-device WireGuard VPN over
+  the forged-source channel instead of forwarding ports.
+- **IP-Spoofing tester** in the CLI (Manage → IP Spoofing Tester) discovers which
+  forged source IPs actually cross the network between two nodes, to build the
+  `spoof_src_pool`.
+- Load-time preflight (`checkSpoof`) refuses a spoof tunnel that cannot work
+  (non-Linux, no root/CAP_NET_RAW, missing peer IP) and warns about strict
+  reverse-path filtering, which silently drops forged-source packets. The panel
+  exposes the core knobs (profile, forged sources, peer IP, interface, pipe
+  mode); the advanced DPI knobs are config-level and round-trip through edits.
+
 ## v1.24.0 — 2026-08-13
 
 **New tunnel type: Hedioum — a pooled SOCKS5 egress over camouflaged pipes.** An

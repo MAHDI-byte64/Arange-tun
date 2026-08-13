@@ -103,6 +103,32 @@ type AdvancedTuning struct {
 	// transports that carry TCP segments honour it; see supportsMSS.
 	MSS int `json:"mss"`
 
+	// Spoof transport (transport == "spoof"). The forged-source raw-IP carrier;
+	// every field is ignored on any other transport.
+	SpoofProfile   string   `json:"spoofProfile"`   // udp (default) / icmp / tcp
+	SpoofUplink    string   `json:"spoofUplink"`    // per-direction override (empty = symmetric)
+	SpoofDownlink  string   `json:"spoofDownlink"`  // per-direction override (empty = symmetric)
+	SpoofSrcIP     string   `json:"spoofSrcIP"`     // forged source, empty spoofs nothing
+	SpoofSrcPool   []string `json:"spoofSrcPool"`   // forged sources to rotate through
+	SpoofPeerIP    string   `json:"spoofPeerIP"`    // peer's real IPv4; required on the server
+	SpoofInterface string   `json:"spoofInterface"` // egress device to pin the raw socket to
+	SpoofPipe      *bool    `json:"spoofPipe"`      // WireGuard-pipe mode instead of a KCP tunnel
+	SpoofPipeAddr  string   `json:"spoofPipeAddr"`  // this host's WireGuard UDP endpoint
+	// Spoof advanced/DPI knobs — config-level; the form leaves them at defaults
+	// but they round-trip through an edit so a hand-tuned config is not lost.
+	SpoofSockBuf     int    `json:"spoofSockBuf"`
+	SpoofPeerSrcIP   string `json:"spoofPeerSrcIP"`
+	SpoofICMPReply   *bool  `json:"spoofICMPReply"`
+	SpoofMTU         int    `json:"spoofMTU"`
+	SpoofTTLJitter   *bool  `json:"spoofTTLJitter"`
+	SpoofRandomDSCP  *bool  `json:"spoofRandomDSCP"`
+	SpoofShufflePort *bool  `json:"spoofShufflePort"`
+	SpoofPortMin     int    `json:"spoofPortMin"`
+	SpoofPortMax     int    `json:"spoofPortMax"`
+	SpoofPadding     *bool  `json:"spoofPadding"`
+	SpoofPaddingMax  int    `json:"spoofPaddingMax"`
+	SpoofFakeTLS     *bool  `json:"spoofFakeTLS"`
+
 	// Limits.
 	MaxConnections int `json:"maxConnections"`
 	BandwidthMbps  int `json:"bandwidthMbps"`
@@ -454,6 +480,55 @@ func applyAdvanced(s *TunnelSpec, a *AdvancedTuning) {
 	if a.MSS > 0 && supportsMSS(s.Transport) {
 		s.MSS = a.MSS
 	}
+
+	// Spoof carries a profile both ends must agree on, plus the forged-source
+	// knobs. Only mapped on the spoof transport, so no other tunnel picks up
+	// stale spoof settings. The wizard defaults the profile to udp; the form does
+	// the same when it is left blank.
+	if s.Transport == "spoof" {
+		s.SpoofProfile = a.SpoofProfile
+		if s.SpoofProfile == "" {
+			s.SpoofProfile = "udp"
+		}
+		s.SpoofUplink = a.SpoofUplink
+		s.SpoofDownlink = a.SpoofDownlink
+		s.SpoofSrcIP = a.SpoofSrcIP
+		s.SpoofSrcPool = a.SpoofSrcPool
+		if len(s.SpoofSrcPool) > 0 && s.SpoofSrcIP == "" {
+			s.SpoofSrcIP = s.SpoofSrcPool[0]
+		}
+		s.SpoofPeerIP = a.SpoofPeerIP
+		s.SpoofInterface = a.SpoofInterface
+		if a.SpoofPipe != nil {
+			s.SpoofPipe = *a.SpoofPipe
+		}
+		s.SpoofPipeAddr = a.SpoofPipeAddr
+		s.SpoofSockBuf = a.SpoofSockBuf
+		s.SpoofPeerSrcIP = a.SpoofPeerSrcIP
+		if a.SpoofICMPReply != nil {
+			s.SpoofICMPReply = *a.SpoofICMPReply
+		}
+		s.SpoofMTU = a.SpoofMTU
+		if a.SpoofTTLJitter != nil {
+			s.SpoofTTLJitter = *a.SpoofTTLJitter
+		}
+		if a.SpoofRandomDSCP != nil {
+			s.SpoofRandomDSCP = *a.SpoofRandomDSCP
+		}
+		if a.SpoofShufflePort != nil {
+			s.SpoofShufflePort = *a.SpoofShufflePort
+		}
+		s.SpoofPortMin = a.SpoofPortMin
+		s.SpoofPortMax = a.SpoofPortMax
+		if a.SpoofPadding != nil {
+			s.SpoofPadding = *a.SpoofPadding
+		}
+		s.SpoofPaddingMax = a.SpoofPaddingMax
+		if a.SpoofFakeTLS != nil {
+			s.SpoofFakeTLS = *a.SpoofFakeTLS
+		}
+	}
+
 	if a.MaxConnections > 0 {
 		s.MaxConnections = a.MaxConnections
 	}
