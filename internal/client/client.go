@@ -71,6 +71,13 @@ func (c *Client) Start() {
 		endpoints.SetSpread(true)
 		c.logger.Infof("load balancing enabled across %d endpoints", endpoints.Len())
 	}
+	// With automatic failover on, a scoring loop measures every endpoint and
+	// keeps traffic on the healthiest one — the multi-exit gaming behaviour. It
+	// is mutually exclusive with spread balancing above.
+	if c.config.HealthFailover && !c.config.LoadBalance && endpoints.Len() > 1 {
+		endpoints.EnableHealthSteering(c.ctx, 5*time.Second, func(m string) { c.logger.Info(m) })
+		c.logger.Infof("automatic health failover enabled across %d endpoints", endpoints.Len())
+	}
 
 	// Built once for every transport that can use it. The configuration was
 	// already validated at load time, so a failure here would mean the file

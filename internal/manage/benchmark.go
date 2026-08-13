@@ -54,6 +54,65 @@ func (p PathQuality) LossPercent() float64 {
 // Usable reports whether enough probes came back to trust the numbers.
 func (p PathQuality) Usable() bool { return p.Err == nil && p.Received >= 2 }
 
+// FECPlan is a KCP forward-error-correction ratio recommended from a measured
+// path: for every Data shards, Parity extra shards are sent so bursty loss is
+// repaired without waiting for a retransmit.
+type FECPlan struct {
+	Data   int
+	Parity int
+	Why    string
+}
+
+// Set reports whether the plan carries a real ratio.
+func (f FECPlan) Set() bool { return f.Data > 0 && f.Parity > 0 }
+
+// Ratio renders the plan as "data:parity".
+func (f FECPlan) Ratio() string { return fmt.Sprintf("%d:%d", f.Data, f.Parity) }
+
+// RecommendFEC sizes the FEC ratio to the measured loss. This is the single
+// setting that most decides how a KCP link feels on a lossy route: too little
+// parity and lost packets still stall waiting for a retransmit, too much and the
+// parity traffic itself congests the link.
+//
+// The rule is that parity/(data+parity) has to exceed the loss rate with
+// headroom, because loss arrives in bursts rather than evenly, so each tier
+// tolerates comfortably more than the loss that selects it.
+func RecommendFEC(q PathQuality) FECPlan {
+	loss := q.LossPercent()
+	switch {
+	case !q.Usable():
+		return FECPlan{10, 3, "link not measurable — the default gaming ratio"}
+	case loss < 1:
+		return FECPlan{20, 5, fmt.Sprintf("%.0f%% loss — a light 25%% parity is plenty on a clean route", loss)}
+	case loss < 5:
+		return FECPlan{10, 5, fmt.Sprintf("%.0f%% loss — 10:5 repairs bursts up to ~33%%", loss)}
+	case loss < 15:
+		return FECPlan{8, 8, fmt.Sprintf("%.0f%% loss — 8:8 repairs bursts up to ~50%%", loss)}
+	default:
+		return FECPlan{4, 8, fmt.Sprintf("%.0f%% loss — 4:8 trades 200%% overhead for repairing up to ~67%%", loss)}
+	}
+}
+
+// SetFEC applies a parity ratio to a KCP tunnel and restarts it. Like the other
+// measured tunings it clears the preset, because the numbers no longer match a
+// named profile and a later preset change must not silently overwrite them.
+func SetFEC(name string, plan FECPlan) error {
+	s, err := LoadSpec(name)
+	if err != nil {
+		return err
+	}
+	if !isKCP(s.Transport) {
+		return fmt.Errorf("FEC only applies to a KCP-based transport")
+	}
+	if s.KCPDataShards == plan.Data && s.KCPParityShards == plan.Parity {
+		return fmt.Errorf("the tunnel already uses %s FEC", plan.Ratio())
+	}
+	s.KCPDataShards = plan.Data
+	s.KCPParityShards = plan.Parity
+	s.Preset = ""
+	return applySpec(s)
+}
+
 // ProbePath measures latency, jitter and loss to a host:port over TCP.
 //
 // TCP is used rather than ICMP on purpose: plenty of networks on this route

@@ -33,17 +33,18 @@ type TunnelRequest struct {
 	ProxyProtocol bool     `json:"proxyProtocol"` // prepend PROXY protocol v2 header
 
 	// Client side (role == "client").
-	ServerHost    string   `json:"serverHost"`    // IP or domain of the server
-	ServerPort    string   `json:"serverPort"`    // server's tunnel control port
-	EdgeIP        string   `json:"edgeIP"`        // websocket transports: CDN edge to dial
-	Proxy         string   `json:"proxy"`         // socks5:// or http:// URL to reach the server through
-	Interface     string   `json:"iface"`         // pin the tunnel to a network interface
-	LocalAddr     string   `json:"localAddr"`     // pin the tunnel to a source address
-	FallbackAddrs []string `json:"fallbackAddrs"` // backup server addresses
-	LoadBalance   bool     `json:"loadBalance"`   // spread connections over all addresses at once
-	Obfs          string   `json:"obfs"`          // frp/rathole DPI obfuscation: "" / "noise" / "tls"
-	TLSSni        string   `json:"tlsSni"`        // frp/rathole tls obfs: SNI / (for acme) the domain
-	TLSCertMode   string   `json:"tlsCertMode"`   // frp/rathole tls obfs: "self" or "acme" (Let's Encrypt)
+	ServerHost     string   `json:"serverHost"`     // IP or domain of the server
+	ServerPort     string   `json:"serverPort"`     // server's tunnel control port
+	EdgeIP         string   `json:"edgeIP"`         // websocket transports: CDN edge to dial
+	Proxy          string   `json:"proxy"`          // socks5:// or http:// URL to reach the server through
+	Interface      string   `json:"iface"`          // pin the tunnel to a network interface
+	LocalAddr      string   `json:"localAddr"`      // pin the tunnel to a source address
+	FallbackAddrs  []string `json:"fallbackAddrs"`  // backup server addresses
+	LoadBalance    bool     `json:"loadBalance"`    // spread connections over all addresses at once
+	HealthFailover bool     `json:"healthFailover"` // keep the tunnel on the healthiest exit (client, multi-address)
+	Obfs           string   `json:"obfs"`           // frp/rathole DPI obfuscation: "" / "noise" / "tls"
+	TLSSni         string   `json:"tlsSni"`         // frp/rathole tls obfs: SNI / (for acme) the domain
+	TLSCertMode    string   `json:"tlsCertMode"`    // frp/rathole tls obfs: "self" or "acme" (Let's Encrypt)
 
 	// TLS, for a wss/wssmux server. Ignored for other transports and for a
 	// client (which never verifies the certificate).
@@ -343,6 +344,9 @@ func buildClient(s *TunnelSpec, req TunnelRequest) error {
 	}
 	if len(s.FallbackAddrs) > 0 {
 		s.LoadBalance = req.LoadBalance
+		// Health failover steers to the single best exit, the opposite of spread
+		// balancing, so the two are mutually exclusive; balancing wins if both set.
+		s.HealthFailover = req.HealthFailover && !req.LoadBalance
 	}
 	return nil
 }

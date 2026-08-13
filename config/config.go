@@ -347,6 +347,11 @@ type ClientConfig struct {
 	// must reach the SAME server, since the control channel — and therefore
 	// the tunnel's identity — lives on one of them.
 	LoadBalance bool `toml:"load_balance"`
+	// HealthFailover scores every configured address on a timer and keeps the
+	// tunnel on the healthiest exit, re-measuring so it follows the best route as
+	// conditions change. It is mutually exclusive with load_balance: steering to
+	// one best exit is the opposite of spreading across all of them.
+	HealthFailover bool `toml:"health_failover"`
 	// Stealth / Obfs / TLSSni configure DPI obfuscation for an frp/rathole
 	// tunnel; they must match the server. See ServerConfig.
 	Stealth bool   `toml:"stealth"`

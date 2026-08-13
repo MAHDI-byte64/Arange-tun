@@ -136,6 +136,7 @@ func loadClientSpec(name string) (TunnelSpec, error) {
 		WebPort:          cc.WebPort,
 		Preset:           cc.Preset,
 		LoadBalance:      cc.LoadBalance,
+		HealthFailover:   cc.HealthFailover,
 		KCPMTU:           cc.MTU,
 		KCPInterval:      cc.Interval,
 		KCPResend:        cc.Resend,

@@ -1706,6 +1706,7 @@
       <label for="nt-fallback" data-i18n>Backup server addresses (optional)</label>
       <input id="nt-fallback" type="text" autocomplete="off" spellcheck="false" placeholder="203.0.113.11, 203.0.113.12:8443">
       <label class="tg" style="margin-bottom:14px"><input type="checkbox" id="nt-lb"><span data-i18n>Load-balance across all addresses (they must reach the same server)</span></label>
+      <label class="tg" style="margin-bottom:14px"><input type="checkbox" id="nt-hf"><span data-i18n>Auto health failover — keep the tunnel on the healthiest exit (best for gaming; not with load-balance)</span></label>
     </div>
 
     <label for="nt-token" data-i18n>Security token</label>
@@ -2044,6 +2045,7 @@ const FA={
   "Expires":"انقضا",
   "Backup addresses":"آدرس‌های پشتیبان",
   "Load balancing":"توزیع بار",
+  "Auto health failover — keep the tunnel on the healthiest exit (best for gaming; not with load-balance)":"فِیل‌اوورِ خودکارِ سلامت — تونل را روی سالم‌ترین خروجی نگه می‌دارد (بهترین برای گیم؛ همراه با توزیع بار نه)",
   "What it does":"چه کاری می‌کند",
   "History":"تاریخچه",
   "Link Test":"تست لینک",
@@ -3594,7 +3596,7 @@ function openNewTunnel(){
    'nt-connpool','nt-muxcon','nt-muxver','nt-muxframe','nt-muxrecv','nt-muxstream',
    'nt-kcpmtu','nt-kcpint','nt-kcpsnd','nt-kcprcv','nt-kcpdata','nt-kcpparity','nt-mss',
    'nt-spoofsrc','nt-spoofpeer','nt-spoofiface','nt-spoofpipeaddr'].forEach(id=>{ if($(id)) $(id).value=''; });
-  ['nt-ipv6','nt-pp','nt-lb','nt-simpleauth','nt-adv-on','nt-acceptudp','nt-aggpool','nt-zerocopy','nt-spoofpipe'].forEach(id=>{ if($(id)) $(id).checked=false; });
+  ['nt-ipv6','nt-pp','nt-lb','nt-hf','nt-simpleauth','nt-adv-on','nt-acceptudp','nt-aggpool','nt-zerocopy','nt-spoofpipe'].forEach(id=>{ if($(id)) $(id).checked=false; });
   if($('nt-spoofprofile')) $('nt-spoofprofile').value='udp';
   $('nt-role').value='server'; $('nt-transport').value='tcp'; $('nt-preset').value='turbo';
   $('nt-tlsmode').value='self'; $('nt-nodelay').value=''; $('nt-loglevel').value=''; $('nt-logformat').value='';
@@ -3799,6 +3801,7 @@ async function submitNewTunnel(){
     ipv6:$('nt-ipv6').checked,
     proxyProtocol:role==='server'&&ntSupportsPP(tr)&&$('nt-pp').checked,
     loadBalance:$('nt-lb').checked,
+    healthFailover:$('nt-hf').checked,
     simpleAuth:ntNeedsTLS(tr)&&$('nt-simpleauth').checked,
     obfs:ntProtoBase?$('nt-obfs').value:'',
     tlsSni:ntProtoBase&&$('nt-obfs').value==='tls'?$('nt-tlssni').value.trim():'',
@@ -3913,6 +3916,7 @@ function ntFill(req){
     $('nt-localaddr').value=req.localAddr||'';
     $('nt-fallback').value=(req.fallbackAddrs||[]).join(', ');
     $('nt-lb').checked=!!req.loadBalance;
+    $('nt-hf').checked=!!req.healthFailover;
   }
   $('nt-simpleauth').checked=!!req.simpleAuth;
   const a=req.advanced;

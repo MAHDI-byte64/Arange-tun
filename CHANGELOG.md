@@ -2,6 +2,28 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.26.0 — 2026-08-13
+
+**Multi-exit health failover and a game-latency tester, ported from BackPack.**
+Two related additions for a client tunnel that lists several server addresses.
+
+- **Automatic health failover** (`health_failover`). With more than one address
+  configured, a scoring loop measures each exit's RTT, jitter and loss on a timer
+  and keeps the tunnel on the healthiest one, re-measuring so it follows the best
+  route as conditions change. It is mutually exclusive with load-balancing
+  (which deliberately spreads across all exits). Wired into the rotating-endpoint
+  list so a failed dial also steps off the current exit. Exposed as a checkbox in
+  the panel and preserved across edits.
+- **Exit Health** screen (CLI: Manage → Exit Health) scores and ranks every
+  server address a client can use and lets the operator pin the healthiest as the
+  primary — the manual companion to automatic failover.
+- **Game Latency Test** (CLI: Manage → Game Latency Test) estimates in-game ping
+  to popular game servers through the current exit, with an editable endpoint
+  list, and a KCP forward-error-correction recommendation sized to the measured
+  loss (`RecommendFEC`).
+
+Ported from BackPack by Amin Mohammadi (AminMGMT), AGPL-3.0; see NOTICE.
+
 ## v1.25.0 — 2026-08-13
 
 **New transport: `spoof` — IP Spoofing (raw forged-source packets).** A new

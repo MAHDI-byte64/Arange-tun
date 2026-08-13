@@ -28,3 +28,10 @@ internal/manage/spooftest.go) is derived from Backpack by Amin Mohammadi
 GNU Affero General Public License v3.0, the same licence as this project. The
 code was ported with attribution under that licence; the tunnel token salts and
 module paths were adapted to Arange-tun.
+
+The multi-exit health failover and scoring (health_failover; the steering in
+internal/utils/network/endpoints.go and internal/utils/network/healthscore.go;
+internal/manage/exithealth.go) and the game-latency tester (internal/manage/
+game.go and gamemenu.go, and RecommendFEC in internal/manage/benchmark.go) are
+also derived from Backpack by Amin Mohammadi (AminMGMT), under the same AGPL-3.0
+licence and with attribution.

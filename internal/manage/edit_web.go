@@ -135,6 +135,7 @@ func TunnelForEdit(name string) (TunnelRequest, error) {
 		req.LocalAddr = c.LocalAddr
 		req.FallbackAddrs = c.FallbackAddrs
 		req.LoadBalance = c.LoadBalance
+		req.HealthFailover = c.HealthFailover
 		req.Obfs = c.ObfsMode()
 		req.TLSSni = c.TLSSni
 		req.SimpleAuth = c.SimpleAuth
