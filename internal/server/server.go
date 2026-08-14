@@ -11,6 +11,7 @@ import (
 	"github.com/mahdi-byte64/arange-tun/internal/utils"
 	"github.com/mahdi-byte64/arange-tun/internal/utils/handlers"
 	"github.com/mahdi-byte64/arange-tun/internal/utils/network"
+	"github.com/mahdi-byte64/arange-tun/internal/web"
 
 	"github.com/sirupsen/logrus"
 )
@@ -44,6 +45,11 @@ func NewServer(cfg *config.ServerConfig, parentCtx context.Context) *Server {
 }
 
 func (s *Server) Start() {
+	// The sniffer/monitor page has no authentication; web_bind pins it to a
+	// chosen address (127.0.0.1 recommended), applied before any transport
+	// starts its sniffer.
+	web.SetMonitorBind(s.config.WebBind)
+
 	// Profiling endpoint, off unless explicitly enabled in the config.
 	//
 	// Bound to loopback on purpose: pprof has no authentication, and its heap

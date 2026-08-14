@@ -2,6 +2,25 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.27.0 — 2026-08-13
+
+**Sniffer monitor page: a bind address, secure by default (`web_bind`).** The
+per-tunnel sniffer/monitor web page has never had authentication — it serves the
+host's CPU/memory/disk/network counters, the tunnel status, and (with the
+sniffer on) every forwarded port's usage. It used to bind to all interfaces.
+
+- New `web_bind` config key pins it to a chosen address. When a monitor port is
+  configured without an explicit bind, the written config now defaults it to
+  `127.0.0.1` — reach it over SSH (`ssh -L <port>:127.0.0.1:<port> root@server`)
+  rather than exposing it to the network. A one-line warning is logged if it is
+  bound to a public address anyway.
+- The bind is applied process-wide before any transport starts its sniffer
+  (`internal/web/monitorhttp.go`), and round-trips through edits.
+
+Ported from BackPack by Amin Mohammadi (AminMGMT), AGPL-3.0; see NOTICE. (The
+nonce-based pool-connection authorization from the same lineage was already
+present in Arange-tun's accept path — internal/server/transport/announce.go.)
+
 ## v1.26.0 — 2026-08-13
 
 **Multi-exit health failover and a game-latency tester, ported from BackPack.**

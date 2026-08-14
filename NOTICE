@@ -35,3 +35,7 @@ internal/manage/exithealth.go) and the game-latency tester (internal/manage/
 game.go and gamemenu.go, and RecommendFEC in internal/manage/benchmark.go) are
 also derived from Backpack by Amin Mohammadi (AminMGMT), under the same AGPL-3.0
 licence and with attribution.
+
+The sniffer/monitor bind-address handling (web_bind; internal/web/monitorhttp.go
+and the monitorBind default) is likewise derived from Backpack by Amin Mohammadi
+(AminMGMT), under the same AGPL-3.0 licence and with attribution.

@@ -122,6 +122,10 @@ type TunnelSpec struct {
 	// Sniffer web panel
 	Sniffer bool
 	WebPort int
+	// WebBind is the address the sniffer/monitor page listens on. The page has
+	// no authentication, so 127.0.0.1 (reach it over SSH) is the safe value;
+	// empty keeps the historical all-interfaces bind.
+	WebBind string
 
 	// TLS (server, wss/wssmux only)
 	TLSCert string
@@ -429,6 +433,7 @@ func (s TunnelSpec) Render() string {
 		p("sniffer = %t\n", s.Sniffer)
 		if s.WebPort > 0 {
 			p("web_port = %d\n", s.WebPort)
+			p("web_bind = %q\n", monitorBind(s.WebBind))
 		}
 		b.WriteString("ports = [\n")
 		for _, port := range s.Ports {
@@ -509,8 +514,20 @@ func (s TunnelSpec) Render() string {
 	p("sniffer = %t\n", s.Sniffer)
 	if s.WebPort > 0 {
 		p("web_port = %d\n", s.WebPort)
+		p("web_bind = %q\n", monitorBind(s.WebBind))
 	}
 	return b.String()
+}
+
+// monitorBind resolves the sniffer/monitor bind address written to a config:
+// an unset value defaults to loopback, because the page has no authentication
+// and binding it to all interfaces exposes the host's stats (and, with the
+// sniffer on, every forwarded port's usage) to the network.
+func monitorBind(configured string) string {
+	if configured == "" {
+		return "127.0.0.1"
+	}
+	return configured
 }
 
 // Save writes the config file, the systemd unit, reloads systemd and starts

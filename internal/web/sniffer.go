@@ -56,7 +56,7 @@ type SystemStats struct {
 func NewDataStore(listenAddr string, shutdownCtx context.Context, snifferLog string, sniffer bool, tunnelStatus *string, logger *logrus.Logger) *Usage {
 	ctx, cancel := context.WithCancel(shutdownCtx)
 	u := &Usage{
-		listenAddr:   listenAddr,
+		listenAddr:   monitorListenAddr(listenAddr),
 		shutdownCtx:  ctx,
 		cancelFunc:   cancel,
 		logger:       logger,
@@ -76,10 +76,7 @@ func (m *Usage) Monitor() {
 	if m.sniffer {
 		mux.HandleFunc("/data", m.handleData) // New route for JSON data
 	}
-	m.server = &http.Server{
-		Addr:    m.listenAddr,
-		Handler: mux,
-	}
+	m.server = newMonitorServer(m.listenAddr, monitorHTTP(mux))
 
 	go func() {
 		<-m.shutdownCtx.Done()
@@ -110,7 +107,10 @@ func (m *Usage) Monitor() {
 		}()
 	}
 	// Start the server
-	m.logger.Info("sniffer service listening on port: ", m.listenAddr)
+	if monitorIsPublic(m.listenAddr) {
+		m.logger.Warnf("the monitor page on %s has no authentication and is reachable from the network; set web_bind = \"127.0.0.1\" and reach it over SSH instead", m.listenAddr)
+	}
+	m.logger.Info("sniffer service listening on: ", m.listenAddr)
 	if err := m.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		m.logger.Errorf("sniffer server error: %v", err)
 	}

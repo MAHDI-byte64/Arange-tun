@@ -203,9 +203,13 @@ type ServerConfig struct {
 	MaxStreamBuffer  int           `toml:"mux_streambuffer"`
 	Sniffer          bool          `toml:"sniffer"`
 	WebPort          int           `toml:"web_port"`
-	SnifferLog       string        `toml:"sniffer_log"`
-	TLSCertFile      string        `toml:"tls_cert"`
-	TLSKeyFile       string        `toml:"tls_key"`
+	// WebBind is the address the sniffer/monitor page listens on. It has no
+	// authentication, so the safe value is 127.0.0.1 (reach it over SSH);
+	// empty keeps the historical all-interfaces bind. See internal/web.
+	WebBind     string `toml:"web_bind"`
+	SnifferLog  string `toml:"sniffer_log"`
+	TLSCertFile string `toml:"tls_cert"`
+	TLSKeyFile  string `toml:"tls_key"`
 	// ACMEDomain switches wss/wssmux to a Let's Encrypt certificate for this
 	// domain instead of the generated self-signed one. The domain must resolve
 	// to this server. Empty keeps the self-signed certificate.
@@ -287,10 +291,13 @@ type ClientConfig struct {
 	MaxStreamBuffer  int           `toml:"mux_streambuffer"`
 	Sniffer          bool          `toml:"sniffer"`
 	WebPort          int           `toml:"web_port"`
-	SnifferLog       string        `toml:"sniffer_log"`
-	DialTimeout      int           `toml:"dial_timeout"`
-	AggressivePool   bool          `toml:"aggressive_pool"`
-	EdgeIP           string        `toml:"edge_ip"`
+	// WebBind is the address the sniffer/monitor page listens on (no auth, so
+	// 127.0.0.1 is the safe value); empty keeps the all-interfaces bind.
+	WebBind        string `toml:"web_bind"`
+	SnifferLog     string `toml:"sniffer_log"`
+	DialTimeout    int    `toml:"dial_timeout"`
+	AggressivePool bool   `toml:"aggressive_pool"`
+	EdgeIP         string `toml:"edge_ip"`
 	// SimpleAuth authorises a wss tunnel by the raw token instead of a proof
 	// bound to the TLS session. It exists for one deployment the binding
 	// otherwise makes impossible: a TLS-terminating reverse proxy — typically
