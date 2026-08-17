@@ -2,11 +2,16 @@ package client
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/mahdi-byte64/arange-tun/internal/packet/engine/flog"
 	"github.com/mahdi-byte64/arange-tun/internal/packet/engine/tnet"
 )
+
+// errNilConn marks a pool slot whose connection is absent (a keepalive re-dial
+// failed), so newConn recreates it instead of dereferencing nil.
+var errNilConn = errors.New("connection not established")
 
 func (c *Client) newConn() (tnet.Conn, error) {
 	c.mu.Lock()
@@ -20,7 +25,15 @@ func (c *Client) newConn() (tnet.Conn, error) {
 	// stream each time (every reused stream and every liveness poll) and leaks a
 	// goroutine per call, which on an idle tunnel piled up unboundedly over
 	// hours. So it is only sent where it belongs, inside createConn below.
-	err := tc.conn.Ping(false)
+	// tc.conn is nil when a background keepalive re-dial has failed and left the
+	// slot empty; treat that the same as a failed liveness probe. Guarding here
+	// also stops a nil dereference on that path.
+	var err error
+	if tc.conn == nil {
+		err = errNilConn
+	} else {
+		err = tc.conn.Ping(false)
+	}
 	if err != nil {
 		flog.Infof("connection lost, retrying....")
 		if tc.conn != nil {

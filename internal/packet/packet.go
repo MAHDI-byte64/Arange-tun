@@ -236,9 +236,15 @@ func buildClientConf(pc *config.PacketConfig) (*conf.Conf, string, int, error) {
 		return nil, "", 0, fmt.Errorf("a packet client needs at least one exposed port or a socks listener")
 	}
 
+	// Parallel tunnel connections. More than one is what keeps the tunnel usable
+	// on a route that keeps killing individual flows (a stateful DPI box that
+	// drops long-lived connections, or plain loss): the entry node round-robins
+	// across the live connections, so one dying and re-dialing does not stall the
+	// whole tunnel the way it does with a single connection. Four is a sensible
+	// default that costs little idle traffic; an operator can override it.
 	conn := pc.Conn
 	if conn <= 0 {
-		conn = 1
+		conn = 4
 	}
 	cfg := &conf.Conf{
 		Role:    "client",

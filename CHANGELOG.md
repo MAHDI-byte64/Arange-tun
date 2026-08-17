@@ -2,6 +2,31 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.28.2 — 2026-08-17
+
+**Packet tunnel: make it hold up on a lossy / DPI-thinned route.** Three changes
+that together fight the "connection lost, retrying…" churn on a marginal path
+(where the crafted raw packets get through but the session keeps dying):
+
+- **Forward error correction is now on by default** (10 data + 3 parity). Without
+  it, a few lost KCP segments — including the smux keepalive — stalled or killed
+  the session; with it, up to 3 losses in every 13 packets are repaired instantly
+  instead of waiting for a retransmit that may never arrive. This is the biggest
+  lever on a lossy route.
+- **Four parallel connections by default** (was one). The entry node round-robins
+  across the live connections, so one flow dying and re-dialing no longer stalls
+  the whole tunnel — important where a stateful DPI box drops long-lived flows.
+- **A real keepalive** replaces the disabled ticker: it probes each connection
+  every 4 seconds and re-dials the dead ones proactively, so the first byte of
+  user traffic never lands on a dead connection, and a re-dial rotates that flow
+  to a fresh source port — which slips past a middlebox that had begun dropping
+  the old one.
+
+Note: FEC changes the KCP wire format, so **both ends must run v1.28.2** — update
+the Iran and the abroad side together, or they will not connect. Packet still
+only works where the network lets its crafted packets through at all; on a route
+that blocks them outright, use a standard transport or a domestic relay.
+
 ## v1.28.1 — 2026-08-17
 
 **Packet tunnel: fix a per-poll goroutine/stream leak and a cosmetic log.** On

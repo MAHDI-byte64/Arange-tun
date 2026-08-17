@@ -60,12 +60,20 @@ func (k *KCP) setDefaults(role string) {
 		}
 	}
 
-	// if k.Dshard == 0 {
-	// 	k.Dshard = 10
-	// }
-	// if k.Pshard == 0 {
-	// 	k.Pshard = 3
-	// }
+	// Forward error correction, on by default. The Packet tunnel rides on crafted
+	// raw packets across paths that are often lossy or that a DPI box thins out;
+	// without FEC a handful of lost KCP segments — including the smux keepalive —
+	// stalls or kills the session, which is exactly the "connection lost,
+	// retrying…" churn seen on a marginal route. With 10 data + 3 parity, any 3
+	// losses in every 13 packets are repaired instantly instead of waiting for a
+	// retransmit that may never arrive. Both ends derive the same values here, so
+	// they always agree (a mismatch would stop the tunnel connecting at all).
+	if k.Dshard == 0 {
+		k.Dshard = 10
+	}
+	if k.Pshard == 0 {
+		k.Pshard = 3
+	}
 
 	if k.Block_ == "" {
 		k.Block_ = "aes"
