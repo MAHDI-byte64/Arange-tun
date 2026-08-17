@@ -2,6 +2,35 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.28.0 — 2026-08-17
+
+**Connection-tracking (conntrack) tuning — fixes a server that gets slow after a
+few hours.** The optimizer now tunes the kernel's conntrack table, the usual
+reason a busy tunnel server is fast for hours and then crawls until the tunnels
+are restarted. Every forwarded connection uses a conntrack slot, the table is
+small by default, and an ESTABLISHED entry is kept for **five days**, so the
+table fills, the kernel starts dropping packets ("nf_conntrack: table full"),
+and new connections stall — restarting the tunnels only frees the slots for a
+while. The optimizer now:
+- loads the `nf_conntrack` module (now and at boot),
+- raises `nf_conntrack_max` to 1048576 and widens the table hash,
+- expires dead states fast (established 1 day instead of 5; time-wait/close-wait/
+  fin-wait/syn 20–30s), so slots return to the pool instead of piling up.
+These are written to their own `/etc/sysctl.d` file, applied best-effort (a
+kernel without conntrack is left untouched), and run automatically on tunnel
+create as well as from the optimizer.
+
+**Optimize from the web panel.** A new **Optimize server** section in the panel
+settings applies the same tuning (BBR, buffers, file limits, conntrack) and
+shows what changed — previously it was CLI-only.
+
+**Fix: the "healthiest exit" checkbox appearing to turn itself off.** Health
+failover and load-balancing only work with more than one server address, but the
+panel let you tick them with no backup address, and the backend then dropped the
+setting — so on reopening the form the box was unchecked, which looked like it
+disabling itself. The two options are now mutually exclusive and are disabled
+(with a hint) until at least one backup address is entered.
+
 ## v1.27.0 — 2026-08-13
 
 **Sniffer monitor page: a bind address, secure by default (`web_bind`).** The

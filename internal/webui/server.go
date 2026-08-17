@@ -19,6 +19,7 @@ import (
 
 	"github.com/mahdi-byte64/arange-tun/internal/app"
 	"github.com/mahdi-byte64/arange-tun/internal/manage"
+	"github.com/mahdi-byte64/arange-tun/internal/optimize"
 	"github.com/mahdi-byte64/arange-tun/internal/utils/network"
 )
 
@@ -242,6 +243,7 @@ func Serve() error {
 	mux.HandleFunc("/metrics", srv.requireReadAuth(srv.handlePrometheus))
 	mux.HandleFunc("/api/logs", srv.requireAuth(srv.handleLogs))
 	mux.HandleFunc("/api/password", srv.requireAuth(srv.handlePassword))
+	mux.HandleFunc("/api/optimize", srv.requireAuth(srv.handleOptimize))
 	mux.HandleFunc("/api/update", srv.requireAuth(srv.handleUpdate))
 	mux.HandleFunc("/api/update/status", srv.requireAuth(srv.handleUpdateStatus))
 	mux.HandleFunc("/api/panelport", srv.requireAuth(srv.handlePanelPort))
@@ -470,6 +472,20 @@ func (s *server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// handleOptimize applies the kernel/network tuning (BBR, socket buffers, file
+// limits, and the connection-tracking table that is the usual cause of a server
+// going slow after a few hours) and returns the per-step log so the panel can
+// show what changed. POST only — it writes sysctl files and touches the kernel.
+func (s *server) handleOptimize(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var lines []string
+	optimize.Apply(func(line string) { lines = append(lines, line) })
+	writeJSON(w, map[string]any{"status": "ok", "log": lines})
 }
 
 // updateProgress records what the last update attempt did.

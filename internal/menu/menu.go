@@ -109,7 +109,7 @@ func printMenu() {
 	menuItem(4, "Manage", "tunnels, ports, transport, status, health check")
 	menuItem(5, "Backup & Restore", "save or restore the full configuration")
 	menuItem(6, "Web Panel", "monitoring web UI — link, login code, port")
-	menuItem(7, "Optimize", "kernel & network tuning — BBR, buffers, limits")
+	menuItem(7, "Optimize", "kernel & network tuning — BBR, buffers, limits, conntrack")
 	menuItem(8, "Telegram Bot", "status reports, relayed through a tunnel")
 	updateDesc := "safe update with automatic rollback"
 	if tag, ok := manage.UpdateAvailable(); ok {
@@ -649,7 +649,7 @@ func autoRefreshMenu() {
 // optimizeMenu is main-menu item 6.
 func optimizeMenu() {
 	tui.Clear()
-	tui.Title("Optimize — kernel & network tuning (BBR, buffers, limits)")
+	tui.Title("Optimize — kernel & network tuning (BBR, buffers, limits, conntrack)")
 	fmt.Println()
 	if !tui.Confirm("Apply system-wide network optimizations now", true) {
 		return
