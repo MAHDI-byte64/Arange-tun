@@ -13,7 +13,13 @@ func (c *Client) newConn() (tnet.Conn, error) {
 	defer c.mu.Unlock()
 	autoExpire := 300
 	tc := c.iter.Next()
-	go tc.sendTCPF(tc.conn)
+	// The TCP-flags profile (PTCPF) is a per-connection handshake that
+	// createConn() already sends once when it dials. Re-sending it on every
+	// newConn — as a fire-and-forget goroutine, on a connection about to be
+	// health-checked and possibly closed — is redundant: it opens a throwaway
+	// stream each time (every reused stream and every liveness poll) and leaks a
+	// goroutine per call, which on an idle tunnel piled up unboundedly over
+	// hours. So it is only sent where it belongs, inside createConn below.
 	err := tc.conn.Ping(false)
 	if err != nil {
 		flog.Infof("connection lost, retrying....")

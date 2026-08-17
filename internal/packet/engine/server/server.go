@@ -87,7 +87,13 @@ func (s *Server) listen(ctx context.Context, listener tnet.Listener) {
 				continue
 			}
 		}
-		flog.Infof("accepted new connection from %s (local: %s)", conn.RemoteAddr(), conn.LocalAddr())
+		// The raw session has no kernel socket, so LocalAddr() is nil here; guard
+		// it rather than print the "%!s(<nil>)" a bare %s produces.
+		local := "raw"
+		if la := conn.LocalAddr(); la != nil {
+			local = la.String()
+		}
+		flog.Infof("accepted new connection from %s (local: %s)", conn.RemoteAddr(), local)
 
 		remote := conn.RemoteAddr()
 		s.addPeer(remote.String())

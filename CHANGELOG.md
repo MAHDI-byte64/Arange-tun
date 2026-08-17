@@ -2,6 +2,25 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.28.1 — 2026-08-17
+
+**Packet tunnel: fix a per-poll goroutine/stream leak and a cosmetic log.** On
+the Packet client, `newConn` fired a redundant `sendTCPF` as a fire-and-forget
+goroutine on every call — every reused stream and every 15-second liveness poll
+— even though `createConn` already sends that per-connection handshake once when
+it dials. On an idle tunnel this leaked a goroutine and opened a throwaway smux
+stream every 15 seconds, piling up over hours. It is now sent only where it
+belongs, in `createConn`. Also fixed the server's "accepted new connection …
+(local: %!s(<nil>))" log — the raw session has no kernel socket, so the nil
+local address is now printed as "raw".
+
+Note: the "connection lost, retrying…" every 15 seconds seen on some routes is
+the smux keepalive (2s interval, 8s timeout) failing to survive the raw
+crafted-packet path — i.e. the network is mangling or dropping the Packet
+tunnel's packets in at least one direction. Like the spoof transport, Packet
+only works where the path leaves its crafted packets intact; on a route where it
+does not, use a standard transport (WSS Mux, TCP + Stealth, or KCP).
+
 ## v1.28.0 — 2026-08-17
 
 **Connection-tracking (conntrack) tuning — fixes a server that gets slow after a
