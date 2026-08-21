@@ -396,6 +396,36 @@
     -webkit-appearance:none;appearance:none;cursor:pointer}
   .sel:focus{border-color:var(--red);box-shadow:0 0 0 4px rgba(var(--accent-rgb),.18)}
   .sel option{background:var(--bg2);color:var(--txt)}
+
+  /* ---------- create-tunnel wizard ----------
+     The side of the tunnel is chosen first, as two cards rather than a dropdown:
+     a server and a client are not the same form with a field swapped — one
+     exposes ports and listens, the other dials out — so it reads as a step. The
+     hidden <select id="nt-role"> still carries the value every handler reads. */
+  .sides{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+  .side{padding:18px 14px;border-radius:18px;cursor:pointer;text-align:center;transition:var(--t-ui);
+    background:rgba(255,255,255,.04);border:1px solid var(--stroke);color:var(--txt);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06);animation:pop-in var(--t-pop) var(--ease-out) both}
+  .side:nth-child(2){animation-delay:.05s}
+  .side:hover{background:rgba(var(--accent-rgb),.12);border-color:rgba(var(--accent-rgb),.34);transform:translateY(-2px)}
+  .side[aria-pressed="true"]{background:rgba(var(--accent-rgb),.14);border-color:rgba(var(--accent-rgb),.45);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 8px 22px rgba(var(--accent-rgb),.18)}
+  .side .sflag{font-size:26px;line-height:1;display:block;margin-bottom:8px}
+  .side .st{font-size:14px;font-weight:700;display:block}
+  .side .sd{font-size:11.5px;color:var(--muted);display:block;margin-top:4px;line-height:1.5}
+  .side[aria-pressed="true"] .st{color:var(--red-soft)}
+  /* A field with a button welded to its right: the port dice, the token copy. */
+  .fjoin{display:flex;gap:8px;align-items:stretch;margin-bottom:14px}
+  .fjoin input{flex:1;min-width:0;margin-bottom:0}
+  .fjoin .btn-sm{flex:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+  .fjoin .btn-sm .ic{width:15px;height:15px}
+  /* The transport's own one-line description, under the picker that chose it —
+     the same sentence the CLI prints beside each entry. */
+  .tdesc{font-size:11.5px;color:var(--muted2);line-height:1.5;margin:-8px 0 14px;min-height:1px;
+    transition:opacity var(--t-hover) ease}
+  /* The whole form body reveals once a side is chosen, sliding up into place. */
+  #nt-body{animation:rise var(--t-rise) var(--ease-out) both}
+  #nt-body[hidden]{display:none}
   .toggles{display:flex;gap:14px;flex-wrap:wrap;margin:4px 0 12px}
   /* Scoped to .modal as well, and not by accident: `.modal label` further up
      sets display:block and outranks a bare `.tg`, so inside Settings every one
@@ -1692,10 +1722,24 @@
     <h3 id="nttitle" data-i18n>New tunnel</h3>
     <p data-i18n>Build a tunnel the same way the CLI does — it is written, enabled and started right away.</p>
 
-    <label for="nt-role" data-i18n>Side</label>
-    <select id="nt-role" class="sel" onchange="ntRoleChange()">
-      <option value="server" data-i18n>🇮🇷 Iran server — exposes the ports (users connect here)</option>
-      <option value="client" data-i18n>🌍 Abroad / kharej — runs the service, dials out</option>
+    <label data-i18n>Which side of the tunnel is this machine?</label>
+    <div class="sides" id="nt-sides" role="group">
+      <button type="button" class="side" data-role="server" aria-pressed="true" onclick="ntPickSide('server')">
+        <span class="sflag">🇮🇷</span>
+        <span class="st" data-i18n>Iran server</span>
+        <span class="sd" data-i18n>Exposes the ports — users connect here.</span>
+      </button>
+      <button type="button" class="side" data-role="client" aria-pressed="false" onclick="ntPickSide('client')">
+        <span class="sflag">🌍</span>
+        <span class="st" data-i18n>Abroad / kharej</span>
+        <span class="sd" data-i18n>Runs the service and dials out.</span>
+      </button>
+    </div>
+    <!-- The value every handler reads. The cards above set it; it stays in the
+         DOM as a hidden select so nothing downstream has to change. -->
+    <select id="nt-role" style="display:none" onchange="ntRoleChange()">
+      <option value="server">server</option>
+      <option value="client">client</option>
     </select>
 
     <div id="nt-transport-row">
@@ -1727,6 +1771,7 @@
       <option value="rathole" hidden>rathole</option>
       <option value="ratholeu" hidden>rathole (udp)</option>
     </select>
+    <div class="tdesc" id="nt-tdesc"></div>
     </div>
 
     <div id="nt-frp-proto-row" style="display:none">
@@ -1773,7 +1818,12 @@
     <!-- Server-only -->
     <div id="nt-server">
       <label for="nt-port" data-i18n>Tunnel (control) port</label>
-      <input id="nt-port" type="number" min="1" max="65535" step="1" placeholder="443" oninput="ntSuggestName()">
+      <div class="fjoin">
+        <input id="nt-port" type="number" min="1" max="65535" step="1" placeholder="443" oninput="ntSuggestName()">
+        <button class="btn-sm" type="button" onclick="ntRollPort('nt-port')" title="Suggest a random port">
+          <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 8h.01M16 8h.01M8 16h.01M16 16h.01M12 12h.01"/></svg>
+          <span data-i18n>Random</span></button>
+      </div>
       <label class="tg" style="margin-bottom:14px"><input type="checkbox" id="nt-ipv6"><span data-i18n>Listen on IPv6 as well</span></label>
       <label for="nt-ports" data-i18n>Exposed ports</label>
       <input id="nt-ports" type="text" autocomplete="off" spellcheck="false" placeholder="443,8080 or 443=1.1.1.1:443">
@@ -1807,7 +1857,7 @@
     </div>
 
     <label for="nt-token" data-i18n>Security token</label>
-    <div class="upd" style="margin-bottom:14px">
+    <div class="fjoin">
       <input id="nt-token" type="text" autocomplete="off" spellcheck="false" style="margin:0" placeholder="shared secret">
       <button class="btn-sm" type="button" onclick="ntGenToken()" data-i18n>Generate</button>
     </div>
@@ -2068,7 +2118,7 @@ const FA={
   "Port":"پورت","Password":"رمز عبور","Restore points":"نقاط بازیابی",
   "Signed-in devices":"دستگاه‌های واردشده","Remote access":"دسترسی از راه دور",
   "Check":"بررسی","Save":"ذخیره","Close":"بستن","Channel":"کانال",
-  "Save password":"ذخیره رمز عبور","Generate":"ساخت","Revoke":"ابطال",
+  "Save password":"ذخیره رمز عبور","Generate":"ساخت","Revoke":"ابطال","Random":"تصادفی",
   "Sign out other devices":"خروج از سایر دستگاه‌ها",
   "Download backup":"دانلود پشتیبان","Restore from file…":"بازیابی از فایل…",
   "Send test":"ارسال آزمایشی","Alerts":"هشدارها","New version":"نسخه جدید",
@@ -2313,8 +2363,24 @@ const FA={
   "Build a tunnel the same way the CLI does — it is written, enabled and started right away.":
     "تونل را دقیقاً مثل خط فرمان بساز — نوشته، فعال و بلافاصله اجرا می‌شود.",
   "Side":"سمت",
-  "🇮🇷 Iran server — exposes the ports (users connect here)":"🇮🇷 سرور ایران — پورت‌ها را نمایش می‌دهد (کاربران به این وصل می‌شوند)",
-  "🌍 Abroad / kharej — runs the service, dials out":"🌍 خارج / kharej — سرویس را اجرا می‌کند و بیرون dial می‌زند",
+  "Which side of the tunnel is this machine?":"این دستگاه کدام سمتِ تونل است؟",
+  "Iran server":"سرور ایران",
+  "Exposes the ports — users connect here.":"پورت‌ها را نمایش می‌دهد — کاربران به اینجا وصل می‌شوند.",
+  "Abroad / kharej":"خارج / kharej",
+  "Runs the service and dials out.":"سرویس را اجرا می‌کند و بیرون dial می‌زند.",
+  "Plain TCP — the simplest and most compatible; a good first try.":"TCP ساده — ساده‌ترین و سازگارترین؛ برای شروع خوب است.",
+  "TCP, multiplexed — many streams over one connection, lower overhead.":"TCP مالتی‌پلکس — چند جریان روی یک اتصال، سربار کمتر.",
+  "TCP wrapped in a Noise record layer — encrypted with no fingerprint.":"TCP پیچیده در لایهٔ Noise — رمزنگاری‌شده بدون اثر انگشت.",
+  "Raw UDP datagrams — for a UDP-based service.":"دیتاگرام خام UDP — برای سرویس مبتنی بر UDP.",
+  "Reliable UDP with error correction — best on a lossy or throttled link.":"UDP قابل‌اعتماد با تصحیح خطا — بهترین برای لینک پرخطا یا throttle‌شده.",
+  "QUIC — TLS 1.3 over UDP, resists a long-lived-TCP stall.":"QUIC — TLS 1.3 روی UDP، در برابر گیرکردنِ TCP طولانی مقاوم است.",
+  "WebSocket — HTTP camouflage, CDN-friendly.":"وب‌سوکت — استتار HTTP، سازگار با CDN.",
+  "WebSocket, multiplexed.":"وب‌سوکت، مالتی‌پلکس.",
+  "Secure WebSocket — TLS encrypted, CDN-friendly.":"وب‌سوکت امن — رمزنگاری TLS، سازگار با CDN.",
+  "TLS WebSocket, multiplexed.":"وب‌سوکت TLS، مالتی‌پلکس.",
+  "Tunnels inside ICMP echo (ping) — for a path that filters UDP and TCP but not ICMP. Linux, root.":"تونل داخل ICMP echo (پینگ) — برای مسیری که UDP و TCP را فیلتر می‌کند اما ICMP را نه. لینوکس، root.",
+  "KCP inside raw IP packets with a forged source — for a path that filters on the real flow. Linux, root.":"KCP داخل پکت‌های خام IP با سورس جعلی — برای مسیری که روی جریان واقعی فیلتر می‌کند. لینوکس، root.",
+  "KCP inside hand-built TCP through a packet socket — a TCP flow with no kernel socket behind it, for a path that resets ordinary TCP. Linux, root.":"KCP داخل TCP دست‌ساز از طریق سوکت پکتی — جریان TCP بدون سوکت کرنل، برای مسیری که TCP معمولی را ریست می‌کند. لینوکس، root.",
   "Transport":"ترنسپورت",
   "Performance preset":"پیش‌تنظیم کارایی",
   "Balance — light on CPU/RAM":"متعادل — کم‌مصرف برای CPU/RAM",
@@ -3780,6 +3846,45 @@ function ntFrpProtoChange(){
   ntSync();
 }
 function closeNewTunnel(){ $('newtun').classList.remove('on'); }
+// ntPickSide is the wizard's first answer: which side of the tunnel this is.
+// The two cards drive the hidden <select id="nt-role">, so every handler below
+// still reads the value the same way — the cards are only a nicer way to set it.
+function ntPickSide(role){
+  $('nt-role').value=role;
+  document.querySelectorAll('#nt-sides .side').forEach(b=>
+    b.setAttribute('aria-pressed', b.dataset.role===role ? 'true' : 'false'));
+  ntRoleChange();
+}
+function ntSyncSideCards(){
+  const role=$('nt-role').value;
+  document.querySelectorAll('#nt-sides .side').forEach(b=>
+    b.setAttribute('aria-pressed', b.dataset.role===role ? 'true' : 'false'));
+}
+
+// NT_TDESC is the one-line description shown under the transport picker — the
+// same sentence the CLI prints beside each entry. Kept in sync with the option
+// list; a transport with no entry simply shows nothing.
+const NT_TDESC={
+  tcp:'Plain TCP — the simplest and most compatible; a good first try.',
+  tcpmux:'TCP, multiplexed — many streams over one connection, lower overhead.',
+  stealth:'TCP wrapped in a Noise record layer — encrypted with no fingerprint.',
+  udp:'Raw UDP datagrams — for a UDP-based service.',
+  kcp:'Reliable UDP with error correction — best on a lossy or throttled link.',
+  quic:'QUIC — TLS 1.3 over UDP, resists a long-lived-TCP stall.',
+  ws:'WebSocket — HTTP camouflage, CDN-friendly.',
+  wsmux:'WebSocket, multiplexed.',
+  wss:'Secure WebSocket — TLS encrypted, CDN-friendly.',
+  wssmux:'TLS WebSocket, multiplexed.',
+  xdi:'Tunnels inside ICMP echo (ping) — for a path that filters UDP and TCP but not ICMP. Linux, root.',
+  spoof:'KCP inside raw IP packets with a forged source — for a path that filters on the real flow. Linux, root.',
+  pck:'KCP inside hand-built TCP through a packet socket — a TCP flow with no kernel socket behind it, for a path that resets ordinary TCP. Linux, root.'
+};
+function ntUpdateTdesc(){
+  const el=$('nt-tdesc'); if(!el) return;
+  const d=NT_TDESC[$('nt-transport').value]||'';
+  el.textContent=d?T(d):'';
+}
+
 function ntRoleChange(){ ntSync(); ntSuggestName(); }
 function ntTransportChange(){
   // Spoof's forged-source settings live in the advanced section but are not
@@ -3802,6 +3907,8 @@ function ntSuggestName(){
 // matching what the CLI would prompt for.
 function ntSync(){
   const role=$('nt-role').value, tr=$('nt-transport').value, adv=$('nt-adv-on').checked;
+  ntSyncSideCards();
+  ntUpdateTdesc();
   $('nt-server').style.display=role==='server'?'':'none';
   $('nt-client').style.display=role==='client'?'':'none';
 
@@ -3871,6 +3978,17 @@ function ntGenToken(){
   const cs='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const a=new Uint32Array(64); crypto.getRandomValues(a);
   $('nt-token').value=Array.from(a,n=>cs[n%cs.length]).join('');
+}
+// ntRollPort suggests a random port in the 10000–60000 window — above the
+// well-known range and below the ephemeral one, so it neither collides with a
+// common service nor gets handed to an outgoing connection. The panel cannot
+// check the far host, so this is a suggestion, not a guarantee; it fills the
+// field the operator can still change. It also refreshes the suggested name.
+function ntRollPort(id){
+  const el=$(id); if(!el) return;
+  const a=new Uint32Array(1); crypto.getRandomValues(a);
+  el.value=10000+(a[0]%50000);
+  ntSuggestName();
 }
 function ntMsg(text,isErr){
   const m=$('nt-msg'); m.textContent=text||'';

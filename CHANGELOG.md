@@ -2,6 +2,27 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.31.0 — 2026-08-21
+
+**The create-tunnel form is a wizard now.** Rebuilt around the way BackPack asks
+the same questions, so building a tunnel reads as a guided flow rather than a
+wall of fields:
+
+- **Which side is this machine** is answered first, as two cards — 🇮🇷 Iran
+  server and 🌍 Abroad/kharej — that spring in and light up when chosen, instead
+  of a dropdown. A server and a client are not one form with a field swapped, so
+  the choice is a step.
+- **The transport carries its own description** — the same one-line sentence the
+  CLI prints beside each entry, shown live under the picker as you change it.
+- **A Random button** next to the tunnel port fills a sensible free-range port,
+  and the token has its Generate button — the two things you would otherwise
+  invent by hand.
+
+All of this is additive: the existing field wiring, every tunnel type (Backhaul,
+WireGuard, Packet, SSH, Hedioum) and every panel test are unchanged. BackPack's
+separate "Direct/L3" tunnel path was deliberately not brought over — the direct
+tunnels this project already has (WireGuard, Packet, SSH) cover that ground.
+
 ## v1.30.2 — 2026-08-21
 
 **One motion vocabulary for the whole panel.** Adopted a single set of timing
