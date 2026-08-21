@@ -2,6 +2,32 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.29.0 — 2026-08-21
+
+**Web panel: a full visual refresh, and a new Throughput preset.**
+
+- **Redesigned panel.** A fresh, cohesive dark aesthetic — a deeper "obsidian"
+  ground with a cool undertone and a warm ember accent, an atmospheric layered
+  background (ember aurora, a cool counter-glow, a whole-page vignette), and
+  glass surfaces that now read as lit panes: every card carries a hairline of
+  light along its top edge and a subtle top-to-bottom sheen, over a two-part
+  layered shadow. The login page was refreshed to match, and its background glow
+  now tracks the chosen accent instead of a fixed maroon. The accent palette the
+  operator can pick from was modernised (Ember, Rose, Saffron, Violet, Azure,
+  Teal); Ember stays the default. The single-theme, one-accent-variable design
+  and the "green means a tunnel is up" rule are unchanged — this is a repaint,
+  not a re-architecture, so every panel behaviour and test is preserved.
+
+- **New "Throughput" performance preset (KCP family only).** Balance, Turbo and
+  Aggressive are all latency-first gaming profiles; Throughput makes the opposite
+  trade on the same udp+kcp+fec transport — batched ACKs, a slower tick, a tenth
+  as much parity (10:1), and a large per-stream mux buffer — so a single download
+  can fill a long fat path. It is offered only where this process runs the
+  congestion control itself (kcp, xdi, spoof); on a kernel-stack transport it is
+  hidden in the panel and refused on submit, because its knobs would be written
+  and then ignored. Ported from Backpack (AminMGMT), AGPL-3.0, with attribution;
+  the tuning numbers were re-fitted to this fork's own preset baselines.
+
 ## v1.28.2 — 2026-08-17
 
 **Packet tunnel: make it hold up on a lossy / DPI-thinned route.** Three changes

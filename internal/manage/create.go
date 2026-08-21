@@ -232,7 +232,14 @@ func buildSpec(req TunnelRequest) (TunnelSpec, error) {
 		preset = PresetTurbo
 	}
 	if !validPreset(preset) {
-		return TunnelSpec{}, fmt.Errorf("unknown preset %q — use balance, turbo or aggressive", preset)
+		return TunnelSpec{}, fmt.Errorf("unknown preset %q — use balance, turbo, aggressive or throughput", preset)
+	}
+	// Caught here rather than silently applied: on a kernel-stack transport this
+	// profile's knobs would be written to the config and then ignored, which
+	// looks like a setting that took when it did nothing.
+	if !presetSuitsTransport(preset, s.Transport) {
+		return TunnelSpec{}, fmt.Errorf("the %s preset applies to the KCP transports only (kcp, xdi, spoof), not %q",
+			presetLabel(preset), s.Transport)
 	}
 	ApplyPreset(&s, preset)
 

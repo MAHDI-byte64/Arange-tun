@@ -39,3 +39,9 @@ licence and with attribution.
 The sniffer/monitor bind-address handling (web_bind; internal/web/monitorhttp.go
 and the monitorBind default) is likewise derived from Backpack by Amin Mohammadi
 (AminMGMT), under the same AGPL-3.0 licence and with attribution.
+
+The "Throughput" performance preset (PresetThroughput in internal/manage/
+preset.go, and its KCP-family gating in setup/edit/create) is derived from
+Backpack by Amin Mohammadi (AminMGMT), under the same AGPL-3.0 licence and with
+attribution; the preset's tuning numbers were re-fitted to this fork's own
+Balance/Turbo/Aggressive baselines.

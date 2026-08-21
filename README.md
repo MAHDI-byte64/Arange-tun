@@ -273,8 +273,10 @@ logs and status — every option explains itself. See **[docs/cli-menu.md](docs/
 <details open>
 <summary><b>Performance</b></summary>
 
-- Three presets — **Balance**, **Turbo** (recommended), **Aggressive** — tuning pools,
-  socket buffers, receive windows and kernel settings (BBR + fq).
+- Four presets — **Balance**, **Turbo** (recommended) and **Aggressive** for
+  latency-first (gaming) links, plus **Throughput** on the KCP family for a single
+  fast download — tuning pools, socket buffers, receive windows, FEC and kernel
+  settings (BBR + fq).
 - **Link Test** measures the route (latency, jitter, loss) and recommends a transport,
   deriving liveness timers from your real round trip.
 - **Optimize** applies kernel/network tuning on its own.
