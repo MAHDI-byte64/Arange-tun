@@ -130,6 +130,12 @@ type AdvancedTuning struct {
 	SpoofPaddingMax  int    `json:"spoofPaddingMax"`
 	SpoofFakeTLS     *bool  `json:"spoofFakeTLS"`
 
+	// PCK transport (transport == "pck"). All optional — the carrier discovers
+	// its own egress. Ignored on any other transport.
+	PckInterface  string   `json:"pckInterface"`  // egress device to pin the packet socket to
+	PckGatewayMAC string   `json:"pckGatewayMAC"` // next-hop MAC override (empty = kernel neigh table)
+	PckFlags      []string `json:"pckFlags"`      // tcpdump-style TCP flag cycle, empty = PSH+ACK
+
 	// Limits.
 	MaxConnections int `json:"maxConnections"`
 	BandwidthMbps  int `json:"bandwidthMbps"`
@@ -538,6 +544,14 @@ func applyAdvanced(s *TunnelSpec, a *AdvancedTuning) {
 		if a.SpoofFakeTLS != nil {
 			s.SpoofFakeTLS = *a.SpoofFakeTLS
 		}
+	}
+
+	// PCK carries only egress overrides, all optional. Mapped on the pck
+	// transport alone so no other tunnel picks up stale pck settings.
+	if s.Transport == "pck" {
+		s.PckInterface = a.PckInterface
+		s.PckGatewayMAC = a.PckGatewayMAC
+		s.PckFlags = a.PckFlags
 	}
 
 	if a.MaxConnections > 0 {

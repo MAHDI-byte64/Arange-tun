@@ -48,6 +48,7 @@ var transportGroups = []struct {
 	{"Experimental", "newer ideas, still being proven — not for production yet", []transportEntry{
 		{"xDi (ICMP)", "tunnels inside ping packets, for networks that filter UDP/TCP but not ICMP — Linux, needs root", "xdi"},
 		{"IP Spoofing", "forges the source of raw IP packets, for a path that filters on the real flow — Linux, needs root; prove it on your route", "spoof"},
+		{"TCP + PCK", "carries KCP inside hand-built TCP through a packet socket — a TCP flow with no kernel socket behind it, for a path that resets or throttles ordinary TCP — Linux, needs root", "pck"},
 	}},
 }
 
@@ -400,6 +401,55 @@ func askSpoof(s *TunnelSpec) {
 	}
 }
 
+// askPck collects the pck (packet-level TCP carrier) settings. It runs on both
+// ends for the pck transport and is a no-op for every other transport.
+//
+// Every field is optional: the carrier discovers its own egress from the route
+// to the peer and sends an ordinary-looking PSH+ACK flow, so the wizard only
+// offers the two overrides an unusual host might need and leaves the rest.
+func askPck(s *TunnelSpec) {
+	if s.Transport != "pck" {
+		return
+	}
+	fmt.Println()
+	tui.Warn("TCP + PCK carries the tunnel inside hand-built TCP segments read and")
+	tui.Warn("written through a packet socket — a TCP flow on the wire with no kernel")
+	tui.Warn("socket behind it. It is Linux-only and needs root (or CAP_NET_RAW), and")
+	tui.Warn("installs a firewall rule so the host does not RST its own crafted flow.")
+	fmt.Println()
+	tui.Info("The carrier works out its own egress from the route to the peer. The")
+	tui.Info("settings below correct a wrong guess on an unusual host — leave them")
+	tui.Info("empty on a normal one.")
+
+	if ifaces, err := net.Interfaces(); err == nil {
+		var names []string
+		for _, ifc := range ifaces {
+			if ifc.Flags&net.FlagUp != 0 && ifc.Flags&net.FlagLoopback == 0 {
+				names = append(names, ifc.Name)
+			}
+		}
+		if len(names) > 0 {
+			tui.Info("Egress device — available: " + strings.Join(names, ", ") + " — empty lets the route decide.")
+		}
+	}
+	for {
+		iface := strings.TrimSpace(tui.PromptDefault("Interface", ""))
+		if iface == "" {
+			break
+		}
+		if _, err := net.InterfaceByName(iface); err != nil {
+			tui.Error(fmt.Sprintf("no such interface: %v", err))
+			continue
+		}
+		s.PckInterface = iface
+		break
+	}
+
+	tui.Info("Next-hop MAC — only set it where the kernel's neighbour table is wrong")
+	tui.Info("(some virtualised networks rewrite ARP). Empty reads it from the kernel.")
+	s.PckGatewayMAC = strings.TrimSpace(tui.PromptDefault("Gateway MAC", ""))
+}
+
 // askSpoofProfile prompts for one packet profile and returns its config value.
 func askSpoofProfile(title string) string {
 	switch tui.ChooseOpt(title, []tui.Option{
@@ -520,6 +570,7 @@ func SetupServer() {
 	askSimpleAuth(&s, transport)
 
 	askSpoof(&s)
+	askPck(&s)
 	askProxyProtocol(&s)
 
 	ApplyPreset(&s, choosePreset(s.Transport))
@@ -572,10 +623,11 @@ func SetupClient() {
 	}
 	askSimpleAuth(&s, transport)
 	askSpoof(&s)
+	askPck(&s)
 
 	// Only offered where it can actually work: the datagram transports carry
 	// their data in UDP, which a TCP proxy cannot relay.
-	if transport != "udp" && transport != "kcp" && transport != "xdi" && transport != "spoof" {
+	if transport != "udp" && transport != "kcp" && transport != "xdi" && transport != "spoof" && transport != "pck" {
 		fmt.Println()
 		tui.Info("Optional proxy: reach the tunnel server through a SOCKS5 or HTTP proxy,")
 		tui.Info("for a machine that cannot open outbound connections directly.")

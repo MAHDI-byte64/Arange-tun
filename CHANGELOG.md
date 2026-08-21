@@ -2,6 +2,29 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.30.0 — 2026-08-21
+
+**New transport: TCP + PCK.** A fourth raw-packet carrier joins xDi (ICMP) and
+IP Spoofing. PCK carries the KCP transport inside TCP segments this process
+builds and reads through a packet socket, instead of through the kernel's TCP
+stack. On the wire it is a TCP flow — real source address, real ports, a header
+with the options and numbering a Linux stack produces — but no socket, no
+handshake and no connection state exist on either host, so nothing in netfilter
+or connection tracking is in a position to reset, throttle or drop it. That is
+the point: on a path where a kernel TCP flow is torn down, this one is not
+visible to the machinery doing it, and KCP above supplies the reliability the
+absent stack would have. It installs a firewall rule so the host does not RST
+its own crafted flow.
+
+- Choose it in the panel (Experimental → **TCP + PCK**) or the CLI transport
+  menu. Its only settings are optional egress overrides (interface, next-hop
+  MAC, TCP-flag cycle) — the carrier discovers its own egress otherwise.
+- Linux only, needs root or `CAP_NET_RAW`. Both ends must run this version.
+- It is a KCP-family transport, so the performance presets (including the new
+  Throughput profile) tune it and it can carry the PROXY-protocol header.
+- Ported from Backpack (AminMGMT), AGPL-3.0, with attribution in NOTICE; the
+  client source-port salt and the iptables comment tag were rebranded.
+
 ## v1.29.0 — 2026-08-21
 
 **Web panel: a full visual refresh, and a new Throughput preset.**

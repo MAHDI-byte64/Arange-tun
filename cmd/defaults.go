@@ -168,6 +168,27 @@ func applyDefaults(cfg *config.Config) {
 	checkOutbound(cfg)
 	checkXdi(cfg)
 	checkSpoof(cfg)
+	checkPck(cfg)
+}
+
+// checkPck refuses a pck tunnel that cannot possibly work, before it tries.
+//
+// Like xdi and spoof it needs a raw socket (root or CAP_NET_RAW) and is Linux
+// only, because it reads and writes TCP segments through a packet socket rather
+// than the kernel's TCP stack. Caught here, the missing capability names itself
+// instead of failing with an errno deep in the transport.
+func checkPck(cfg *config.Config) {
+	usesPck := cfg.Server.Transport == config.PCK || cfg.Client.Transport == config.PCK
+	if !usesPck {
+		return
+	}
+	if runtime.GOOS != "linux" {
+		logger.Fatalf("the pck transport is only available on Linux (it needs a packet socket)")
+	}
+	if os.Geteuid() != 0 {
+		logger.Fatalf("the pck transport needs a packet socket, which requires root or CAP_NET_RAW — run as root, or grant the capability with: setcap cap_net_raw+ep %s", app.BinPath)
+	}
+	logger.Warn("pck carries the tunnel inside hand-built TCP segments read and written through a packet socket — a TCP flow on the wire with no kernel socket behind it, for a path that resets or throttles ordinary TCP. It installs a firewall rule so the host kernel does not RST its own crafted flow.")
 }
 
 // checkXdi refuses an xdi tunnel that cannot possibly work, before it tries.
@@ -338,7 +359,7 @@ func checkOutbound(cfg *config.Config) {
 	// tunnel would come up and quietly leave by the wrong link — or, with a
 	// proxy, come up and carry nothing at all.
 	switch cfg.Client.Transport {
-	case config.UDP, config.KCP, config.XDI, config.QUIC, config.SPOOF:
+	case config.UDP, config.KCP, config.XDI, config.QUIC, config.SPOOF, config.PCK:
 		logger.Fatalf("proxy, local_addr, interface and so_mark are not supported on the %s transport: its data is not carried over the TCP dialer these settings apply to. Use tcp, tcpmux, ws, wss or wsmux, or remove them.", cfg.Client.Transport)
 	}
 

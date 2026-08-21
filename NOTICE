@@ -29,6 +29,14 @@ GNU Affero General Public License v3.0, the same licence as this project. The
 code was ported with attribution under that licence; the tunnel token salts and
 module paths were adapted to Arange-tun.
 
+The "TCP + PCK" transport (the pck_* config keys; the packet-level TCP carrier
+in internal/utils/network/pck*.go and its KCP integration in kcp.go; the
+transport wiring in server/client and internal/manage) is likewise derived from
+Backpack by Amin Mohammadi (AminMGMT), under the same AGPL-3.0 licence and with
+attribution. It carries KCP inside hand-built TCP segments read and written
+through a packet socket. The client source-port derivation salt and the iptables
+comment tag were rebranded to Arange-tun.
+
 The multi-exit health failover and scoring (health_failover; the steering in
 internal/utils/network/endpoints.go and internal/utils/network/healthscore.go;
 internal/manage/exithealth.go) and the game-latency tester (internal/manage/

@@ -150,7 +150,7 @@ func (c *Client) Start() {
 		tcpMuxClient := transport.NewMuxClient(c.ctx, tcpMuxConfig, c.logger)
 		go tcpMuxClient.Start()
 
-	case config.KCP, config.XDI, config.SPOOF:
+	case config.KCP, config.XDI, config.SPOOF, config.PCK:
 		// The spoof transport in pipe mode is a bare datagram relay for
 		// WireGuard, not a KCP tunnel — handle it separately and stop here.
 		if c.config.Transport == config.SPOOF && c.config.SpoofPipe {
@@ -185,6 +185,7 @@ func (c *Client) Start() {
 		kcp := c.config.KCPConfig.WithDefaults()
 		useICMP := c.config.Transport == config.XDI
 		useSpoof := c.config.Transport == config.SPOOF
+		usePck := c.config.Transport == config.PCK
 		kcpConfig := &transport.KcpConfig{
 			RemoteAddr:       c.config.RemoteAddr,
 			Endpoints:        endpoints,
@@ -227,6 +228,10 @@ func (c *Client) Start() {
 			SpoofICMPReply:   c.config.SpoofICMPReply,
 			SpoofMTU:         c.config.SpoofMTU,
 			SpoofDPI:         network.SpoofDPIFromConfig(c.config.SpoofConfig),
+			UsePck:           usePck,
+			PckInterface:     c.config.PckInterface,
+			PckGatewayMAC:    c.config.PckGatewayMAC,
+			PckFlags:         c.config.PckFlags,
 		}
 		kcpClient := transport.NewKcpClient(c.ctx, kcpConfig, c.logger)
 		go kcpClient.Start()

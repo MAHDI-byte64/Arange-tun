@@ -91,6 +91,9 @@ func loadServerSpec(name string) (TunnelSpec, error) {
 		SpoofPadding:     sc.SpoofPadding,
 		SpoofPaddingMax:  sc.SpoofPaddingMax,
 		SpoofFakeTLS:     sc.SpoofFakeTLS,
+		PckInterface:     sc.PckInterface,
+		PckGatewayMAC:    sc.PckGatewayMAC,
+		PckFlags:         sc.PckFlags,
 	}, nil
 }
 
@@ -171,6 +174,9 @@ func loadClientSpec(name string) (TunnelSpec, error) {
 		SpoofPadding:     cc.SpoofPadding,
 		SpoofPaddingMax:  cc.SpoofPaddingMax,
 		SpoofFakeTLS:     cc.SpoofFakeTLS,
+		PckInterface:     cc.PckInterface,
+		PckGatewayMAC:    cc.PckGatewayMAC,
+		PckFlags:         cc.PckFlags,
 	}, nil
 }
 

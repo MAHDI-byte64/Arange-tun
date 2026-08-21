@@ -1671,6 +1671,7 @@
       <optgroup label="Experimental">
         <option value="xdi">xDi (ICMP)</option>
         <option value="spoof">IP Spoofing</option>
+        <option value="pck">TCP + PCK</option>
       </optgroup>
       <option value="frp" hidden>frp</option>
       <option value="frpu" hidden>frp (udp)</option>
@@ -1866,6 +1867,14 @@
           <label for="nt-spoofpipeaddr" data-i18n>WireGuard UDP endpoint on this host</label>
           <input id="nt-spoofpipeaddr" type="text" autocomplete="off" spellcheck="false" placeholder="127.0.0.1:51820">
         </div>
+      </div>
+      <div id="nt-adv-pck" style="display:none">
+        <p class="acclabel" style="margin-bottom:8px" data-i18n>TCP + PCK (hand-built TCP through a packet socket)</p>
+        <p class="hint" style="margin:-4px 0 10px;font-size:11.5px;color:var(--muted2)" data-i18n>Carries the tunnel inside crafted TCP segments with no kernel socket behind them — a TCP flow on the wire, for a path that resets or throttles ordinary TCP. Needs root; it installs a firewall rule so the host does not RST its own flow. The fields below are optional — the carrier finds its own egress.</p>
+        <label for="nt-pckiface" data-i18n>Egress interface (optional)</label>
+        <input id="nt-pckiface" type="text" autocomplete="off" spellcheck="false" placeholder="eth0">
+        <label for="nt-pckgw" data-i18n>Next-hop MAC (optional — only if the kernel's is wrong)</label>
+        <input id="nt-pckgw" type="text" autocomplete="off" spellcheck="false" placeholder="aa:bb:cc:dd:ee:ff">
       </div>
       <label class="tg" id="nt-zc-row" style="display:none;margin-bottom:14px"><input type="checkbox" id="nt-zerocopy"><span data-i18n>Zero-copy forwarding (experimental)</span></label>
     </div>
@@ -2322,6 +2331,9 @@ const FA={
   "Egress interface (optional)":"اینترفیس خروج (اختیاری)",
   "WireGuard pipe mode (carry a WireGuard VPN instead of forwarding ports)":"حالت پایپ WireGuard (به‌جای فوروارد پورت‌ها یک VPN وایرگارد را حمل کن)",
   "WireGuard UDP endpoint on this host":"اندپوینت UDP وایرگارد روی این هاست",
+  "TCP + PCK (hand-built TCP through a packet socket)":"TCP + PCK (پکت TCP دست‌ساز از طریق سوکت پکتی)",
+  "Carries the tunnel inside crafted TCP segments with no kernel socket behind them — a TCP flow on the wire, for a path that resets or throttles ordinary TCP. Needs root; it installs a firewall rule so the host does not RST its own flow. The fields below are optional — the carrier finds its own egress.":"تانل را داخل سگمنت‌های TCP دست‌سازِ بدون سوکت کرنل حمل می‌کند — روی سیم یک جریان TCP است، برای مسیری که TCP معمولی را ریست یا throttle می‌کند. نیاز به root دارد؛ یک قانون فایروال نصب می‌کند تا هاست جریان خودش را RST نکند. فیلدهای زیر اختیاری‌اند — کریِر خروجی خودش را پیدا می‌کند.",
+  "Next-hop MAC (optional — only if the kernel's is wrong)":"MAC گام بعدی (اختیاری — فقط اگر مقدار کرنل اشتباه باشد)",
   "Client's real IPv4 (required on the server side)":"آی‌پی واقعی IPv4 کلاینت (در سمت سرور الزامی است)",
   "Create tunnel":"ساخت تونل",
   "Create another":"ساخت یکی دیگر",
@@ -2742,6 +2754,7 @@ function trLabel(t){
   if(t==='hedioum') return 'Hedioum';
   if(t==='xdi') return 'xDi (ICMP)';
   if(t==='spoof') return 'IP Spoofing';
+  if(t==='pck') return 'TCP + PCK';
   return t.toUpperCase();
 }
 
@@ -3074,10 +3087,10 @@ function closeDetails(){ $('details').classList.remove('on'); detName=null; }
 // form only ever shows what applies to the chosen side and transport.
 const ntNeedsTLS=t=>t==='wss'||t==='wssmux';
 const ntIsWS=t=>t==='ws'||t==='wss'||t==='wsmux'||t==='wssmux';
-const ntIsMux=t=>['tcpmux','wsmux','wssmux','kcp','xdi','spoof'].includes(t);
-const ntIsKCP=t=>t==='kcp'||t==='xdi'||t==='spoof';
-const ntIsDatagram=t=>t==='udp'||t==='kcp'||t==='xdi'||t==='quic'||t==='spoof';
-const ntSupportsPP=t=>['tcp','tcpmux','kcp','wsmux','wssmux','stealth','quic'].includes(t);
+const ntIsMux=t=>['tcpmux','wsmux','wssmux','kcp','xdi','spoof','pck'].includes(t);
+const ntIsKCP=t=>t==='kcp'||t==='xdi'||t==='spoof'||t==='pck';
+const ntIsDatagram=t=>t==='udp'||t==='kcp'||t==='xdi'||t==='quic'||t==='spoof'||t==='pck';
+const ntSupportsPP=t=>['tcp','tcpmux','kcp','pck','wsmux','wssmux','stealth','quic'].includes(t);
 // The transports that carry TCP segments, and so can have their size clamped.
 const ntSupportsMSS=t=>['tcp','tcpmux','stealth','ws','wss','wsmux','wssmux'].includes(t);
 
@@ -3649,7 +3662,7 @@ function openNewTunnel(){
    'nt-tlscert','nt-tlskey','nt-keepalive','nt-heartbeat','nt-maxconn','nt-bw','nt-channelsize',
    'nt-connpool','nt-muxcon','nt-muxver','nt-muxframe','nt-muxrecv','nt-muxstream',
    'nt-kcpmtu','nt-kcpint','nt-kcpsnd','nt-kcprcv','nt-kcpdata','nt-kcpparity','nt-mss',
-   'nt-spoofsrc','nt-spoofpeer','nt-spoofiface','nt-spoofpipeaddr'].forEach(id=>{ if($(id)) $(id).value=''; });
+   'nt-spoofsrc','nt-spoofpeer','nt-spoofiface','nt-spoofpipeaddr','nt-pckiface','nt-pckgw'].forEach(id=>{ if($(id)) $(id).value=''; });
   ['nt-ipv6','nt-pp','nt-lb','nt-hf','nt-simpleauth','nt-adv-on','nt-acceptudp','nt-aggpool','nt-zerocopy','nt-spoofpipe'].forEach(id=>{ if($(id)) $(id).checked=false; });
   if($('nt-spoofprofile')) $('nt-spoofprofile').value='udp';
   $('nt-role').value='server'; $('nt-transport').value='tcp'; $('nt-preset').value='turbo';
@@ -3799,6 +3812,7 @@ function ntSync(){
   // Spoof: the forged-source knobs, with the peer field only meaningful on the
   // server and the WireGuard endpoint only when pipe mode is on.
   $('nt-adv-spoof').style.display=tr==='spoof'?'':'none';
+  $('nt-adv-pck').style.display=tr==='pck'?'':'none';
   $('nt-spoofpeer-row').style.display=(tr==='spoof'&&role==='server')?'':'none';
   $('nt-spoofpipeaddr-row').style.display=(tr==='spoof'&&$('nt-spoofpipe').checked)?'':'none';
   $('nt-zc-row').style.display=tr==='tcp'?'':'none';
@@ -3863,6 +3877,10 @@ function ntAdvanced(){
       a.spoofPipe=true;
       const pa=$('nt-spoofpipeaddr').value.trim(); if(pa) a.spoofPipeAddr=pa;
     }
+  }
+  if(tr==='pck'){
+    const ifc=$('nt-pckiface').value.trim(); if(ifc) a.pckInterface=ifc;
+    const gw=$('nt-pckgw').value.trim(); if(gw) a.pckGatewayMAC=gw;
   }
   if(tr==='tcp' && $('nt-zerocopy').checked) a.zeroCopy=true;
   return Object.keys(a).length?a:undefined;
@@ -4020,6 +4038,8 @@ function ntFill(req){
     $('nt-spoofiface').value=a.spoofInterface||'';
     if(typeof a.spoofPipe==='boolean') $('nt-spoofpipe').checked=a.spoofPipe;
     $('nt-spoofpipeaddr').value=a.spoofPipeAddr||'';
+    $('nt-pckiface').value=a.pckInterface||'';
+    $('nt-pckgw').value=a.pckGatewayMAC||'';
     if(typeof a.zeroCopy==='boolean') $('nt-zerocopy').checked=a.zeroCopy;
   }
   // The built-in reverse-proxy tunnels have no transport choice — keep the

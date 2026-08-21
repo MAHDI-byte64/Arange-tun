@@ -113,6 +113,9 @@ func TunnelForEdit(name string) (TunnelRequest, error) {
 				SpoofPadding:     boolPtr(s.SpoofPadding),
 				SpoofPaddingMax:  s.SpoofPaddingMax,
 				SpoofFakeTLS:     boolPtr(s.SpoofFakeTLS),
+				PckInterface:     s.PckInterface,
+				PckGatewayMAC:    s.PckGatewayMAC,
+				PckFlags:         s.PckFlags,
 				MaxConnections:   s.MaxConnections,
 				BandwidthMbps:    s.BandwidthMbps,
 				ZeroCopy:         &zc,
@@ -182,6 +185,9 @@ func TunnelForEdit(name string) (TunnelRequest, error) {
 				SpoofPadding:     boolPtr(c.SpoofPadding),
 				SpoofPaddingMax:  c.SpoofPaddingMax,
 				SpoofFakeTLS:     boolPtr(c.SpoofFakeTLS),
+				PckInterface:     c.PckInterface,
+				PckGatewayMAC:    c.PckGatewayMAC,
+				PckFlags:         c.PckFlags,
 				ZeroCopy:         &zc,
 			}
 		}

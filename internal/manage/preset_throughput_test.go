@@ -61,10 +61,10 @@ func TestThroughputPresetTradesLatencyForBandwidth(t *testing.T) {
 
 // The profile must be offered only where it changes anything: the transports
 // whose congestion control, retransmission and FEC this process runs. In this
-// fork that is the KCP family kcp/xdi/spoof (the packet tunnel is its own type,
-// not a Backhaul transport).
+// fork that is the KCP family kcp/xdi/spoof/pck (the standalone packet tunnel is
+// its own type, not a Backhaul transport).
 func TestThroughputPresetIsOfferedOnKCPOnly(t *testing.T) {
-	for _, transport := range []string{"kcp", "xdi", "spoof"} {
+	for _, transport := range []string{"kcp", "xdi", "spoof", "pck"} {
 		if !presetSuitsTransport(PresetThroughput, transport) {
 			t.Errorf("throughput should be allowed on %q", transport)
 		}
