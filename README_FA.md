@@ -279,7 +279,7 @@ connection pooling:
 | **TCP** | TCP, TCP Mux, TCP + Stealth | *Stealth* wraps TCP in a Noise layer with **no fingerprint** — random-looking bytes with nothing for DPI to match. Best under heavy filtering. |
 | **UDP** | UDP, UDP + KCP | *KCP* adds reliable delivery with **forward error correction**, repairing loss without waiting for a retransmit. |
 | **WebSocket** | WS, WS Mux, WSS, WSS Mux | *WSS* uses TLS with a real Chrome fingerprint and a Let's Encrypt (or self-signed) certificate; a **decoy site** answers non-tunnel probes so the server looks like a normal HTTPS website. |
-| **Experimental** | xDi (ICMP) · IP Spoofing | ‏xDi تونل را داخل پکت‌های پینگ می‌برد؛ IP Spoofing تونل KCP را داخل پکت‌های خام IPv4 با **سورس جعلی** حمل می‌کند (پروفایل‌های udp/icmp/tcp، استخر سورس چرخشی، ابهام‌سازی ضدDPI و حالت پایپ WireGuard). هر دو فقط لینوکس و نیازمند root. |
+| **Experimental** | xDi (ICMP) · IP Spoofing · TCP + PCK | ‏xDi تونل را داخل پکت‌های پینگ می‌برد؛ IP Spoofing تونل KCP را داخل پکت‌های خام IPv4 با **سورس جعلی** حمل می‌کند (پروفایل‌های udp/icmp/tcp، استخر سورس چرخشی، ابهام‌سازی ضدDPI و حالت پایپ WireGuard)؛ TCP + PCK تونل KCP را داخل **سگمنت‌های TCP دست‌ساز از طریق سوکت پکتی** حمل می‌کند — روی سیم یک جریان TCP بدون سوکت کرنل، طوری که هیچ‌چیز در netfilter نتواند آن را ریست یا throttle کند؛ برای مسیری که TCP معمولی را قطع می‌کند. هر سه فقط لینوکس و نیازمند root. |
 
 </div>
 
@@ -296,8 +296,10 @@ connection pooling:
 
 **کارایی**
 
-- سه پیش‌تنظیم — **Balance**، **Turbo** (پیشنهادی) و **Aggressive** — که پول‌ها،
-  بافرهای سوکت، پنجره‌های دریافت و تنظیمات کرنل (BBR + fq) را تنظیم می‌کنند.
+- چهار پیش‌تنظیم — **Balance**، **Turbo** (پیشنهادی) و **Aggressive** برای
+  لینک‌های تأخیرمحور (بازی)، به‌علاوهٔ **Throughput** روی خانوادهٔ KCP برای یک
+  دانلود سریع تک‌جریانی — که پول‌ها، بافرهای سوکت، پنجره‌های دریافت، FEC و
+  تنظیمات کرنل (BBR + fq) را تنظیم می‌کنند.
 - **Link Test** مسیر را می‌سنجد (تأخیر، jitter، loss) و ترنسپورت مناسب را پیشنهاد
   می‌دهد و تایمرهای liveness را از رفت‌وبرگشت واقعی تو مشتق می‌کند.
 - **Optimize** تنظیمات کرنل/شبکه را خودش اعمال می‌کند (BBR + fq، سقف بافر سوکت،

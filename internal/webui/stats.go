@@ -145,7 +145,7 @@ type TunnelInfo struct {
 	Pool *metrics.PoolStats `json:"pool,omitempty"`
 
 	// From the tunnel's own config.
-	Preset         string   `json:"preset,omitempty"`         // display label: Balance / Turbo / Aggressive / Custom
+	Preset         string   `json:"preset,omitempty"`         // display label: Balance / Turbo / Aggressive / Throughput / Custom
 	MaxConnections int      `json:"maxConnections,omitempty"` // 0 = unlimited
 	BandwidthMbps  int      `json:"bandwidthMbps,omitempty"`  // 0 = unlimited
 	ProxyProtocol  bool     `json:"proxyProtocol,omitempty"`

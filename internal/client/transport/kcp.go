@@ -88,16 +88,25 @@ type KcpConfig struct {
 	SpoofICMPReply bool
 	SpoofMTU       int
 	SpoofDPI       network.SpoofDPI
+	// UsePck carries the session inside hand-built TCP segments read and written
+	// through a packet socket (the pck transport). Only the packet layer differs.
+	UsePck        bool
+	PckInterface  string
+	PckGatewayMAC string
+	PckFlags      []string
 }
 
 // transportLabel is what the panel and logs call this transport — XDI over ICMP
-// echo, SPOOF over forged raw IP, KCP over UDP.
+// echo, SPOOF over forged raw IP, PCK over hand-built TCP, KCP over UDP.
 func (c *KcpTransport) transportLabel() string {
 	if c.config.UseICMP {
 		return "XDI"
 	}
 	if c.config.UseSpoof {
 		return "SPOOF"
+	}
+	if c.config.UsePck {
+		return "PCK"
 	}
 	return "KCP"
 }
@@ -133,6 +142,16 @@ func (c *KcpConfig) settings() network.KCPSettings {
 			MTU:        c.SpoofMTU,
 			DPI:        c.SpoofDPI,
 		}
+	}
+	if c.UsePck {
+		carrier := &network.PcapCarrier{
+			Interface:  c.PckInterface,
+			GatewayMAC: c.PckGatewayMAC,
+		}
+		if flags, err := network.ParseTCPFlagList(c.PckFlags); err == nil {
+			carrier.Flags = flags
+		}
+		s.Pck = carrier
 	}
 	return s
 }

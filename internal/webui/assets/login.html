@@ -10,13 +10,13 @@
 <title>Arange-tun · Login</title>
 <style>
   :root{
-    --bg:#0a0a0b; --card:rgba(255,255,255,.045); --stroke:rgba(255,255,255,.09);
+    --bg:#07070b; --card:rgba(255,255,255,.05); --stroke:rgba(255,255,255,.10);
     --accent-rgb:255,69,58;
     --accent:rgb(var(--accent-rgb));
     --red:var(--accent);
-    --red-soft:color-mix(in srgb, var(--accent) 60%, #fff);
-    --red-deep:color-mix(in srgb, var(--accent) 68%, #000);
-    --txt:#f5f5f7; --muted:#9a9aa0; --radius:26px;
+    --red-soft:color-mix(in srgb, var(--accent) 62%, #fff);
+    --red-deep:color-mix(in srgb, var(--accent) 70%, #000);
+    --txt:#f6f6f9; --muted:#9c9ca6; --radius:26px;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
@@ -25,25 +25,34 @@
     background:var(--bg); color:var(--txt);
     display:grid; place-items:center; overflow:hidden; -webkit-font-smoothing:antialiased;
     min-height:100dvh;
+    /* Same obsidian ground as the panel: an ember aurora top-left, a cool
+       counter-glow top-right, and a whole-page vignette. */
+    background-image:
+      radial-gradient(900px 560px at 8% -10%, rgba(var(--accent-rgb),.14), transparent 56%),
+      radial-gradient(760px 480px at 100% 0%, rgba(120,140,255,.05), transparent 55%),
+      radial-gradient(1200px 800px at 50% 45%, transparent 60%, rgba(0,0,0,.5));
   }
   .ic{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
   :focus-visible{outline:2px solid var(--red);outline-offset:3px}
 
-  .glow{position:fixed;inset:0;z-index:0;filter:blur(90px);opacity:.6}
+  .glow{position:fixed;inset:0;z-index:0;filter:blur(90px);opacity:.5}
   .glow::before,.glow::after{content:"";position:absolute;border-radius:50%}
-  .glow::before{width:520px;height:520px;background:radial-gradient(circle,var(--red-deep),transparent 65%);
+  .glow::before{width:520px;height:520px;background:radial-gradient(circle,var(--red),transparent 65%);
     top:-160px;left:-120px;animation:float1 14s ease-in-out infinite}
-  .glow::after{width:420px;height:420px;background:radial-gradient(circle,#7a0d08,transparent 65%);
+  /* Accent-derived so it tracks the chosen theme rather than sitting a fixed
+     maroon behind, say, a teal accent. */
+  .glow::after{width:420px;height:420px;background:radial-gradient(circle,var(--red-deep),transparent 65%);
     bottom:-140px;right:-100px;animation:float2 18s ease-in-out infinite}
   @keyframes float1{50%{transform:translate(120px,80px) scale(1.15)}}
   @keyframes float2{50%{transform:translate(-100px,-60px) scale(1.1)}}
 
   .card{
     position:relative;z-index:1;width:min(92vw,380px);padding:44px 34px 30px;
-    background:var(--card);border:1px solid var(--stroke);border-radius:var(--radius);
+    background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,0) 42%),var(--card);
+    border:1px solid var(--stroke);border-radius:var(--radius);
     backdrop-filter:blur(30px) saturate(160%);-webkit-backdrop-filter:blur(30px) saturate(160%);
-    box-shadow:0 30px 80px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.08);
+    box-shadow:0 30px 80px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.14);
     text-align:center;animation:rise .7s cubic-bezier(.16,1,.3,1) both;
   }
   @keyframes rise{from{opacity:0;transform:translateY(24px) scale(.98)}}
@@ -73,10 +82,11 @@
   .toggle:hover{color:var(--red-soft)}
   button[type=submit]{
     min-height:52px;padding:0 16px;font-size:16px;font-weight:600;color:#fff;cursor:pointer;
-    background:linear-gradient(145deg,var(--red),var(--red-deep));border:none;border-radius:16px;
-    transition:transform .25s,box-shadow .25s;box-shadow:0 10px 26px rgba(var(--accent-rgb),.35);touch-action:manipulation;
+    background:linear-gradient(145deg,var(--red-soft),var(--red-deep));border:none;border-radius:16px;
+    transition:transform .25s,box-shadow .25s;
+    box-shadow:0 10px 26px rgba(var(--accent-rgb),.38),inset 0 1px 0 rgba(255,255,255,.36);touch-action:manipulation;
   }
-  button[type=submit]:hover{transform:translateY(-2px);box-shadow:0 16px 36px rgba(var(--accent-rgb),.5)}
+  button[type=submit]:hover{transform:translateY(-2px);box-shadow:0 16px 40px rgba(var(--accent-rgb),.55),inset 0 1px 0 rgba(255,255,255,.42)}
   button[type=submit]:active{transform:translateY(0) scale(.99)}
   .foot{margin-top:22px;color:var(--muted);font-size:11.5px;letter-spacing:.03em}
   .foot b{color:var(--red-soft);font-weight:600}

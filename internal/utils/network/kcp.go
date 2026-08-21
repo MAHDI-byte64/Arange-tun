@@ -40,7 +40,25 @@ type KCPSettings struct {
 	// source is forged — the "IP Spoofing" transport. Like UseICMP it swaps only
 	// the packet layer; everything above is unchanged. See spoofconn_linux.go.
 	Spoof *SpoofCarrier
+	// Pck, when set, carries the KCP session inside TCP segments this process
+	// builds and reads through a packet socket — the "TCP + PCK" transport.
+	// Again only the packet layer differs. Unlike Spoof it forges no address:
+	// the source is this machine's real one, so the server learns each client
+	// from the wire exactly as a UDP socket would. See pckconn_linux.go.
+	Pck *PcapCarrier
+	// Logf, when set, receives one-line startup notes — for the pck carrier, the
+	// egress it discovered and whether the kernel-RST guard installed. A pck
+	// tunnel that never connects is otherwise silent, so this is where its
+	// interface/next-hop/guard decisions surface. Nil disables the notes; it is
+	// only ever called at startup, never on the data path.
+	Logf func(format string, args ...any)
 }
+
+// pckDiagnoser is implemented by the pck carrier alone, to surface in the
+// startup log what it discovered about the egress path and whether the
+// kernel-RST guard installed. The type assertion against it does nothing for
+// every other carrier.
+type pckDiagnoser interface{ PckDiag() string }
 
 // SpoofCarrier is the IP-spoofing carrier's tuning, passed down to the raw
 // socket. Nil in KCPSettings means the session rides on UDP (or ICMP) instead.
@@ -96,6 +114,11 @@ func (s KCPSettings) effectiveMTU() int {
 			over = d
 		}
 		return s.MTU - over
+	}
+	if s.Pck != nil {
+		// The IP and TCP headers plus the timestamp option. The Ethernet header
+		// is outside the IP MTU and so is not counted.
+		return s.MTU - PckOverhead()
 	}
 	return s.MTU
 }
@@ -181,6 +204,34 @@ func KCPListen(bindAddr, token string, s KCPSettings) (*kcp.Listener, error) {
 		return listener, nil
 	}
 
+	// Over the pck carrier there is no bound socket at all: TCP segments are
+	// read off the wire through a packet socket and handed to KCP as a single
+	// PacketConn. The bind address supplies only the port the tunnel's segments
+	// are addressed to, so a capture shows the port the operator configured.
+	if s.Pck != nil {
+		carrier := *s.Pck
+		carrier.Token = token
+		if carrier.Port == 0 {
+			carrier.Port = portOf(bindAddr)
+		}
+		if carrier.Port == 0 {
+			return nil, fmt.Errorf("pck: the tunnel port could not be read from %q", bindAddr)
+		}
+		conn, err := newPckConn(true, carrier.Port, carrier)
+		if err != nil {
+			return nil, err
+		}
+		if d, ok := conn.(pckDiagnoser); ok && s.Logf != nil {
+			s.Logf("%s", d.PckDiag())
+		}
+		listener, err := kcp.ServeConn(block, s.DataShards, s.ParityShards, conn)
+		if err != nil {
+			conn.Close()
+			return nil, fmt.Errorf("pck: failed to start the KCP listener: %w", err)
+		}
+		return listener, nil
+	}
+
 	listener, err := kcp.ListenWithOptions(bindAddr, block, s.DataShards, s.ParityShards)
 	if err != nil {
 		return nil, fmt.Errorf("kcp: failed to listen on %s: %w", bindAddr, err)
@@ -246,6 +297,38 @@ func KCPDial(remoteAddr, token string, s KCPSettings) (*kcp.UDPSession, error) {
 			conn.Close()
 			return nil, fmt.Errorf("spoof: failed to open the KCP session: %w", err)
 		}
+	} else if s.Pck != nil {
+		// The client addresses its segments to the server's real address and the
+		// tunnel port, and sends from a port of its own derived from the token.
+		ipAddr, err := hostToIPAddr(remoteAddr)
+		if err != nil {
+			return nil, err
+		}
+		carrier := *s.Pck
+		carrier.Token = token
+		carrier.PeerIP = ipAddr.IP.String()
+		if carrier.Port == 0 {
+			carrier.Port = portOf(remoteAddr)
+		}
+		if carrier.Port == 0 {
+			return nil, fmt.Errorf("pck: the tunnel port could not be read from %q", remoteAddr)
+		}
+		conn, err := newPckConn(false, carrier.Port, carrier)
+		if err != nil {
+			return nil, err
+		}
+		if d, ok := conn.(pckDiagnoser); ok && s.Logf != nil {
+			s.Logf("%s", d.PckDiag())
+		}
+		// KCP calls conn.WriteTo with this address on every send; the pck conn
+		// crafts its own TCP to the server regardless, so it only needs to be a
+		// stable non-nil address (the server's real IP and the tunnel port).
+		session, err = kcp.NewConn2(&net.UDPAddr{IP: ipAddr.IP, Port: int(carrier.Port)},
+			block, s.DataShards, s.ParityShards, conn)
+		if err != nil {
+			conn.Close()
+			return nil, fmt.Errorf("pck: failed to open the KCP session: %w", err)
+		}
 	} else {
 		session, err = kcp.DialWithOptions(remoteAddr, block, s.DataShards, s.ParityShards)
 		if err != nil {
@@ -266,4 +349,19 @@ func hostToIPAddr(remoteAddr string) (*net.IPAddr, error) {
 		host = h
 	}
 	return net.ResolveIPAddr("ip4", host)
+}
+
+// portOf returns the port of a "host:port" address, or 0 when there is none.
+// The pck carrier uses it to take the tunnel port straight from the address the
+// operator configured, so a capture shows the port they expect.
+func portOf(addr string) uint16 {
+	_, p, err := net.SplitHostPort(addr)
+	if err != nil {
+		return 0
+	}
+	n, err := net.LookupPort("tcp", p)
+	if err != nil {
+		return 0
+	}
+	return uint16(n)
 }

@@ -98,6 +98,13 @@ type TunnelSpec struct {
 	SpoofPaddingMax  int  // most padding bytes per frame
 	SpoofFakeTLS     bool // prepend a fake TLS record header (tcp)
 
+	// PCK transport (KCP inside hand-built TCP through a packet socket). Filled
+	// only when the transport is pck; see config.PckConfig. All optional — the
+	// carrier discovers its own egress and defaults to an ordinary-looking flow.
+	PckInterface  string   // egress device to pin the packet socket to
+	PckGatewayMAC string   // next-hop MAC override (empty = read from neigh table)
+	PckFlags      []string // tcpdump-style TCP flag cycle (e.g. ["PA"]), empty = PSH+ACK
+
 	// Throughput / latency tuning
 	MSS      int // TCP max segment size (0 = auto)
 	SoRcvBuf int // per-socket receive buffer (bytes)
@@ -271,16 +278,39 @@ func (s TunnelSpec) writeSpoof(p func(string, ...any)) {
 	}
 }
 
+// writePck emits the pck (packet-level TCP carrier) knobs. A no-op for every
+// other transport, so a tunnel that is not on pck never carries stale pck
+// settings. Every field is optional — the carrier discovers its own egress and
+// defaults to an ordinary-looking flow — so only non-empty values are written.
+func (s TunnelSpec) writePck(p func(string, ...any)) {
+	if s.Transport != "pck" {
+		return
+	}
+	if s.PckInterface != "" {
+		p("pck_interface = %q\n", s.PckInterface)
+	}
+	if s.PckGatewayMAC != "" {
+		p("pck_gateway_mac = %q\n", s.PckGatewayMAC)
+	}
+	if len(s.PckFlags) > 0 {
+		quoted := make([]string, len(s.PckFlags))
+		for i, f := range s.PckFlags {
+			quoted[i] = fmt.Sprintf("%q", f)
+		}
+		p("pck_flags = [%s]\n", strings.Join(quoted, ", "))
+	}
+}
+
 // isMux reports whether a transport multiplexes over SMUX.
 func isMux(t string) bool {
-	return t == "tcpmux" || t == "wsmux" || t == "wssmux" || t == "kcp" || t == "xdi" || t == "spoof"
+	return t == "tcpmux" || t == "wsmux" || t == "wssmux" || t == "kcp" || t == "xdi" || t == "spoof" || t == "pck"
 }
 
 // isKCP reports whether a transport rides on KCP — over UDP (kcp), over ICMP
 // echo (xdi), or over forged raw IP (spoof). All three are tuned by the same
 // kcp_* knobs and the same presets.
 func isKCP(t string) bool {
-	return t == "kcp" || t == "xdi" || t == "spoof"
+	return t == "kcp" || t == "xdi" || t == "spoof" || t == "pck"
 }
 
 // IsDatagram reports whether a transport carries datagrams (UDP/KCP), for
@@ -291,7 +321,7 @@ func IsDatagram(t string) bool { return isDatagram(t) }
 // tunnel never shows up in the TCP listen table and cannot be probed with a
 // TCP connect, so every check that assumes TCP has to skip it.
 func isDatagram(t string) bool {
-	return t == "udp" || t == "kcp" || t == "xdi" || t == "quic" || t == "spoof"
+	return t == "udp" || t == "kcp" || t == "xdi" || t == "quic" || t == "spoof" || t == "pck"
 }
 
 // supportsProxyProtocol reports whether a transport can prepend the PROXY
@@ -300,7 +330,7 @@ func isDatagram(t string) bool {
 // connection to describe.
 func supportsProxyProtocol(t string) bool {
 	switch t {
-	case "tcp", "tcpmux", "kcp", "wsmux", "wssmux", "stealth", "quic":
+	case "tcp", "tcpmux", "kcp", "pck", "wsmux", "wssmux", "stealth", "quic":
 		return true
 	}
 	return false
@@ -341,7 +371,7 @@ func isReverseProxy(t string) bool {
 // validTransport reports whether t is one of the engine's supported transports.
 func validTransport(t string) bool {
 	switch t {
-	case "tcp", "tcpmux", "udp", "kcp", "quic", "ws", "wss", "wsmux", "wssmux", "stealth", "xdi", "spoof", "frp", "frpu", "rathole", "ratholeu":
+	case "tcp", "tcpmux", "udp", "kcp", "quic", "ws", "wss", "wsmux", "wssmux", "stealth", "xdi", "spoof", "pck", "frp", "frpu", "rathole", "ratholeu":
 		return true
 	}
 	return false
@@ -389,6 +419,7 @@ func (s TunnelSpec) Render() string {
 		s.writeTuning(p)
 		s.writeKCP(p)
 		s.writeSpoof(p)
+		s.writePck(p)
 		if s.Transport == "tcp" {
 			// accept_udp is only honoured by the plain TCP transport in the engine.
 			p("accept_udp = %t\n", s.AcceptUDP)
@@ -483,6 +514,7 @@ func (s TunnelSpec) Render() string {
 	s.writeTuning(p)
 	s.writeKCP(p)
 	s.writeSpoof(p)
+	s.writePck(p)
 	if isWS(s.Transport) && s.EdgeIP != "" {
 		p("edge_ip = %q\n", s.EdgeIP)
 	}

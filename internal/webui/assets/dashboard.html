@@ -16,20 +16,41 @@
 <title>Arange-tun · Dashboard</title>
 <style>
   :root{
-    --bg:#0a0a0b; --bg2:#0e0e10;
-    --card:rgba(255,255,255,.045); --card-hi:rgba(255,255,255,.07);
-    --stroke:rgba(255,255,255,.09);
-    /* The single fixed accent: the red-orange of the CLI menu. The panel has
-       one theme on purpose, so what you see here matches `sudo arange-tun`. */
+    /* Obsidian base — a very dark ground with a faint cool-violet undertone, so
+       the warm ember accent reads as warm against it rather than against pure
+       neutral grey. --bg is the page; --bg2 is an elevated opaque surface for
+       things that float over it (modals, drawers, the menu, toasts). */
+    --bg:#07070b; --bg2:#101017;
+    /* Glass surfaces. --card is the translucent fill a panel tints the page
+       with; --card-hi is its hover state. They stay near-transparent on purpose
+       so the atmospheric background reads through them — the depth comes from
+       the highlight and shadow tokens below, not from a heavier fill. */
+    --card:rgba(255,255,255,.045); --card-hi:rgba(255,255,255,.075);
+    --stroke:rgba(255,255,255,.10);
+    --hair:rgba(255,255,255,.07);   /* thin internal dividers */
+    /* The hairline of light along the top edge of a glass surface — the single
+       detail that makes glass read as glass rather than as a flat tinted box.
+       Applied as an inset box-shadow so it never needs a pseudo-element. */
+    --glow:rgba(255,255,255,.14);
+    /* Layered elevation. Depth is two shadows: a tight contact shadow that
+       grounds the surface, and a wide soft one that lifts it off the page. */
+    --sh-1:0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.28);
+    --sh-2:0 2px 6px rgba(0,0,0,.40), 0 24px 60px rgba(0,0,0,.40);
+    /* The single fixed accent: the red-orange of the CLI menu. It is the default
+       and the operator may pick another; every coloured thing derives from this
+       one variable, so a theme is that variable and nothing else. */
     --accent-rgb:255,69,58;
     --accent:rgb(var(--accent-rgb));
     --red:var(--accent);
-    --red-soft:color-mix(in srgb, var(--accent) 60%, #fff);
-    --red-deep:color-mix(in srgb, var(--accent) 68%, #000);
+    --red-soft:color-mix(in srgb, var(--accent) 62%, #fff);
+    --red-deep:color-mix(in srgb, var(--accent) 70%, #000);
+    /* A soft wash of the accent, for tinted fills and the glow behind primary
+       controls — derived so it tracks whatever accent is chosen. */
+    --accent-wash:rgba(var(--accent-rgb),.14);
     /* Green is reserved for one meaning only: a tunnel that is up. Amber marks
        one that is down. Nothing decorative uses either. */
     --green:#30d158; --amber:#ff9f0a;
-    --txt:#f5f5f7; --muted:#9a9aa0; --muted2:#636366;
+    --txt:#f6f6f9; --muted:#9c9ca6; --muted2:#66666f;
     --radius:22px;
   }
   *{box-sizing:border-box;margin:0;padding:0}
@@ -45,11 +66,16 @@
       system-ui,"Noto Naskh Arabic","SF Arabic",Tahoma,sans-serif;
     background:var(--bg); color:var(--txt); -webkit-font-smoothing:antialiased;
     min-height:100dvh; padding:22px clamp(14px,4vw,40px) 60px;
+    /* An atmospheric ground: a warm ember aurora bleeding down from the top-left,
+       a cooler counter-glow at the top-right, a faint pool of accent at the
+       bottom, and a whole-page vignette that darkens the corners so the content
+       column reads as lit. All accent-derived, so it re-tints with the theme. */
     background-image:
-      radial-gradient(1100px 620px at 6% -8%, rgba(var(--accent-rgb),.13), transparent 58%),
-      radial-gradient(900px 520px at 98% 2%, rgba(var(--accent-rgb),.07), transparent 55%),
-      radial-gradient(760px 760px at 50% 118%, rgba(var(--accent-rgb),.06), transparent 60%),
-      linear-gradient(180deg, rgba(255,255,255,.015), transparent 30%);
+      radial-gradient(1200px 680px at 4% -12%, rgba(var(--accent-rgb),.16), transparent 56%),
+      radial-gradient(980px 560px at 100% -4%, rgba(120,140,255,.05), transparent 54%),
+      radial-gradient(820px 820px at 50% 120%, rgba(var(--accent-rgb),.07), transparent 60%),
+      radial-gradient(1400px 900px at 50% 40%, transparent 62%, rgba(0,0,0,.42)),
+      linear-gradient(180deg, rgba(255,255,255,.02), transparent 26%);
     background-attachment:fixed;
   }
   .wrap{max-width:1200px;margin:0 auto;position:relative;z-index:0}
@@ -100,9 +126,12 @@
   .ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
   button{font-family:inherit;touch-action:manipulation}
   :focus-visible{outline:2px solid var(--red);outline-offset:3px;border-radius:10px}
-  /* elevation scale for depth (skill: consistent shadow scale) */
-  header,.meter,.pill,.tun{box-shadow:0 1px 2px rgba(0,0,0,.22),0 10px 30px rgba(0,0,0,.20)}
-  .meter:hover,.tun:hover{box-shadow:0 2px 6px rgba(0,0,0,.28),0 20px 48px rgba(0,0,0,.30)}
+  /* Elevation scale for depth: a layered ground shadow plus the inset rim of
+     light along the top edge, which is what makes every glass surface read as a
+     lit pane rather than a flat tinted box. One rule, so the whole panel shares
+     the same physics of depth. */
+  header,.meter,.pill,.tun{box-shadow:var(--sh-1), inset 0 1px 0 var(--glow)}
+  .meter:hover,.tun:hover{box-shadow:var(--sh-2), inset 0 1px 0 var(--glow)}
   ::selection{background:rgba(var(--accent-rgb),.35)}
 
   /* ---------- header ---------- */
@@ -116,7 +145,7 @@
     position:relative;z-index:1;
     display:flex;align-items:center;gap:16px;flex-wrap:wrap;
     padding:16px 20px;margin-bottom:22px;
-    background:var(--card);border:1px solid var(--stroke);border-radius:var(--radius);
+    background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0) 46%),var(--card);border:1px solid var(--stroke);border-radius:var(--radius);
     backdrop-filter:blur(26px) saturate(160%);-webkit-backdrop-filter:blur(26px) saturate(160%);
     animation:rise .6s cubic-bezier(.16,1,.3,1) both;
   }
@@ -266,9 +295,9 @@
   .modal .actions button{flex:1;min-height:46px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;transition:.22s}
   .btn-ghost{background:rgba(255,255,255,.05);border:1px solid var(--stroke);color:var(--txt)}
   .btn-ghost:hover{background:rgba(255,255,255,.1)}
-  .btn-primary{background:linear-gradient(145deg,var(--red),var(--red-deep));border:none;color:#fff;
-    box-shadow:0 8px 22px rgba(var(--accent-rgb),.35)}
-  .btn-primary:hover{transform:translateY(-1px)}
+  .btn-primary{background:linear-gradient(145deg,var(--red-soft),var(--red-deep));border:none;color:#fff;
+    box-shadow:0 8px 22px rgba(var(--accent-rgb),.38),inset 0 1px 0 rgba(255,255,255,.36)}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 12px 30px rgba(var(--accent-rgb),.5),inset 0 1px 0 rgba(255,255,255,.42)}
   .btn-primary:disabled{opacity:.55;cursor:default;transform:none}
   /* Delete is the one irreversible action in a modal, so it carries the accent
      as a warning rather than sitting neutral next to Close. */
@@ -425,7 +454,7 @@
   /* ---------- meters ---------- */
   .grid-meters{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px}
   .meter{
-    background:var(--card);border:1px solid var(--stroke);border-radius:var(--radius);
+    background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0) 46%),var(--card);border:1px solid var(--stroke);border-radius:var(--radius);
     padding:20px 16px 16px;text-align:center;position:relative;overflow:hidden;
     backdrop-filter:blur(20px);transition:transform .3s,background .3s,border-color .3s;
     animation:rise .6s cubic-bezier(.16,1,.3,1) both;
@@ -445,7 +474,7 @@
 
   /* ---------- quick stats ---------- */
   .grid-stats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:26px}
-  .pill{background:var(--card);border:1px solid var(--stroke);border-radius:16px;padding:14px 16px;
+  .pill{background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0) 46%),var(--card);border:1px solid var(--stroke);border-radius:16px;padding:14px 16px;
     display:flex;align-items:center;gap:12px;backdrop-filter:blur(20px);transition:transform .25s,background .25s;
     animation:rise .6s cubic-bezier(.16,1,.3,1) both}
   .pill:hover{transform:translateY(-3px);background:var(--card-hi)}
@@ -507,7 +536,7 @@
   .et-proxy .etp-del{flex:none;background:none;border:1px solid var(--stroke);color:var(--muted);
     border-radius:9px;width:34px;height:34px;cursor:pointer;transition:.2s}
   .et-proxy .etp-del:hover{color:var(--red-soft);border-color:rgba(var(--accent-rgb),.4)}
-  .tun{background:var(--card);border:1px solid var(--stroke);border-radius:var(--radius);
+  .tun{background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0) 46%),var(--card);border:1px solid var(--stroke);border-radius:var(--radius);
     padding:18px;backdrop-filter:blur(20px);transition:transform .3s,background .3s,border-color .3s;
     position:relative;overflow:hidden;animation:rise .5s cubic-bezier(.16,1,.3,1) both}
   /* Status is carried by a ring around the whole card, drawn inside its edge,
@@ -1642,6 +1671,7 @@
       <optgroup label="Experimental">
         <option value="xdi">xDi (ICMP)</option>
         <option value="spoof">IP Spoofing</option>
+        <option value="pck">TCP + PCK</option>
       </optgroup>
       <option value="frp" hidden>frp</option>
       <option value="frpu" hidden>frp (udp)</option>
@@ -1684,7 +1714,8 @@
     <select id="nt-preset" class="sel">
       <option value="balance" data-i18n>Balance — light on CPU/RAM</option>
       <option value="turbo" selected data-i18n>Turbo — recommended</option>
-      <option value="aggressive" data-i18n>Aggressive — maximum throughput</option>
+      <option value="aggressive" data-i18n>Aggressive — maximum gaming headroom</option>
+      <option value="throughput" id="nt-preset-throughput" data-i18n>Throughput — max bandwidth (KCP only)</option>
     </select>
 
     <label for="nt-name" data-i18n>Tunnel name</label>
@@ -1836,6 +1867,14 @@
           <label for="nt-spoofpipeaddr" data-i18n>WireGuard UDP endpoint on this host</label>
           <input id="nt-spoofpipeaddr" type="text" autocomplete="off" spellcheck="false" placeholder="127.0.0.1:51820">
         </div>
+      </div>
+      <div id="nt-adv-pck" style="display:none">
+        <p class="acclabel" style="margin-bottom:8px" data-i18n>TCP + PCK (hand-built TCP through a packet socket)</p>
+        <p class="hint" style="margin:-4px 0 10px;font-size:11.5px;color:var(--muted2)" data-i18n>Carries the tunnel inside crafted TCP segments with no kernel socket behind them — a TCP flow on the wire, for a path that resets or throttles ordinary TCP. Needs root; it installs a firewall rule so the host does not RST its own flow. The fields below are optional — the carrier finds its own egress.</p>
+        <label for="nt-pckiface" data-i18n>Egress interface (optional)</label>
+        <input id="nt-pckiface" type="text" autocomplete="off" spellcheck="false" placeholder="eth0">
+        <label for="nt-pckgw" data-i18n>Next-hop MAC (optional — only if the kernel's is wrong)</label>
+        <input id="nt-pckgw" type="text" autocomplete="off" spellcheck="false" placeholder="aa:bb:cc:dd:ee:ff">
       </div>
       <label class="tg" id="nt-zc-row" style="display:none;margin-bottom:14px"><input type="checkbox" id="nt-zerocopy"><span data-i18n>Zero-copy forwarding (experimental)</span></label>
     </div>
@@ -2231,7 +2270,8 @@ const FA={
   "Performance preset":"پیش‌تنظیم کارایی",
   "Balance — light on CPU/RAM":"متعادل — کم‌مصرف برای CPU/RAM",
   "Turbo — recommended":"توربو — پیشنهادی",
-  "Aggressive — maximum throughput":"تهاجمی — بیشترین توان عبوری",
+  "Aggressive — maximum gaming headroom":"تهاجمی — بیشترین فضای بازی",
+  "Throughput — max bandwidth (KCP only)":"توان عبوری — بیشترین پهنای باند (فقط KCP)",
   "Tunnel name":"نام تونل",
   "Tunnel (control) port":"پورت (کنترل) تونل",
   "Listen on IPv6 as well":"روی IPv6 هم گوش بده",
@@ -2291,6 +2331,9 @@ const FA={
   "Egress interface (optional)":"اینترفیس خروج (اختیاری)",
   "WireGuard pipe mode (carry a WireGuard VPN instead of forwarding ports)":"حالت پایپ WireGuard (به‌جای فوروارد پورت‌ها یک VPN وایرگارد را حمل کن)",
   "WireGuard UDP endpoint on this host":"اندپوینت UDP وایرگارد روی این هاست",
+  "TCP + PCK (hand-built TCP through a packet socket)":"TCP + PCK (پکت TCP دست‌ساز از طریق سوکت پکتی)",
+  "Carries the tunnel inside crafted TCP segments with no kernel socket behind them — a TCP flow on the wire, for a path that resets or throttles ordinary TCP. Needs root; it installs a firewall rule so the host does not RST its own flow. The fields below are optional — the carrier finds its own egress.":"تانل را داخل سگمنت‌های TCP دست‌سازِ بدون سوکت کرنل حمل می‌کند — روی سیم یک جریان TCP است، برای مسیری که TCP معمولی را ریست یا throttle می‌کند. نیاز به root دارد؛ یک قانون فایروال نصب می‌کند تا هاست جریان خودش را RST نکند. فیلدهای زیر اختیاری‌اند — کریِر خروجی خودش را پیدا می‌کند.",
+  "Next-hop MAC (optional — only if the kernel's is wrong)":"MAC گام بعدی (اختیاری — فقط اگر مقدار کرنل اشتباه باشد)",
   "Client's real IPv4 (required on the server side)":"آی‌پی واقعی IPv4 کلاینت (در سمت سرور الزامی است)",
   "Create tunnel":"ساخت تونل",
   "Create another":"ساخت یکی دیگر",
@@ -2402,11 +2445,11 @@ function relang(){ applyLang(LANG); }
 // every day rather than colour words.
 const ACCENTS=[
   ['ember','255,69,58','Ember'],       // the CLI's own colour, and the default
-  ['pomegranate','231,29,54','Pomegranate'],
-  ['saffron','247,181,56','Saffron'],
-  ['pistachio','127,184,0','Pistachio'],
-  ['turquoise','65,187,217','Turquoise'],
-  ['frost','173,202,214','Frost'],
+  ['rose','244,63,94','Rose'],
+  ['saffron','245,171,53','Saffron'],
+  ['violet','139,92,246','Violet'],
+  ['azure','56,139,253','Azure'],
+  ['teal','45,212,191','Teal'],
 ];
 function applyAccent(id){
   const a=ACCENTS.find(x=>x[0]===id)||ACCENTS[0];
@@ -2711,6 +2754,7 @@ function trLabel(t){
   if(t==='hedioum') return 'Hedioum';
   if(t==='xdi') return 'xDi (ICMP)';
   if(t==='spoof') return 'IP Spoofing';
+  if(t==='pck') return 'TCP + PCK';
   return t.toUpperCase();
 }
 
@@ -3043,10 +3087,10 @@ function closeDetails(){ $('details').classList.remove('on'); detName=null; }
 // form only ever shows what applies to the chosen side and transport.
 const ntNeedsTLS=t=>t==='wss'||t==='wssmux';
 const ntIsWS=t=>t==='ws'||t==='wss'||t==='wsmux'||t==='wssmux';
-const ntIsMux=t=>['tcpmux','wsmux','wssmux','kcp','xdi','spoof'].includes(t);
-const ntIsKCP=t=>t==='kcp'||t==='xdi'||t==='spoof';
-const ntIsDatagram=t=>t==='udp'||t==='kcp'||t==='xdi'||t==='quic'||t==='spoof';
-const ntSupportsPP=t=>['tcp','tcpmux','kcp','wsmux','wssmux','stealth','quic'].includes(t);
+const ntIsMux=t=>['tcpmux','wsmux','wssmux','kcp','xdi','spoof','pck'].includes(t);
+const ntIsKCP=t=>t==='kcp'||t==='xdi'||t==='spoof'||t==='pck';
+const ntIsDatagram=t=>t==='udp'||t==='kcp'||t==='xdi'||t==='quic'||t==='spoof'||t==='pck';
+const ntSupportsPP=t=>['tcp','tcpmux','kcp','pck','wsmux','wssmux','stealth','quic'].includes(t);
 // The transports that carry TCP segments, and so can have their size clamped.
 const ntSupportsMSS=t=>['tcp','tcpmux','stealth','ws','wss','wsmux','wssmux'].includes(t);
 
@@ -3618,7 +3662,7 @@ function openNewTunnel(){
    'nt-tlscert','nt-tlskey','nt-keepalive','nt-heartbeat','nt-maxconn','nt-bw','nt-channelsize',
    'nt-connpool','nt-muxcon','nt-muxver','nt-muxframe','nt-muxrecv','nt-muxstream',
    'nt-kcpmtu','nt-kcpint','nt-kcpsnd','nt-kcprcv','nt-kcpdata','nt-kcpparity','nt-mss',
-   'nt-spoofsrc','nt-spoofpeer','nt-spoofiface','nt-spoofpipeaddr'].forEach(id=>{ if($(id)) $(id).value=''; });
+   'nt-spoofsrc','nt-spoofpeer','nt-spoofiface','nt-spoofpipeaddr','nt-pckiface','nt-pckgw'].forEach(id=>{ if($(id)) $(id).value=''; });
   ['nt-ipv6','nt-pp','nt-lb','nt-hf','nt-simpleauth','nt-adv-on','nt-acceptudp','nt-aggpool','nt-zerocopy','nt-spoofpipe'].forEach(id=>{ if($(id)) $(id).checked=false; });
   if($('nt-spoofprofile')) $('nt-spoofprofile').value='udp';
   $('nt-role').value='server'; $('nt-transport').value='tcp'; $('nt-preset').value='turbo';
@@ -3746,6 +3790,17 @@ function ntSync(){
     ? T('Leave empty to generate one. The client must use the exact same token.')
     : T('Required — must match the token the server was given.');
 
+  // Throughput is a KCP-family preset only: on a kernel-stack transport every
+  // knob it changes belongs to the OS, so it is hidden there and a tunnel that
+  // had it selected falls back to Turbo rather than submitting a choice the
+  // backend would refuse.
+  const thr=$('nt-preset-throughput');
+  if(thr){
+    thr.hidden=!ntIsKCP(tr);
+    thr.disabled=!ntIsKCP(tr);
+    if(!ntIsKCP(tr) && $('nt-preset').value==='throughput') $('nt-preset').value='turbo';
+  }
+
   // Advanced blocks track the same predicates.
   $('nt-advbody').style.display=adv?'':'none';
   $('nt-adv-server').style.display=role==='server'?'':'none';
@@ -3757,6 +3812,7 @@ function ntSync(){
   // Spoof: the forged-source knobs, with the peer field only meaningful on the
   // server and the WireGuard endpoint only when pipe mode is on.
   $('nt-adv-spoof').style.display=tr==='spoof'?'':'none';
+  $('nt-adv-pck').style.display=tr==='pck'?'':'none';
   $('nt-spoofpeer-row').style.display=(tr==='spoof'&&role==='server')?'':'none';
   $('nt-spoofpipeaddr-row').style.display=(tr==='spoof'&&$('nt-spoofpipe').checked)?'':'none';
   $('nt-zc-row').style.display=tr==='tcp'?'':'none';
@@ -3821,6 +3877,10 @@ function ntAdvanced(){
       a.spoofPipe=true;
       const pa=$('nt-spoofpipeaddr').value.trim(); if(pa) a.spoofPipeAddr=pa;
     }
+  }
+  if(tr==='pck'){
+    const ifc=$('nt-pckiface').value.trim(); if(ifc) a.pckInterface=ifc;
+    const gw=$('nt-pckgw').value.trim(); if(gw) a.pckGatewayMAC=gw;
   }
   if(tr==='tcp' && $('nt-zerocopy').checked) a.zeroCopy=true;
   return Object.keys(a).length?a:undefined;
@@ -3978,6 +4038,8 @@ function ntFill(req){
     $('nt-spoofiface').value=a.spoofInterface||'';
     if(typeof a.spoofPipe==='boolean') $('nt-spoofpipe').checked=a.spoofPipe;
     $('nt-spoofpipeaddr').value=a.spoofPipeAddr||'';
+    $('nt-pckiface').value=a.pckInterface||'';
+    $('nt-pckgw').value=a.pckGatewayMAC||'';
     if(typeof a.zeroCopy==='boolean') $('nt-zerocopy').checked=a.zeroCopy;
   }
   // The built-in reverse-proxy tunnels have no transport choice — keep the
