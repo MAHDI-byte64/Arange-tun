@@ -2,6 +2,16 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.30.2 — 2026-08-21
+
+**One motion vocabulary for the whole panel.** Adopted a single set of timing
+tokens (a strong ease-out curve, a gentle spring, and named press/hover/pop/rise
+durations) so every transition and entrance across the panel shares the same
+physics instead of a scatter of ad-hoc values. The grids now assemble with a
+short stagger — each card a beat behind the one before it — and notices pop in
+place rather than sliding. Hint text moved to a higher-contrast muted tone
+(4.8:1) for readability. No behavioural change; all panel tests preserved.
+
 ## v1.30.1 — 2026-08-21
 
 **Panel redesign, section by section.** A deeper pass over the whole panel on top
