@@ -50,8 +50,24 @@
     /* Green is reserved for one meaning only: a tunnel that is up. Amber marks
        one that is down. Nothing decorative uses either. */
     --green:#30d158; --amber:#ff9f0a;
-    --txt:#f6f6f9; --muted:#9c9ca6; --muted2:#66666f;
+    --txt:#f6f6f9; --muted:#9c9ca6; --muted2:#83838a;
     --radius:22px;
+
+    /* One motion vocabulary for the whole panel, so nothing has to guess. The
+       curve is a strong ease-out: it starts fast, which is what makes an
+       interface feel like it heard you. The durations are ceilings — a press is
+       felt rather than seen, a hover is a colour settling, and nothing that is
+       not a sheet or a drawer runs past 300ms. --ease-spring is the gentle
+       overshoot the accordions and the wizard steps open on; --t-ui is the
+       named-property transition every interactive surface shares (never `all`,
+       which would interpolate properties nobody intended). */
+    --ease-out:var(--ease-out);
+    --ease-in-out:cubic-bezier(.77,0,.175,1);
+    --ease-spring:cubic-bezier(.34,1.4,.64,1);
+    --t-press:140ms; --t-hover:180ms; --t-pop:220ms; --t-rise:400ms;
+    --t-ui:background var(--t-hover) ease,border-color var(--t-hover) ease,
+           color var(--t-hover) ease,box-shadow var(--t-hover) ease,
+           transform var(--t-press) var(--ease-out);
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{-webkit-text-size-adjust:100%}
@@ -133,6 +149,13 @@
   header,.meter,.pill,.tun{box-shadow:var(--sh-1), inset 0 1px 0 var(--glow)}
   .meter:hover,.tun:hover{box-shadow:var(--sh-2), inset 0 1px 0 var(--glow)}
   ::selection{background:rgba(var(--accent-rgb),.35)}
+  /* Secondary "glass" controls all catch the same hairline of light on their top
+     edge, so buttons across every section read as one material. */
+  .btn-ghost,.logbtn,.menubtn,.iconbtn,.close,.btn-sm,.updpill,.logout,.helpq,.typecard{box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+  /* Text fields sit slightly recessed — an inset shadow reads as a well the
+     value is typed into, the counterpart to the raised buttons above. */
+  .modal input,.modal textarea,.sel,.logfilter,.thresholds input,.et-proxy input{box-shadow:inset 0 1px 3px rgba(0,0,0,.28)}
+  .modal input:focus,.modal textarea:focus,.sel:focus{box-shadow:inset 0 1px 3px rgba(0,0,0,.2),0 0 0 4px rgba(var(--accent-rgb),.2)}
 
   /* ---------- header ---------- */
   header{
@@ -147,11 +170,11 @@
     padding:16px 20px;margin-bottom:22px;
     background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0) 46%),var(--card);border:1px solid var(--stroke);border-radius:var(--radius);
     backdrop-filter:blur(26px) saturate(160%);-webkit-backdrop-filter:blur(26px) saturate(160%);
-    animation:rise .6s cubic-bezier(.16,1,.3,1) both;
+    animation:rise var(--t-rise) var(--ease-out) both;
   }
   .brand{display:flex;align-items:center;gap:12px}
   .mark{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;color:#fff;
-    background:linear-gradient(145deg,var(--red),var(--red-deep));
+    background:linear-gradient(145deg,var(--red-soft),var(--red-deep));
     box-shadow:0 8px 22px rgba(var(--accent-rgb),.45),inset 0 1px 0 rgba(255,255,255,.4)}
   .mark .ic{width:24px;height:24px;stroke-width:2}
   .brand h1{font-size:19px;font-weight:700;letter-spacing:-.02em;line-height:1}
@@ -186,7 +209,7 @@
   .menu{position:fixed;z-index:55;min-width:300px;max-width:min(340px,calc(100vw - 24px));padding:14px;
     max-height:calc(100dvh - 90px);overflow-y:auto;
     background:rgba(24,24,27,.97);border:1px solid rgba(255,255,255,.14);border-radius:18px;
-    box-shadow:0 16px 48px rgba(0,0,0,.6),0 2px 8px rgba(0,0,0,.4);
+    box-shadow:0 16px 48px rgba(0,0,0,.6),0 2px 8px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.10);
     backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%)}
   .menu[hidden]{display:none}
   .menu::-webkit-scrollbar{width:8px}.menu::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:8px}
@@ -196,7 +219,7 @@
      reveal a chevron on hover, and a log-out in the danger colour. Its children
      stagger in on open — the CSS echo of the source's staggerChildren. */
   @keyframes mp-in{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
-  .menu:not([hidden]) > *{animation:mp-in .34s cubic-bezier(.16,1,.3,1) both}
+  .menu:not([hidden]) > *{animation:mp-in .34s var(--ease-out) both}
   .menu:not([hidden]) > *:nth-child(1){animation-delay:.02s}
   .menu:not([hidden]) > *:nth-child(2){animation-delay:.06s}
   .menu:not([hidden]) > *:nth-child(3){animation-delay:.10s}
@@ -211,7 +234,7 @@
      one-line subtitle (OS · location), all filled from the live values on open. */
   .mp-head{display:flex;align-items:center;gap:12px;padding:4px 4px 2px}
   .mp-avatar{width:46px;height:46px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;
-    background:linear-gradient(145deg,var(--red),var(--red-deep));
+    background:linear-gradient(145deg,var(--red-soft),var(--red-deep));
     box-shadow:0 8px 22px rgba(var(--accent-rgb),.45),inset 0 1px 0 rgba(255,255,255,.4)}
   .mp-avatar .ic{width:24px;height:24px}
   .mp-id{min-width:0;display:flex;flex-direction:column}
@@ -274,8 +297,10 @@
   .modal{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:20px;
     background:rgba(0,0,0,.55);backdrop-filter:blur(6px);opacity:0;pointer-events:none;transition:opacity .3s}
   .modal.on{opacity:1;pointer-events:auto}
-  .modal .box{width:min(92vw,400px);background:var(--bg2);border:1px solid var(--stroke);border-radius:22px;
-    padding:26px;box-shadow:0 30px 80px rgba(0,0,0,.6);transform:translateY(14px) scale(.98);transition:transform .3s cubic-bezier(.16,1,.3,1)}
+  .modal .box{width:min(92vw,400px);
+    background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,0) 26%),var(--bg2);
+    border:1px solid var(--stroke);border-radius:22px;
+    padding:26px;box-shadow:0 30px 80px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.10);transform:translateY(14px) scale(.98);transition:transform .3s var(--ease-out)}
   .modal.on .box{transform:none}
   .modal h3{font-size:17px;font-weight:700;margin-bottom:4px}
   .modal p{font-size:12.5px;color:var(--muted);margin-bottom:18px}
@@ -340,7 +365,7 @@
      enough to choose by. */
   .accnote{margin-left:auto;font-size:11.5px;font-weight:400;color:var(--muted);
     text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .acch .chev{width:16px;height:16px;flex:none;color:var(--muted);transition:transform .42s cubic-bezier(.34,1.56,.64,1)}
+  .acch .chev{width:16px;height:16px;flex:none;color:var(--muted);transition:transform .42s var(--ease-spring)}
   .acch[aria-expanded="true"] .chev{transform:rotate(180deg);color:var(--red-soft)}
   /* One vertical rhythm inside every drawer: the gap between rows equals the
      padding above the first row and below the last, so the spacing reads as a
@@ -348,7 +373,7 @@
      ad-hoc ones (inline and from .modal input/label/.msg) are neutralised here
      so the flex gap is the only thing setting the spacing. */
   .accb{display:flex;flex-direction:column;gap:12px;padding:12px 14px;border-top:1px solid var(--stroke);
-    overflow:hidden;transition:height .5s cubic-bezier(.34,1.56,.64,1)}
+    overflow:hidden;transition:height .5s var(--ease-spring)}
   .accb[hidden]{display:none}
   .modal .accb > *{margin-top:0!important;margin-bottom:0!important}
   @media (prefers-reduced-motion:reduce){ .accb{transition:none} .acch .chev{transition:none} }
@@ -371,6 +396,36 @@
     -webkit-appearance:none;appearance:none;cursor:pointer}
   .sel:focus{border-color:var(--red);box-shadow:0 0 0 4px rgba(var(--accent-rgb),.18)}
   .sel option{background:var(--bg2);color:var(--txt)}
+
+  /* ---------- create-tunnel wizard ----------
+     The side of the tunnel is chosen first, as two cards rather than a dropdown:
+     a server and a client are not the same form with a field swapped — one
+     exposes ports and listens, the other dials out — so it reads as a step. The
+     hidden <select id="nt-role"> still carries the value every handler reads. */
+  .sides{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+  .side{padding:18px 14px;border-radius:18px;cursor:pointer;text-align:center;transition:var(--t-ui);
+    background:rgba(255,255,255,.04);border:1px solid var(--stroke);color:var(--txt);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06);animation:pop-in var(--t-pop) var(--ease-out) both}
+  .side:nth-child(2){animation-delay:.05s}
+  .side:hover{background:rgba(var(--accent-rgb),.12);border-color:rgba(var(--accent-rgb),.34);transform:translateY(-2px)}
+  .side[aria-pressed="true"]{background:rgba(var(--accent-rgb),.14);border-color:rgba(var(--accent-rgb),.45);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 8px 22px rgba(var(--accent-rgb),.18)}
+  .side .sflag{font-size:26px;line-height:1;display:block;margin-bottom:8px}
+  .side .st{font-size:14px;font-weight:700;display:block}
+  .side .sd{font-size:11.5px;color:var(--muted);display:block;margin-top:4px;line-height:1.5}
+  .side[aria-pressed="true"] .st{color:var(--red-soft)}
+  /* A field with a button welded to its right: the port dice, the token copy. */
+  .fjoin{display:flex;gap:8px;align-items:stretch;margin-bottom:14px}
+  .fjoin input{flex:1;min-width:0;margin-bottom:0}
+  .fjoin .btn-sm{flex:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+  .fjoin .btn-sm .ic{width:15px;height:15px}
+  /* The transport's own one-line description, under the picker that chose it —
+     the same sentence the CLI prints beside each entry. */
+  .tdesc{font-size:11.5px;color:var(--muted2);line-height:1.5;margin:-8px 0 14px;min-height:1px;
+    transition:opacity var(--t-hover) ease}
+  /* The whole form body reveals once a side is chosen, sliding up into place. */
+  #nt-body{animation:rise var(--t-rise) var(--ease-out) both}
+  #nt-body[hidden]{display:none}
   .toggles{display:flex;gap:14px;flex-wrap:wrap;margin:4px 0 12px}
   /* Scoped to .modal as well, and not by accident: `.modal label` further up
      sets display:block and outranks a bare `.tg`, so inside Settings every one
@@ -406,7 +461,7 @@
   .supportfab{position:fixed;right:max(16px,env(safe-area-inset-right));
     bottom:max(16px,env(safe-area-inset-bottom));z-index:50;
     width:46px;height:46px;border-radius:50%;display:grid;place-items:center;cursor:pointer;
-    background:linear-gradient(145deg,var(--red),var(--red-deep));border:none;color:#fff;
+    background:linear-gradient(145deg,var(--red-soft),var(--red-deep));border:none;color:#fff;
     box-shadow:0 10px 28px rgba(var(--accent-rgb),.42),inset 0 1px 0 rgba(255,255,255,.35);
     transition:transform .22s}
   .supportfab:hover{transform:translateY(-2px) scale(1.05)}
@@ -427,7 +482,7 @@
   .warnbar{display:flex;align-items:center;gap:10px;padding:12px 16px;margin-bottom:16px;
     border-radius:14px;font-size:12.5px;font-weight:600;color:var(--amber);
     background:rgba(255,159,10,.1);border:1px solid rgba(255,159,10,.3);
-    animation:rise .6s cubic-bezier(.16,1,.3,1) both}
+    animation:rise var(--t-rise) var(--ease-out) both}
   .warnbar .ic{width:16px;height:16px;flex:none}
   .warnbar code{font-family:ui-monospace,Menlo,monospace;font-weight:400;font-size:11.5px;
     padding:1px 6px;border-radius:6px;background:rgba(255,159,10,.14)}
@@ -438,7 +493,7 @@
   .updbar{display:flex;align-items:center;gap:10px;padding:12px 16px;margin-bottom:16px;
     border-radius:14px;font-size:12.5px;font-weight:600;color:var(--red-soft);
     background:rgba(var(--accent-rgb),.12);border:1px solid rgba(var(--accent-rgb),.30);
-    animation:rise .6s cubic-bezier(.16,1,.3,1) both}
+    animation:rise var(--t-rise) var(--ease-out) both}
   .updbar .ic{width:16px;height:16px;flex:none}
   .updbar b{font-family:ui-monospace,Menlo,monospace;font-size:12px}
   .updbar .btn-sm{margin-left:auto;flex:none}
@@ -457,16 +512,19 @@
     background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0) 46%),var(--card);border:1px solid var(--stroke);border-radius:var(--radius);
     padding:20px 16px 16px;text-align:center;position:relative;overflow:hidden;
     backdrop-filter:blur(20px);transition:transform .3s,background .3s,border-color .3s;
-    animation:rise .6s cubic-bezier(.16,1,.3,1) both;
+    animation:rise var(--t-rise) var(--ease-out) both;
   }
   .meter:hover{transform:translateY(-4px);background:var(--card-hi);border-color:rgba(255,255,255,.16)}
   .ring{width:112px;height:112px;margin:0 auto 10px;position:relative}
   .ring svg{transform:rotate(-90deg)}
-  .ring .track{stroke:rgba(255,255,255,.08)}
-  .ring .bar{stroke-linecap:round;transition:stroke-dashoffset .7s cubic-bezier(.16,1,.3,1),stroke .4s}
+  .ring .track{stroke:rgba(255,255,255,.07)}
+  /* The progress arc glows softly in the accent — the detail that turns a flat
+     gauge into a lit instrument. Rounded caps and a smooth spring on the sweep. */
+  .ring .bar{stroke-linecap:round;transition:stroke-dashoffset .8s var(--ease-out),stroke .4s;
+    filter:drop-shadow(0 0 5px rgba(var(--accent-rgb),.5))}
   .ring .val{position:absolute;inset:0;display:grid;place-items:center;
-    font-size:23px;font-weight:700;font-variant-numeric:tabular-nums}
-  .ring .val span{font-size:11px;color:var(--muted);font-weight:500;margin-top:2px}
+    font-size:25px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .ring .val span{font-size:11px;color:var(--muted);font-weight:600;margin-top:1px;letter-spacing:.02em}
   .meter .label{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);
     letter-spacing:.03em;text-transform:uppercase}
   .meter .label .ic{width:14px;height:14px}
@@ -476,12 +534,13 @@
   .grid-stats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:26px}
   .pill{background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0) 46%),var(--card);border:1px solid var(--stroke);border-radius:16px;padding:14px 16px;
     display:flex;align-items:center;gap:12px;backdrop-filter:blur(20px);transition:transform .25s,background .25s;
-    animation:rise .6s cubic-bezier(.16,1,.3,1) both}
+    animation:rise var(--t-rise) var(--ease-out) both}
   .pill:hover{transform:translateY(-3px);background:var(--card-hi)}
-  .pill .ico{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;color:var(--red-soft);
-    background:rgba(var(--accent-rgb),.14);border:1px solid rgba(var(--accent-rgb),.22)}
-  .pill .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
-  .pill .v{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:2px}
+  .pill .ico{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;color:var(--red-soft);
+    background:linear-gradient(145deg,rgba(var(--accent-rgb),.24),rgba(var(--accent-rgb),.10));
+    border:1px solid rgba(var(--accent-rgb),.26);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 4px 12px rgba(var(--accent-rgb),.14)}
+  .pill .k{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+  .pill .v{font-size:17px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:2px}
   /* A one-line note under a pill's value, for the case where the number is
      correct but needs explaining — shown amber because it only appears when
      something did not take effect. */
@@ -489,16 +548,17 @@
 
   /* ---------- section title ---------- */
   .sec{display:flex;align-items:center;gap:10px;margin:6px 2px 14px}
-  .sec h2{font-size:16px;font-weight:700;letter-spacing:-.01em}
-  .sec .count{font-size:12px;color:var(--muted);background:rgba(255,255,255,.06);
-    padding:3px 10px;border-radius:20px;border:1px solid var(--stroke);font-variant-numeric:tabular-nums}
+  .sec h2{font-size:17px;font-weight:700;letter-spacing:-.02em}
+  .sec .count{font-size:12px;color:var(--red-soft);background:rgba(var(--accent-rgb),.12);
+    padding:3px 10px;border-radius:20px;border:1px solid rgba(var(--accent-rgb),.24);font-weight:700;
+    font-variant-numeric:tabular-nums;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
 
   /* ---------- tunnels ---------- */
   .grid-tun{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(310px,1fr))}
 
   /* ---------- pages (Overview / Control Center) ---------- */
   .pagehdr{display:flex;align-items:center;gap:10px;margin:2px 2px 18px}
-  .pagehdr h2{font-size:19px;font-weight:800;letter-spacing:-.02em}
+  .pagehdr h2{font-size:22px;font-weight:800;letter-spacing:-.03em}
   .helpq{width:26px;height:26px;flex:none;border-radius:50%;border:1px solid var(--stroke);
     background:rgba(255,255,255,.05);color:var(--muted);font:700 14px inherit;cursor:pointer;transition:.2s}
   .helpq:hover{background:rgba(var(--accent-rgb),.16);color:var(--red-soft);border-color:rgba(var(--accent-rgb),.35)}
@@ -538,7 +598,7 @@
   .et-proxy .etp-del:hover{color:var(--red-soft);border-color:rgba(var(--accent-rgb),.4)}
   .tun{background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0) 46%),var(--card);border:1px solid var(--stroke);border-radius:var(--radius);
     padding:18px;backdrop-filter:blur(20px);transition:transform .3s,background .3s,border-color .3s;
-    position:relative;overflow:hidden;animation:rise .5s cubic-bezier(.16,1,.3,1) both}
+    position:relative;overflow:hidden;animation:rise var(--t-rise) var(--ease-out) both}
   /* Status is carried by a ring around the whole card, drawn inside its edge,
      rather than a bar down one side. The same three pixels say the same thing
      and now describe the card they belong to.
@@ -573,7 +633,8 @@
   @keyframes pulse-a{0%{box-shadow:0 0 0 0 rgba(255,159,10,.55)}70%{box-shadow:0 0 0 8px rgba(255,159,10,0)}100%{box-shadow:0 0 0 0 rgba(255,159,10,0)}}
   .badges{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
   .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:4px 10px;border-radius:8px;
-    letter-spacing:.02em;background:rgba(255,255,255,.06);border:1px solid var(--stroke);color:var(--txt)}
+    letter-spacing:.02em;background:rgba(255,255,255,.06);border:1px solid var(--stroke);color:var(--txt);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
   .badge .ic{width:12px;height:12px}
   .badge.role{background:rgba(var(--accent-rgb),.14);border-color:rgba(var(--accent-rgb),.28);color:var(--red-soft)}
   .badge.bot{background:rgba(var(--accent-rgb),.12);border-color:rgba(var(--accent-rgb),.26);color:var(--red-soft)}
@@ -644,7 +705,7 @@
   .scrim.on{opacity:1;pointer-events:auto}
   .drawer{position:fixed;left:0;right:0;bottom:0;z-index:50;max-height:78dvh;
     background:var(--bg2);border-top:1px solid var(--stroke);border-radius:24px 24px 0 0;
-    box-shadow:0 -20px 60px rgba(0,0,0,.6);transform:translateY(100%);transition:transform .4s cubic-bezier(.16,1,.3,1);
+    box-shadow:0 -20px 60px rgba(0,0,0,.6);transform:translateY(100%);transition:transform .4s var(--ease-out);
     display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom)}
   .drawer.on{transform:translateY(0)}
   .drawer .dh{position:relative;display:flex;align-items:center;gap:12px;padding:18px 22px 14px;border-bottom:1px solid var(--stroke)}
@@ -670,6 +731,24 @@
 
   .empty{text-align:center;color:var(--muted);padding:50px 0;font-size:14px}
   @keyframes rise{from{opacity:0;transform:translateY(18px)}}
+  /* A small pop for things that appear in place rather than sliding in — a
+     badge, a notice pill — so their arrival is felt without a slide. */
+  @keyframes pop-in{from{opacity:0;transform:scale(.9)}}
+  .updpill{animation:pop-in var(--t-pop) var(--ease-out) both}
+  /* The grids assemble with a short stagger — each card a beat behind the one
+     before it, so the page settles in a wave instead of all at once. The rise
+     itself is defined on the cards; only the delay is set here. */
+  .grid-meters .meter:nth-child(2){animation-delay:.05s}
+  .grid-meters .meter:nth-child(3){animation-delay:.10s}
+  .grid-meters .meter:nth-child(4){animation-delay:.15s}
+  .grid-stats .pill:nth-child(2){animation-delay:.05s}
+  .grid-stats .pill:nth-child(3){animation-delay:.10s}
+  .grid-stats .pill:nth-child(4){animation-delay:.15s}
+  .grid-tun .tun:nth-child(2){animation-delay:.06s}
+  .grid-tun .tun:nth-child(3){animation-delay:.12s}
+  .grid-tun .tun:nth-child(4){animation-delay:.18s}
+  .grid-tun .tun:nth-child(5){animation-delay:.24s}
+  .grid-tun .tun:nth-child(6){animation-delay:.30s}
 
   /* ---------- right to left ----------
      Almost nothing needs flipping by hand: the layout is flex and grid, which
@@ -752,12 +831,12 @@
     padding:18px 18px calc(18px + env(safe-area-inset-bottom));
     background:rgba(20,20,23,.99);border-top:1px solid var(--stroke);
     border-radius:22px 22px 0 0;box-shadow:0 -18px 50px rgba(0,0,0,.55);
-    transform:translateY(110%);transition:transform .42s cubic-bezier(.16,1,.3,1)}
+    transform:translateY(110%);transition:transform .42s var(--ease-out)}
   .pwa.on{transform:none}
   .pwa[hidden]{display:none}
   .pwa-head{display:flex;align-items:center;gap:13px;margin-bottom:12px}
   .pwa-mark{width:46px;height:46px;border-radius:14px;flex:none;display:grid;place-items:center;color:#fff;
-    background:linear-gradient(145deg,var(--red),var(--red-deep));
+    background:linear-gradient(145deg,var(--red-soft),var(--red-deep));
     box-shadow:0 8px 22px rgba(var(--accent-rgb),.4)}
   .pwa-mark .ic{width:24px;height:24px}
   .pwa-t{min-width:0;flex:1}
@@ -1643,10 +1722,24 @@
     <h3 id="nttitle" data-i18n>New tunnel</h3>
     <p data-i18n>Build a tunnel the same way the CLI does — it is written, enabled and started right away.</p>
 
-    <label for="nt-role" data-i18n>Side</label>
-    <select id="nt-role" class="sel" onchange="ntRoleChange()">
-      <option value="server" data-i18n>🇮🇷 Iran server — exposes the ports (users connect here)</option>
-      <option value="client" data-i18n>🌍 Abroad / kharej — runs the service, dials out</option>
+    <label data-i18n>Which side of the tunnel is this machine?</label>
+    <div class="sides" id="nt-sides" role="group">
+      <button type="button" class="side" data-role="server" aria-pressed="true" onclick="ntPickSide('server')">
+        <span class="sflag">🇮🇷</span>
+        <span class="st" data-i18n>Iran server</span>
+        <span class="sd" data-i18n>Exposes the ports — users connect here.</span>
+      </button>
+      <button type="button" class="side" data-role="client" aria-pressed="false" onclick="ntPickSide('client')">
+        <span class="sflag">🌍</span>
+        <span class="st" data-i18n>Abroad / kharej</span>
+        <span class="sd" data-i18n>Runs the service and dials out.</span>
+      </button>
+    </div>
+    <!-- The value every handler reads. The cards above set it; it stays in the
+         DOM as a hidden select so nothing downstream has to change. -->
+    <select id="nt-role" style="display:none" onchange="ntRoleChange()">
+      <option value="server">server</option>
+      <option value="client">client</option>
     </select>
 
     <div id="nt-transport-row">
@@ -1678,6 +1771,7 @@
       <option value="rathole" hidden>rathole</option>
       <option value="ratholeu" hidden>rathole (udp)</option>
     </select>
+    <div class="tdesc" id="nt-tdesc"></div>
     </div>
 
     <div id="nt-frp-proto-row" style="display:none">
@@ -1724,7 +1818,12 @@
     <!-- Server-only -->
     <div id="nt-server">
       <label for="nt-port" data-i18n>Tunnel (control) port</label>
-      <input id="nt-port" type="number" min="1" max="65535" step="1" placeholder="443" oninput="ntSuggestName()">
+      <div class="fjoin">
+        <input id="nt-port" type="number" min="1" max="65535" step="1" placeholder="443" oninput="ntSuggestName()">
+        <button class="btn-sm" type="button" onclick="ntRollPort('nt-port')" title="Suggest a random port">
+          <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 8h.01M16 8h.01M8 16h.01M16 16h.01M12 12h.01"/></svg>
+          <span data-i18n>Random</span></button>
+      </div>
       <label class="tg" style="margin-bottom:14px"><input type="checkbox" id="nt-ipv6"><span data-i18n>Listen on IPv6 as well</span></label>
       <label for="nt-ports" data-i18n>Exposed ports</label>
       <input id="nt-ports" type="text" autocomplete="off" spellcheck="false" placeholder="443,8080 or 443=1.1.1.1:443">
@@ -1758,7 +1857,7 @@
     </div>
 
     <label for="nt-token" data-i18n>Security token</label>
-    <div class="upd" style="margin-bottom:14px">
+    <div class="fjoin">
       <input id="nt-token" type="text" autocomplete="off" spellcheck="false" style="margin:0" placeholder="shared secret">
       <button class="btn-sm" type="button" onclick="ntGenToken()" data-i18n>Generate</button>
     </div>
@@ -2019,7 +2118,7 @@ const FA={
   "Port":"پورت","Password":"رمز عبور","Restore points":"نقاط بازیابی",
   "Signed-in devices":"دستگاه‌های واردشده","Remote access":"دسترسی از راه دور",
   "Check":"بررسی","Save":"ذخیره","Close":"بستن","Channel":"کانال",
-  "Save password":"ذخیره رمز عبور","Generate":"ساخت","Revoke":"ابطال",
+  "Save password":"ذخیره رمز عبور","Generate":"ساخت","Revoke":"ابطال","Random":"تصادفی",
   "Sign out other devices":"خروج از سایر دستگاه‌ها",
   "Download backup":"دانلود پشتیبان","Restore from file…":"بازیابی از فایل…",
   "Send test":"ارسال آزمایشی","Alerts":"هشدارها","New version":"نسخه جدید",
@@ -2264,8 +2363,24 @@ const FA={
   "Build a tunnel the same way the CLI does — it is written, enabled and started right away.":
     "تونل را دقیقاً مثل خط فرمان بساز — نوشته، فعال و بلافاصله اجرا می‌شود.",
   "Side":"سمت",
-  "🇮🇷 Iran server — exposes the ports (users connect here)":"🇮🇷 سرور ایران — پورت‌ها را نمایش می‌دهد (کاربران به این وصل می‌شوند)",
-  "🌍 Abroad / kharej — runs the service, dials out":"🌍 خارج / kharej — سرویس را اجرا می‌کند و بیرون dial می‌زند",
+  "Which side of the tunnel is this machine?":"این دستگاه کدام سمتِ تونل است؟",
+  "Iran server":"سرور ایران",
+  "Exposes the ports — users connect here.":"پورت‌ها را نمایش می‌دهد — کاربران به اینجا وصل می‌شوند.",
+  "Abroad / kharej":"خارج / kharej",
+  "Runs the service and dials out.":"سرویس را اجرا می‌کند و بیرون dial می‌زند.",
+  "Plain TCP — the simplest and most compatible; a good first try.":"TCP ساده — ساده‌ترین و سازگارترین؛ برای شروع خوب است.",
+  "TCP, multiplexed — many streams over one connection, lower overhead.":"TCP مالتی‌پلکس — چند جریان روی یک اتصال، سربار کمتر.",
+  "TCP wrapped in a Noise record layer — encrypted with no fingerprint.":"TCP پیچیده در لایهٔ Noise — رمزنگاری‌شده بدون اثر انگشت.",
+  "Raw UDP datagrams — for a UDP-based service.":"دیتاگرام خام UDP — برای سرویس مبتنی بر UDP.",
+  "Reliable UDP with error correction — best on a lossy or throttled link.":"UDP قابل‌اعتماد با تصحیح خطا — بهترین برای لینک پرخطا یا throttle‌شده.",
+  "QUIC — TLS 1.3 over UDP, resists a long-lived-TCP stall.":"QUIC — TLS 1.3 روی UDP، در برابر گیرکردنِ TCP طولانی مقاوم است.",
+  "WebSocket — HTTP camouflage, CDN-friendly.":"وب‌سوکت — استتار HTTP، سازگار با CDN.",
+  "WebSocket, multiplexed.":"وب‌سوکت، مالتی‌پلکس.",
+  "Secure WebSocket — TLS encrypted, CDN-friendly.":"وب‌سوکت امن — رمزنگاری TLS، سازگار با CDN.",
+  "TLS WebSocket, multiplexed.":"وب‌سوکت TLS، مالتی‌پلکس.",
+  "Tunnels inside ICMP echo (ping) — for a path that filters UDP and TCP but not ICMP. Linux, root.":"تونل داخل ICMP echo (پینگ) — برای مسیری که UDP و TCP را فیلتر می‌کند اما ICMP را نه. لینوکس، root.",
+  "KCP inside raw IP packets with a forged source — for a path that filters on the real flow. Linux, root.":"KCP داخل پکت‌های خام IP با سورس جعلی — برای مسیری که روی جریان واقعی فیلتر می‌کند. لینوکس، root.",
+  "KCP inside hand-built TCP through a packet socket — a TCP flow with no kernel socket behind it, for a path that resets ordinary TCP. Linux, root.":"KCP داخل TCP دست‌ساز از طریق سوکت پکتی — جریان TCP بدون سوکت کرنل، برای مسیری که TCP معمولی را ریست می‌کند. لینوکس، root.",
   "Transport":"ترنسپورت",
   "Performance preset":"پیش‌تنظیم کارایی",
   "Balance — light on CPU/RAM":"متعادل — کم‌مصرف برای CPU/RAM",
@@ -3731,6 +3846,45 @@ function ntFrpProtoChange(){
   ntSync();
 }
 function closeNewTunnel(){ $('newtun').classList.remove('on'); }
+// ntPickSide is the wizard's first answer: which side of the tunnel this is.
+// The two cards drive the hidden <select id="nt-role">, so every handler below
+// still reads the value the same way — the cards are only a nicer way to set it.
+function ntPickSide(role){
+  $('nt-role').value=role;
+  document.querySelectorAll('#nt-sides .side').forEach(b=>
+    b.setAttribute('aria-pressed', b.dataset.role===role ? 'true' : 'false'));
+  ntRoleChange();
+}
+function ntSyncSideCards(){
+  const role=$('nt-role').value;
+  document.querySelectorAll('#nt-sides .side').forEach(b=>
+    b.setAttribute('aria-pressed', b.dataset.role===role ? 'true' : 'false'));
+}
+
+// NT_TDESC is the one-line description shown under the transport picker — the
+// same sentence the CLI prints beside each entry. Kept in sync with the option
+// list; a transport with no entry simply shows nothing.
+const NT_TDESC={
+  tcp:'Plain TCP — the simplest and most compatible; a good first try.',
+  tcpmux:'TCP, multiplexed — many streams over one connection, lower overhead.',
+  stealth:'TCP wrapped in a Noise record layer — encrypted with no fingerprint.',
+  udp:'Raw UDP datagrams — for a UDP-based service.',
+  kcp:'Reliable UDP with error correction — best on a lossy or throttled link.',
+  quic:'QUIC — TLS 1.3 over UDP, resists a long-lived-TCP stall.',
+  ws:'WebSocket — HTTP camouflage, CDN-friendly.',
+  wsmux:'WebSocket, multiplexed.',
+  wss:'Secure WebSocket — TLS encrypted, CDN-friendly.',
+  wssmux:'TLS WebSocket, multiplexed.',
+  xdi:'Tunnels inside ICMP echo (ping) — for a path that filters UDP and TCP but not ICMP. Linux, root.',
+  spoof:'KCP inside raw IP packets with a forged source — for a path that filters on the real flow. Linux, root.',
+  pck:'KCP inside hand-built TCP through a packet socket — a TCP flow with no kernel socket behind it, for a path that resets ordinary TCP. Linux, root.'
+};
+function ntUpdateTdesc(){
+  const el=$('nt-tdesc'); if(!el) return;
+  const d=NT_TDESC[$('nt-transport').value]||'';
+  el.textContent=d?T(d):'';
+}
+
 function ntRoleChange(){ ntSync(); ntSuggestName(); }
 function ntTransportChange(){
   // Spoof's forged-source settings live in the advanced section but are not
@@ -3753,6 +3907,8 @@ function ntSuggestName(){
 // matching what the CLI would prompt for.
 function ntSync(){
   const role=$('nt-role').value, tr=$('nt-transport').value, adv=$('nt-adv-on').checked;
+  ntSyncSideCards();
+  ntUpdateTdesc();
   $('nt-server').style.display=role==='server'?'':'none';
   $('nt-client').style.display=role==='client'?'':'none';
 
@@ -3822,6 +3978,17 @@ function ntGenToken(){
   const cs='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const a=new Uint32Array(64); crypto.getRandomValues(a);
   $('nt-token').value=Array.from(a,n=>cs[n%cs.length]).join('');
+}
+// ntRollPort suggests a random port in the 10000–60000 window — above the
+// well-known range and below the ephemeral one, so it neither collides with a
+// common service nor gets handed to an outgoing connection. The panel cannot
+// check the far host, so this is a suggestion, not a guarantee; it fills the
+// field the operator can still change. It also refreshes the suggested name.
+function ntRollPort(id){
+  const el=$(id); if(!el) return;
+  const a=new Uint32Array(1); crypto.getRandomValues(a);
+  el.value=10000+(a[0]%50000);
+  ntSuggestName();
 }
 function ntMsg(text,isErr){
   const m=$('nt-msg'); m.textContent=text||'';
@@ -4605,7 +4772,7 @@ function openAcc(id){
   $('acch-'+id).setAttribute('aria-expanded','true');
   // Opening bounces: the overshoot easing lets the height spring slightly past
   // and settle.
-  b.style.transition='height .5s cubic-bezier(.34,1.56,.64,1)';
+  b.style.transition='height .5s var(--ease-spring)';
   b.style.height='0px';
   requestAnimationFrame(function(){
     b.style.height=b.scrollHeight+'px';

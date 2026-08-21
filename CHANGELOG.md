@@ -2,6 +2,59 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.31.0 — 2026-08-21
+
+**The create-tunnel form is a wizard now.** Rebuilt around the way BackPack asks
+the same questions, so building a tunnel reads as a guided flow rather than a
+wall of fields:
+
+- **Which side is this machine** is answered first, as two cards — 🇮🇷 Iran
+  server and 🌍 Abroad/kharej — that spring in and light up when chosen, instead
+  of a dropdown. A server and a client are not one form with a field swapped, so
+  the choice is a step.
+- **The transport carries its own description** — the same one-line sentence the
+  CLI prints beside each entry, shown live under the picker as you change it.
+- **A Random button** next to the tunnel port fills a sensible free-range port,
+  and the token has its Generate button — the two things you would otherwise
+  invent by hand.
+
+All of this is additive: the existing field wiring, every tunnel type (Backhaul,
+WireGuard, Packet, SSH, Hedioum) and every panel test are unchanged. BackPack's
+separate "Direct/L3" tunnel path was deliberately not brought over — the direct
+tunnels this project already has (WireGuard, Packet, SSH) cover that ground.
+
+## v1.30.2 — 2026-08-21
+
+**One motion vocabulary for the whole panel.** Adopted a single set of timing
+tokens (a strong ease-out curve, a gentle spring, and named press/hover/pop/rise
+durations) so every transition and entrance across the panel shares the same
+physics instead of a scatter of ad-hoc values. The grids now assemble with a
+short stagger — each card a beat behind the one before it — and notices pop in
+place rather than sliding. Hint text moved to a higher-contrast muted tone
+(4.8:1) for readability. No behavioural change; all panel tests preserved.
+
+## v1.30.1 — 2026-08-21
+
+**Panel redesign, section by section.** A deeper pass over the whole panel on top
+of the v1.29.0 palette refresh — every section reworked to read as one premium
+material:
+
+- **Ring gauges** now glow softly in the accent, with bolder value type — a lit
+  instrument rather than a flat gauge.
+- **Stat pills** carry a gradient icon chip with an inset highlight and a soft
+  accent glow; values are heavier and tighter.
+- **Brand mark, menu avatar and the support button** are brighter and glossier.
+- **Every secondary control** (buttons, menu rows, the log filter, chooser
+  cards) catches the same hairline of light on its top edge, and **text fields**
+  sit in a subtly recessed well — raised buttons over inset inputs, one material
+  throughout.
+- **Dialogs, the slide-in menu and the log drawer** gained the lit top rim and a
+  faint top sheen.
+- **Section headers** are larger and tighter; the tunnel count is an accent chip.
+
+No structural or behavioural change — the single-theme, one-accent, green-means-
+online design and every panel test are preserved.
+
 ## v1.30.0 — 2026-08-21
 
 **New transport: TCP + PCK.** A fourth raw-packet carrier joins xDi (ICMP) and
