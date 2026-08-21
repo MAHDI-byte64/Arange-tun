@@ -2,6 +2,22 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.31.1 — 2026-08-21
+
+**The advanced settings are collapsible drawers now.** The create-tunnel form's
+advanced options — previously one long block behind a checkbox — are organised
+the way BackPack asks them, into drawers you open only if you need them:
+
+- **Fine Tune** — the performance knobs (keepalive, heartbeat, pools, mux and
+  KCP windows, MSS, logging) in a tidy two-column grid with a heading for each
+  group, and a note that says changing one marks the tunnel custom.
+- **Connection & limits** — max connections, bandwidth cap and zero-copy.
+- **IP Spoofing** and **Packet carrier** get their own drawers, opened
+  automatically when their transport is chosen.
+
+Each drawer springs open on the same overshoot easing as the settings accordion.
+The field wiring, every value read on submit, and every panel test are unchanged.
+
 ## v1.31.0 — 2026-08-21
 
 **The create-tunnel form is a wizard now.** Rebuilt around the way BackPack asks

@@ -426,6 +426,21 @@
   /* The whole form body reveals once a side is chosen, sliding up into place. */
   #nt-body{animation:rise var(--t-rise) var(--ease-out) both}
   #nt-body[hidden]{display:none}
+  /* The advanced drawers' field layout: a tidy two-column grid, a full-width
+     row for the long ones, a section heading that breaks a long drawer into the
+     groups the CLI asks in, and a soft accent note box for the warnings that
+     belong before a group of questions. Reused by Fine Tune and Connection. */
+  .ftgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .ftgrid .frow.full,.ftgrid .ftsec,.ftgrid .ftnote{grid-column:1/-1}
+  .frow{display:flex;flex-direction:column;gap:6px;margin:0}
+  .frow > label{margin:0;font-size:12px;color:var(--muted)}
+  .frow input,.frow select{margin:0}
+  .ftsec{font-size:12px;font-weight:700;color:var(--txt);padding-top:8px;
+    border-top:1px solid var(--stroke);margin-top:4px}
+  .ftnote{font-size:11.5px;line-height:1.6;color:var(--muted2);
+    padding:9px 11px;border-radius:12px;background:rgba(var(--accent-rgb),.07);
+    border:1px solid rgba(var(--accent-rgb),.18);margin:0}
+  @media (max-width:520px){ .ftgrid{grid-template-columns:1fr} .sides{grid-template-columns:1fr} }
   .toggles{display:flex;gap:14px;flex-wrap:wrap;margin:4px 0 12px}
   /* Scoped to .modal as well, and not by accident: `.modal label` further up
      sets display:block and outranks a bare `.tg`, so inside Settings every one
@@ -1891,91 +1906,130 @@
     <label class="tg" id="nt-sa-row" style="display:none;margin-bottom:14px"><input type="checkbox" id="nt-simpleauth"><span data-i18n>Simple token auth (for a TLS-terminating proxy in front)</span></label>
 
     <!-- Advanced tuning -->
-    <label class="tg" style="margin-bottom:12px"><input type="checkbox" id="nt-adv-on" onchange="ntSync()"><span data-i18n>Fine-tune advanced settings (overrides the preset)</span></label>
-    <div id="nt-advbody" style="display:none">
-      <div class="thresholds" style="grid-template-columns:1fr 1fr">
-        <label>Keepalive (s)<input id="nt-keepalive" type="number" min="0" step="1" placeholder="preset"></label>
-        <label>Heartbeat (s)<input id="nt-heartbeat" type="number" min="0" step="1" placeholder="preset"></label>
-        <label data-i18n>Max connections<input id="nt-maxconn" type="number" min="0" step="1" placeholder="0 = ∞"></label>
-        <label data-i18n>Bandwidth (Mbps)<input id="nt-bw" type="number" min="0" step="1" placeholder="0 = ∞"></label>
-      </div>
-      <label for="nt-nodelay" data-i18n>TCP_NODELAY</label>
-      <select id="nt-nodelay" class="sel"><option value="" data-i18n>Preset default</option><option value="on" data-i18n>On</option><option value="off" data-i18n>Off</option></select>
-      <label for="nt-loglevel" data-i18n>Log level</label>
-      <select id="nt-loglevel" class="sel"><option value="" data-i18n>Preset default</option><option value="info">info</option><option value="debug">debug</option><option value="warn">warn</option><option value="error">error</option></select>
-      <label for="nt-logformat" data-i18n>Log format</label>
-      <select id="nt-logformat" class="sel"><option value="" data-i18n>Preset default</option><option value="text" data-i18n>Human-readable</option><option value="json">JSON</option></select>
+    <!-- Advanced settings, organised the way BackPack asks them: collapsible
+         drawers opened only when needed. The hidden always-on checkbox stays so
+         ntAdvanced and the edit prefill keep reading the same flag. -->
+    <input type="checkbox" id="nt-adv-on" checked hidden>
+    <div id="nt-advbody">
 
-      <div id="nt-adv-server">
-        <label for="nt-channelsize" data-i18n>Channel size</label>
-        <input id="nt-channelsize" type="number" min="0" step="1" placeholder="preset">
-        <label class="tg" id="nt-au-row" style="display:none;margin-bottom:14px"><input type="checkbox" id="nt-acceptudp"><span data-i18n>Accept UDP over the TCP transport</span></label>
-      </div>
-      <div id="nt-adv-client" style="display:none">
-        <label for="nt-connpool" data-i18n>Connection pool size</label>
-        <input id="nt-connpool" type="number" min="0" step="1" placeholder="preset">
-        <label class="tg" style="margin-bottom:14px"><input type="checkbox" id="nt-aggpool"><span data-i18n>Aggressive pool</span></label>
+      <!-- Fine Tune -->
+      <div class="acc">
+        <button class="acch" id="acch-nt-ft" aria-expanded="false" aria-controls="accb-nt-ft" onclick="toggleAcc('nt-ft')">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
+          <span data-i18n>Fine Tune</span><span class="accnote" id="nt-ft-note" data-i18n>preset defaults</span>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="accb" id="accb-nt-ft" hidden>
+          <p class="ftnote" data-i18n>These start on the preset's own values. Change one and the tunnel is marked custom, so a later preset change cannot quietly overwrite it.</p>
+          <div class="ftgrid">
+            <div class="frow"><label for="nt-keepalive">Keepalive (s)</label><input id="nt-keepalive" type="number" min="0" step="1" placeholder="preset"></div>
+            <div class="frow"><label for="nt-heartbeat">Heartbeat (s)</label><input id="nt-heartbeat" type="number" min="0" step="1" placeholder="preset"></div>
+            <div class="frow full"><label for="nt-nodelay" data-i18n>TCP_NODELAY</label>
+              <select id="nt-nodelay" class="sel"><option value="" data-i18n>Preset default</option><option value="on" data-i18n>On</option><option value="off" data-i18n>Off</option></select></div>
+            <div id="nt-adv-server" class="full">
+              <div class="frow"><label for="nt-channelsize" data-i18n>Channel size</label><input id="nt-channelsize" type="number" min="0" step="1" placeholder="preset"></div>
+              <label class="tg" id="nt-au-row" style="display:none;margin-top:12px"><input type="checkbox" id="nt-acceptudp"><span data-i18n>Accept UDP over the TCP transport</span></label>
+            </div>
+            <div id="nt-adv-client" class="full" style="display:none">
+              <div class="frow"><label for="nt-connpool" data-i18n>Connection pool size</label><input id="nt-connpool" type="number" min="0" step="1" placeholder="preset"></div>
+              <label class="tg" style="margin-top:12px"><input type="checkbox" id="nt-aggpool"><span data-i18n>Aggressive pool</span></label>
+            </div>
+            <div id="nt-adv-mss" class="full" style="display:none">
+              <div class="frow"><label for="nt-mss" data-i18n>TCP MSS clamp</label><input id="nt-mss" type="number" min="0" step="1" placeholder="0 = off"></div>
+              <p class="hint" style="margin:8px 0 0;font-size:11.5px;color:var(--muted2)" data-i18n>Only for a path that silently drops full-sized packets — Health Check reports the value. Set the same number on both ends. Leave 0 unless told otherwise.</p>
+            </div>
+            <div id="nt-adv-mux" class="full" style="display:none">
+              <p class="ftsec">Mux</p>
+              <div class="ftgrid" style="margin-top:12px">
+                <div class="frow"><label data-i18n>Connections</label><input id="nt-muxcon" type="number" min="0" step="1" placeholder="preset"></div>
+                <div class="frow"><label data-i18n>Version</label><input id="nt-muxver" type="number" min="0" step="1" placeholder="preset"></div>
+                <div class="frow"><label data-i18n>Frame size</label><input id="nt-muxframe" type="number" min="0" step="1" placeholder="preset"></div>
+                <div class="frow"><label data-i18n>Recv buffer</label><input id="nt-muxrecv" type="number" min="0" step="1" placeholder="preset"></div>
+                <div class="frow"><label data-i18n>Stream buffer</label><input id="nt-muxstream" type="number" min="0" step="1" placeholder="preset"></div>
+              </div>
+            </div>
+            <div id="nt-adv-kcp" class="full" style="display:none">
+              <p class="ftsec">KCP</p>
+              <div class="ftgrid" style="margin-top:12px">
+                <div class="frow"><label data-i18n>MTU</label><input id="nt-kcpmtu" type="number" min="0" step="1" placeholder="preset"></div>
+                <div class="frow"><label data-i18n>Interval (ms)</label><input id="nt-kcpint" type="number" min="0" step="1" placeholder="preset"></div>
+                <div class="frow"><label data-i18n>Send window</label><input id="nt-kcpsnd" type="number" min="0" step="1" placeholder="preset"></div>
+                <div class="frow"><label data-i18n>Recv window</label><input id="nt-kcprcv" type="number" min="0" step="1" placeholder="preset"></div>
+                <div class="frow"><label data-i18n>FEC data</label><input id="nt-kcpdata" type="number" min="0" step="1" placeholder="preset"></div>
+                <div class="frow"><label data-i18n>FEC parity</label><input id="nt-kcpparity" type="number" min="0" step="1" placeholder="preset"></div>
+              </div>
+            </div>
+            <div class="frow"><label for="nt-loglevel" data-i18n>Log level</label>
+              <select id="nt-loglevel" class="sel"><option value="" data-i18n>Preset default</option><option value="info">info</option><option value="debug">debug</option><option value="warn">warn</option><option value="error">error</option></select></div>
+            <div class="frow"><label for="nt-logformat" data-i18n>Log format</label>
+              <select id="nt-logformat" class="sel"><option value="" data-i18n>Preset default</option><option value="text" data-i18n>Human-readable</option><option value="json">JSON</option></select></div>
+          </div>
+        </div>
       </div>
 
-      <div id="nt-adv-mss" style="display:none">
-        <label for="nt-mss" data-i18n>TCP MSS clamp</label>
-        <input id="nt-mss" type="number" min="0" step="1" placeholder="0 = off">
-        <p class="hint" style="margin:2px 0 12px;font-size:11.5px;color:var(--muted2)" data-i18n>Only for a path that silently drops full-sized packets — Health Check reports the value. Set the same number on both ends. Leave 0 unless told otherwise.</p>
+      <!-- Connection & limits -->
+      <div class="acc">
+        <button class="acch" id="acch-nt-cl" aria-expanded="false" aria-controls="accb-nt-cl" onclick="toggleAcc('nt-cl')">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0114 0M8.5 16.05a6 6 0 017 0M2 9.05a16 16 0 0120 0M12 20h.01"/></svg>
+          <span data-i18n>Connection &amp; limits</span><span class="accnote" data-i18n>optional</span>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="accb" id="accb-nt-cl" hidden>
+          <p class="ftnote" data-i18n>Caps for this tunnel as a whole — useful when several services share one link. 0 means no limit, and both start there.</p>
+          <div class="ftgrid">
+            <div class="frow"><label for="nt-maxconn" data-i18n>Max connections</label><input id="nt-maxconn" type="number" min="0" step="1" placeholder="0 = ∞"></div>
+            <div class="frow"><label for="nt-bw" data-i18n>Bandwidth (Mbps)</label><input id="nt-bw" type="number" min="0" step="1" placeholder="0 = ∞"></div>
+          </div>
+          <label class="tg" id="nt-zc-row" style="display:none;margin-top:12px"><input type="checkbox" id="nt-zerocopy"><span data-i18n>Zero-copy forwarding (experimental)</span></label>
+        </div>
       </div>
 
-      <div id="nt-adv-mux" style="display:none">
-        <p class="acclabel" style="margin-bottom:8px">Mux</p>
-        <div class="thresholds" style="grid-template-columns:1fr 1fr">
-          <label>Connections<input id="nt-muxcon" type="number" min="0" step="1" placeholder="preset"></label>
-          <label>Version<input id="nt-muxver" type="number" min="0" step="1" placeholder="preset"></label>
-          <label>Frame size<input id="nt-muxframe" type="number" min="0" step="1" placeholder="preset"></label>
-          <label>Recv buffer<input id="nt-muxrecv" type="number" min="0" step="1" placeholder="preset"></label>
-          <label>Stream buffer<input id="nt-muxstream" type="number" min="0" step="1" placeholder="preset"></label>
+      <!-- IP Spoofing carrier -->
+      <div class="acc" id="nt-adv-spoof" style="display:none">
+        <button class="acch" id="acch-nt-sp" aria-expanded="false" aria-controls="accb-nt-sp" onclick="toggleAcc('nt-sp')">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M12 2l7 4v6c0 5-3 8-7 10-4-2-7-5-7-10V6l7-4z"/><path d="M9 12l2 2 4-4"/></svg>
+          <span data-i18n>IP Spoofing</span><span class="accnote" data-i18n>carrier settings</span>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="accb" id="accb-nt-sp" hidden>
+          <p class="ftnote" data-i18n>Experimental. Forges the source of raw IP packets — only carries traffic where the network does not drop forged-source packets. Both ends must use the same profile. Needs root; prove it with the CLI's spoof tester.</p>
+          <label for="nt-spoofprofile" data-i18n>Packet profile (both ends must match)</label>
+          <select id="nt-spoofprofile" class="sel">
+            <option value="udp" data-i18n>UDP — most compatible (recommended)</option>
+            <option value="icmp" data-i18n>ICMP — looks like ping, for paths that filter UDP</option>
+            <option value="tcp" data-i18n>TCP — looks like a TCP flow (auto RST-drop rule)</option>
+          </select>
+          <label for="nt-spoofsrc" data-i18n>Forged source IP(s) — comma-separated to rotate a pool</label>
+          <input id="nt-spoofsrc" type="text" autocomplete="off" spellcheck="false" placeholder="203.0.113.7, 203.0.113.8">
+          <div id="nt-spoofpeer-row">
+            <label for="nt-spoofpeer" data-i18n>Client's real IPv4 (required on the server side)</label>
+            <input id="nt-spoofpeer" type="text" autocomplete="off" spellcheck="false" placeholder="198.51.100.5">
+          </div>
+          <label for="nt-spoofiface" data-i18n>Egress interface (optional)</label>
+          <input id="nt-spoofiface" type="text" autocomplete="off" spellcheck="false" placeholder="eth0">
+          <label class="tg" style="margin:6px 0 8px"><input type="checkbox" id="nt-spoofpipe" onchange="ntSync()"><span data-i18n>WireGuard pipe mode (carry a WireGuard VPN instead of forwarding ports)</span></label>
+          <div id="nt-spoofpipeaddr-row" style="display:none">
+            <label for="nt-spoofpipeaddr" data-i18n>WireGuard UDP endpoint on this host</label>
+            <input id="nt-spoofpipeaddr" type="text" autocomplete="off" spellcheck="false" placeholder="127.0.0.1:51820">
+          </div>
         </div>
       </div>
-      <div id="nt-adv-kcp" style="display:none">
-        <p class="acclabel" style="margin-bottom:8px">KCP</p>
-        <div class="thresholds" style="grid-template-columns:1fr 1fr">
-          <label>MTU<input id="nt-kcpmtu" type="number" min="0" step="1" placeholder="preset"></label>
-          <label>Interval (ms)<input id="nt-kcpint" type="number" min="0" step="1" placeholder="preset"></label>
-          <label>Send window<input id="nt-kcpsnd" type="number" min="0" step="1" placeholder="preset"></label>
-          <label>Recv window<input id="nt-kcprcv" type="number" min="0" step="1" placeholder="preset"></label>
-          <label>FEC data<input id="nt-kcpdata" type="number" min="0" step="1" placeholder="preset"></label>
-          <label>FEC parity<input id="nt-kcpparity" type="number" min="0" step="1" placeholder="preset"></label>
+
+      <!-- Packet carrier -->
+      <div class="acc" id="nt-adv-pck" style="display:none">
+        <button class="acch" id="acch-nt-pk" aria-expanded="false" aria-controls="accb-nt-pk" onclick="toggleAcc('nt-pk')">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>
+          <span data-i18n>Packet carrier</span><span class="accnote" data-i18n>egress &amp; flags</span>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="accb" id="accb-nt-pk" hidden>
+          <p class="ftnote" data-i18n>Carries the tunnel inside crafted TCP segments with no kernel socket behind them — a TCP flow on the wire, for a path that resets or throttles ordinary TCP. Needs root; it installs a firewall rule so the host does not RST its own flow. The fields below are optional — the carrier finds its own egress.</p>
+          <label for="nt-pckiface" data-i18n>Egress interface (optional)</label>
+          <input id="nt-pckiface" type="text" autocomplete="off" spellcheck="false" placeholder="eth0">
+          <label for="nt-pckgw" data-i18n>Next-hop MAC (optional — only if the kernel's is wrong)</label>
+          <input id="nt-pckgw" type="text" autocomplete="off" spellcheck="false" placeholder="aa:bb:cc:dd:ee:ff">
         </div>
       </div>
-      <div id="nt-adv-spoof" style="display:none">
-        <p class="acclabel" style="margin-bottom:8px" data-i18n>IP Spoofing (raw forged-source packets)</p>
-        <p class="hint" style="margin:-4px 0 10px;font-size:11.5px;color:var(--muted2)" data-i18n>Experimental. Forges the source of raw IP packets — only carries traffic where the network does not drop forged-source packets. Both ends must use the same profile. Needs root; prove it with the CLI's spoof tester.</p>
-        <label for="nt-spoofprofile" data-i18n>Packet profile (both ends must match)</label>
-        <select id="nt-spoofprofile" class="sel">
-          <option value="udp" data-i18n>UDP — most compatible (recommended)</option>
-          <option value="icmp" data-i18n>ICMP — looks like ping, for paths that filter UDP</option>
-          <option value="tcp" data-i18n>TCP — looks like a TCP flow (auto RST-drop rule)</option>
-        </select>
-        <label for="nt-spoofsrc" data-i18n>Forged source IP(s) — comma-separated to rotate a pool</label>
-        <input id="nt-spoofsrc" type="text" autocomplete="off" spellcheck="false" placeholder="203.0.113.7, 203.0.113.8">
-        <div id="nt-spoofpeer-row">
-          <label for="nt-spoofpeer" data-i18n>Client's real IPv4 (required on the server side)</label>
-          <input id="nt-spoofpeer" type="text" autocomplete="off" spellcheck="false" placeholder="198.51.100.5">
-        </div>
-        <label for="nt-spoofiface" data-i18n>Egress interface (optional)</label>
-        <input id="nt-spoofiface" type="text" autocomplete="off" spellcheck="false" placeholder="eth0">
-        <label class="tg" style="margin:6px 0 8px"><input type="checkbox" id="nt-spoofpipe" onchange="ntSync()"><span data-i18n>WireGuard pipe mode (carry a WireGuard VPN instead of forwarding ports)</span></label>
-        <div id="nt-spoofpipeaddr-row" style="display:none">
-          <label for="nt-spoofpipeaddr" data-i18n>WireGuard UDP endpoint on this host</label>
-          <input id="nt-spoofpipeaddr" type="text" autocomplete="off" spellcheck="false" placeholder="127.0.0.1:51820">
-        </div>
-      </div>
-      <div id="nt-adv-pck" style="display:none">
-        <p class="acclabel" style="margin-bottom:8px" data-i18n>TCP + PCK (hand-built TCP through a packet socket)</p>
-        <p class="hint" style="margin:-4px 0 10px;font-size:11.5px;color:var(--muted2)" data-i18n>Carries the tunnel inside crafted TCP segments with no kernel socket behind them — a TCP flow on the wire, for a path that resets or throttles ordinary TCP. Needs root; it installs a firewall rule so the host does not RST its own flow. The fields below are optional — the carrier finds its own egress.</p>
-        <label for="nt-pckiface" data-i18n>Egress interface (optional)</label>
-        <input id="nt-pckiface" type="text" autocomplete="off" spellcheck="false" placeholder="eth0">
-        <label for="nt-pckgw" data-i18n>Next-hop MAC (optional — only if the kernel's is wrong)</label>
-        <input id="nt-pckgw" type="text" autocomplete="off" spellcheck="false" placeholder="aa:bb:cc:dd:ee:ff">
-      </div>
-      <label class="tg" id="nt-zc-row" style="display:none;margin-bottom:14px"><input type="checkbox" id="nt-zerocopy"><span data-i18n>Zero-copy forwarding (experimental)</span></label>
     </div>
 
     <div class="msg" id="nt-msg"></div>
@@ -2383,6 +2437,26 @@ const FA={
   "KCP inside hand-built TCP through a packet socket — a TCP flow with no kernel socket behind it, for a path that resets ordinary TCP. Linux, root.":"KCP داخل TCP دست‌ساز از طریق سوکت پکتی — جریان TCP بدون سوکت کرنل، برای مسیری که TCP معمولی را ریست می‌کند. لینوکس، root.",
   "Transport":"ترنسپورت",
   "Performance preset":"پیش‌تنظیم کارایی",
+  "Fine Tune":"تنظیم دقیق",
+  "preset defaults":"پیش‌فرض‌های پروفایل",
+  "These start on the preset's own values. Change one and the tunnel is marked custom, so a later preset change cannot quietly overwrite it.":"این‌ها از مقادیر خودِ پروفایل شروع می‌شوند. یکی را تغییر بده و تانل «سفارشی» علامت می‌خورد، تا تغییر بعدیِ پروفایل نتواند بی‌صدا رونویسی‌اش کند.",
+  "Connections":"اتصال‌ها",
+  "Frame size":"اندازهٔ فریم",
+  "Recv buffer":"بافر دریافت",
+  "Stream buffer":"بافر جریان",
+  "MTU":"MTU",
+  "Interval (ms)":"بازه (میلی‌ثانیه)",
+  "Send window":"پنجرهٔ ارسال",
+  "Recv window":"پنجرهٔ دریافت",
+  "FEC data":"دادهٔ FEC",
+  "FEC parity":"پریتی FEC",
+  "Connection &amp; limits":"اتصال و محدودیت‌ها",
+  "optional":"اختیاری",
+  "Caps for this tunnel as a whole — useful when several services share one link. 0 means no limit, and both start there.":"سقف برای کل این تانل — وقتی چند سرویس یک لینک را share می‌کنند مفید است. ۰ یعنی بدون محدودیت، و هر دو از همان‌جا شروع می‌شوند.",
+  "IP Spoofing":"IP Spoofing",
+  "carrier settings":"تنظیمات کریِر",
+  "Packet carrier":"کریِر پکتی",
+  "egress &amp; flags":"خروجی و فلگ‌ها",
   "Balance — light on CPU/RAM":"متعادل — کم‌مصرف برای CPU/RAM",
   "Turbo — recommended":"توربو — پیشنهادی",
   "Aggressive — maximum gaming headroom":"تهاجمی — بیشترین فضای بازی",
@@ -3778,7 +3852,10 @@ function openNewTunnel(){
    'nt-connpool','nt-muxcon','nt-muxver','nt-muxframe','nt-muxrecv','nt-muxstream',
    'nt-kcpmtu','nt-kcpint','nt-kcpsnd','nt-kcprcv','nt-kcpdata','nt-kcpparity','nt-mss',
    'nt-spoofsrc','nt-spoofpeer','nt-spoofiface','nt-spoofpipeaddr','nt-pckiface','nt-pckgw'].forEach(id=>{ if($(id)) $(id).value=''; });
-  ['nt-ipv6','nt-pp','nt-lb','nt-hf','nt-simpleauth','nt-adv-on','nt-acceptudp','nt-aggpool','nt-zerocopy','nt-spoofpipe'].forEach(id=>{ if($(id)) $(id).checked=false; });
+  ['nt-ipv6','nt-pp','nt-lb','nt-hf','nt-simpleauth','nt-acceptudp','nt-aggpool','nt-zerocopy','nt-spoofpipe'].forEach(id=>{ if($(id)) $(id).checked=false; });
+  // The advanced drawers are always available now; the hidden flag stays on and
+  // the drawers start collapsed on every open.
+  ['nt-ft','nt-cl','nt-sp','nt-pk'].forEach(id=>{ if($('accb-'+id)) closeAcc(id); });
   if($('nt-spoofprofile')) $('nt-spoofprofile').value='udp';
   $('nt-role').value='server'; $('nt-transport').value='tcp'; $('nt-preset').value='turbo';
   $('nt-tlsmode').value='self'; $('nt-nodelay').value=''; $('nt-loglevel').value=''; $('nt-logformat').value='';
@@ -3887,10 +3964,13 @@ function ntUpdateTdesc(){
 
 function ntRoleChange(){ ntSync(); ntSuggestName(); }
 function ntTransportChange(){
-  // Spoof's forged-source settings live in the advanced section but are not
-  // optional (the server needs the peer IP), so open it automatically.
-  if($('nt-transport').value==='spoof') $('nt-adv-on').checked=true;
   ntSync();
+  // Spoof's forged-source settings are not optional (the server needs the peer
+  // IP), and the packet carrier is worth surfacing, so open their drawer as soon
+  // as the transport is chosen rather than leaving it collapsed.
+  const tr=$('nt-transport').value;
+  if(tr==='spoof') openAcc('nt-sp');
+  else if(tr==='pck') openAcc('nt-pk');
 }
 
 // ntSuggestName fills a default name from the port, but never overwrites a name
@@ -3906,7 +3986,7 @@ function ntSuggestName(){
 // ntSync shows only the rows that apply to the current side and transport,
 // matching what the CLI would prompt for.
 function ntSync(){
-  const role=$('nt-role').value, tr=$('nt-transport').value, adv=$('nt-adv-on').checked;
+  const role=$('nt-role').value, tr=$('nt-transport').value;
   ntSyncSideCards();
   ntUpdateTdesc();
   $('nt-server').style.display=role==='server'?'':'none';
@@ -3957,8 +4037,8 @@ function ntSync(){
     if(!ntIsKCP(tr) && $('nt-preset').value==='throughput') $('nt-preset').value='turbo';
   }
 
-  // Advanced blocks track the same predicates.
-  $('nt-advbody').style.display=adv?'':'none';
+  // Advanced blocks track the same predicates. The drawers are always present
+  // now (collapsed); only their per-side/per-transport contents come and go.
   $('nt-adv-server').style.display=role==='server'?'':'none';
   $('nt-adv-client').style.display=role==='client'?'':'none';
   $('nt-au-row').style.display=(role==='server'&&tr==='tcp')?'':'none';
