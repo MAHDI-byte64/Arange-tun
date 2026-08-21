@@ -2,6 +2,28 @@
 
 All notable changes to Arange-tun are documented here.
 
+## v1.30.1 — 2026-08-21
+
+**Panel redesign, section by section.** A deeper pass over the whole panel on top
+of the v1.29.0 palette refresh — every section reworked to read as one premium
+material:
+
+- **Ring gauges** now glow softly in the accent, with bolder value type — a lit
+  instrument rather than a flat gauge.
+- **Stat pills** carry a gradient icon chip with an inset highlight and a soft
+  accent glow; values are heavier and tighter.
+- **Brand mark, menu avatar and the support button** are brighter and glossier.
+- **Every secondary control** (buttons, menu rows, the log filter, chooser
+  cards) catches the same hairline of light on its top edge, and **text fields**
+  sit in a subtly recessed well — raised buttons over inset inputs, one material
+  throughout.
+- **Dialogs, the slide-in menu and the log drawer** gained the lit top rim and a
+  faint top sheen.
+- **Section headers** are larger and tighter; the tunnel count is an accent chip.
+
+No structural or behavioural change — the single-theme, one-accent, green-means-
+online design and every panel test are preserved.
+
 ## v1.30.0 — 2026-08-21
 
 **New transport: TCP + PCK.** A fourth raw-packet carrier joins xDi (ICMP) and
